@@ -9,8 +9,8 @@ const supabaseClient = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KE
 // ── Role-based redirect ───────────────────────────
 function redirectByRole(role) {
     const redirects = {
-        admin:    '/pages/admin/admin-home.html',
-        partner:  '/pages/dashboard/partner-home.html',
+        admin:    '/pages/admin/dashboard.html',
+        partner:  '/pages/partner/dashboard.html',
         customer: '/pages/browse/cars.html'
     };
     window.location.href = redirects[role] || '/pages/browse/cars.html';
@@ -124,7 +124,8 @@ async function logout() {
 }
 
 // ── Guard: redirect if not logged in ─────────────
-async function requireAuth() {
+// roles (optional): array of allowed roles e.g. ['partner','admin']
+async function requireAuth(roles = null) {
     const token = localStorage.getItem('sakyan_token');
     if (!token) {
         window.location.href = '/pages/auth/login.html';
@@ -136,18 +137,17 @@ async function requireAuth() {
         window.location.href = '/pages/auth/login.html';
         return null;
     }
+    if (roles && !roles.includes(user.role)) {
+        // Wrong role — redirect to correct dashboard
+        redirectByRole(user.role);
+        return null;
+    }
     return user;
 }
 
 // ── Guard: redirect if not specific role ──────────
 async function requireRole(role) {
-    const user = await requireAuth();
-    if (!user) return null;
-    if (user.role !== role) {
-        redirectByRole(user.role);
-        return null;
-    }
-    return user;
+    return requireAuth([role]);
 }
 
 // ── Auto-restore session on page load ─────────────
