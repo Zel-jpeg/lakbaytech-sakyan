@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Become a Partner — Sakyan</title>
+  <meta name="description" content="List your car on Sakyan and start earning. Free to join, no monthly fees."/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root { --red: #e63946; --dark: #1a1a2e; }
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #f8f9fa; }
+    .sakyan-nav { background: white; box-shadow: 0 1px 12px rgba(0,0,0,.07); position: sticky; top: 0; z-index: 1000; }
+    .navbar-brand { font-size: 1.4rem; font-weight: 800; color: var(--dark) !important; }
+    .navbar-brand span { color: var(--red); }
+
+    .hero-banner { background: linear-gradient(135deg, var(--dark) 0%, #16213e 100%); color: white; padding: 60px 0; }
+    .hero-banner h1 { font-size: 2.2rem; font-weight: 800; }
+
+    .perk-card { background: white; border-radius: 14px; padding: 24px; border: 1px solid #f1f3f5; box-shadow: 0 2px 8px rgba(0,0,0,.05); height: 100%; }
+    .perk-icon { font-size: 2rem; margin-bottom: 12px; }
+    .perk-card h5 { font-weight: 700; color: var(--dark); }
+
+    .form-card { background: white; border-radius: 16px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .form-card h4 { font-weight: 800; color: var(--dark); margin-bottom: 4px; }
+    .form-label { font-weight: 500; font-size: .88rem; color: #495057; }
+    .form-control:focus, .form-select:focus { border-color: var(--red); box-shadow: 0 0 0 .2rem rgba(230,57,70,.12); }
+    .btn-sakyan { background: var(--red); color: white; font-weight: 600; border: none; border-radius: 8px; }
+    .btn-sakyan:hover { background: #c1121f; color: white; }
+    .step-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--red); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; flex-shrink: 0; }
+    .upload-zone { border: 2px dashed #dee2e6; border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: border-color .2s; }
+    .upload-zone:hover { border-color: var(--red); }
+    .upload-zone input { display: none; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar sakyan-nav navbar-expand-lg py-3">
+  <div class="container">
+    <a class="navbar-brand" href="/public/index.html">🚗 Sak<span>yan</span></a>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary btn-sm" href="/pages/auth/login.html">Sign In</a>
+      <a class="btn btn-sakyan btn-sm" href="/pages/auth/register.html">Sign Up</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="hero-banner">
+  <div class="container text-center">
+    <div class="mb-3" style="font-size:3rem">🚗</div>
+    <h1>Start Earning with Your Car</h1>
+    <p class="mt-2" style="color:rgba(255,255,255,.75);max-width:520px;margin:12px auto 0">List your car for free on Sakyan. We connect you with trusted renters across the Philippines.</p>
+  </div>
+</div>
+
+<!-- Perks -->
+<section class="py-5 bg-white">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="perk-card">
+          <div class="perk-icon">✅</div>
+          <h5>Free to List</h5>
+          <p class="text-muted mb-0" style="font-size:.88rem">No monthly fees. No subscription. List your cars at zero cost and only pay when you earn.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="perk-card">
+          <div class="perk-icon">🔒</div>
+          <h5>You're in Control</h5>
+          <p class="text-muted mb-0" style="font-size:.88rem">Review customer IDs before approving. Set your own price. Approve or reject any booking.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="perk-card">
+          <div class="perk-icon">💰</div>
+          <h5>Earn on Your Terms</h5>
+          <p class="text-muted mb-0" style="font-size:.88rem">You set your price per day. We collect 8–12% commission — only from completed bookings.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Application Form -->
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-7">
+        <div id="success-state" class="d-none text-center py-5">
+          <div style="font-size:4rem">🎉</div>
+          <h3 class="fw-700 mt-3" style="font-weight:700">Application Submitted!</h3>
+          <p class="text-muted">Our team will review your application within 24–48 hours. You'll receive a notification once approved.</p>
+          <a href="/public/index.html" class="btn btn-sakyan px-4">Back to Home</a>
+        </div>
+
+        <div id="form-state">
+          <div class="form-card">
+            <h4>Partner Application</h4>
+            <p class="text-muted mb-4" style="font-size:.9rem">Fill out the form below. Approval usually takes 24–48 hours.</p>
+
+            <form id="apply-form" onsubmit="submitApplication(event)">
+              <!-- Step 1: Account -->
+              <div class="d-flex gap-3 align-items-center mb-3">
+                <div class="step-dot">1</div>
+                <h6 class="mb-0 fw-700" style="font-weight:700">Account & Business Info</h6>
+              </div>
+              <div class="row g-3 mb-4 ms-1 ps-3" style="border-left:2px solid #f1f3f5">
+                <div class="col-12">
+                  <label class="form-label">Business / Rental Name *</label>
+                  <input type="text" id="business-name" class="form-control" placeholder="e.g. Juan's Car Rentals" required/>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Partner Type *</label>
+                  <select id="partner-type" class="form-select" required>
+                    <option value="">Select...</option>
+                    <option value="individual">Individual Owner</option>
+                    <option value="company">Company / Fleet Owner</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Contact Person *</label>
+                  <input type="text" id="contact-person" class="form-control" placeholder="Full name" required/>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Contact Number *</label>
+                  <input type="tel" id="contact-phone" class="form-control" placeholder="09XXXXXXXXX" required/>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Business Address *</label>
+                  <input type="text" id="business-address" class="form-control" placeholder="City, Province" required/>
+                </div>
+              </div>
+
+              <!-- Step 2: Documents -->
+              <div class="d-flex gap-3 align-items-center mb-3">
+                <div class="step-dot">2</div>
+                <h6 class="mb-0 fw-700" style="font-weight:700">Verification Documents</h6>
+              </div>
+              <div class="row g-3 ms-1 ps-3" style="border-left:2px solid #f1f3f5">
+                <div class="col-md-6">
+                  <label class="form-label">Government ID *</label>
+                  <div class="upload-zone" onclick="document.getElementById('gov-id').click()">
+                    <input type="file" id="gov-id" accept="image/*,application/pdf"/>
+                    <div>📎 Upload Gov't ID</div>
+                    <small class="text-muted">Driver's License, PhilSys, Passport</small>
+                    <div id="gov-id-name" class="mt-1 text-success fw-600" style="font-size:.82rem"></div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Business Permit <small class="text-muted">(if company)</small></label>
+                  <div class="upload-zone" onclick="document.getElementById('biz-permit').click()">
+                    <input type="file" id="biz-permit" accept="image/*,application/pdf"/>
+                    <div>📎 Upload Business Permit</div>
+                    <small class="text-muted">Optional for individual</small>
+                    <div id="biz-permit-name" class="mt-1 text-success fw-600" style="font-size:.82rem"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 p-3 rounded" style="background:#f8f9fa;font-size:.82rem;color:#6c757d">
+                By submitting, you agree to our Partner Terms of Service and commission structure (8–12% on completed bookings, admin-set).
+              </div>
+
+              <button type="submit" id="submit-btn" class="btn btn-sakyan w-100 btn-lg mt-4">Submit Application →</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/public/assets/js/config.js"></script>
+<script src="/public/assets/js/utils.js"></script>
+<script src="/public/assets/js/api.js"></script>
+<script src="/public/assets/js/auth.js"></script>
+<script>
+  // Show filename on file select
+  document.getElementById('gov-id').addEventListener('change', function() {
+    document.getElementById('gov-id-name').textContent = this.files[0]?.name ?? '';
+  });
+  document.getElementById('biz-permit').addEventListener('change', function() {
+    document.getElementById('biz-permit-name').textContent = this.files[0]?.name ?? '';
+  });
+
+  async function uploadDoc(file, bucket) {
+    if (!file) return null;
+    const { createClient } = supabase;
+    const sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    const fileName = `${bucket}/${Date.now()}-${file.name}`;
+    const { data, error } = await sb.storage.from('documents').upload(fileName, file);
+    if (error) throw new Error('Upload failed: ' + error.message);
+    const { data: urlData } = sb.storage.from('documents').getPublicUrl(fileName);
+    return urlData.publicUrl;
+  }
+
+  async function submitApplication(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+
+    const govIdFile = document.getElementById('gov-id').files[0];
+    if (!govIdFile) { showToast('Please upload your Government ID.', 'warning'); return; }
+
+    setButtonLoading(btn, true, 'Submitting…');
+    showLoader();
+    try {
+      // Ensure user is logged in
+      const user = await requireAuth();
+      if (!user) return;
+
+      const [govIdUrl, bizUrl] = await Promise.all([
+        uploadDoc(govIdFile, 'gov-id'),
+        uploadDoc(document.getElementById('biz-permit').files[0], 'biz-permit'),
+      ]);
+
+      await api.post('/partners/apply', {
+        business_name:       document.getElementById('business-name').value,
+        partner_type:        document.getElementById('partner-type').value,
+        contact_person:      document.getElementById('contact-person').value,
+        contact_phone:       document.getElementById('contact-phone').value,
+        business_address:    document.getElementById('business-address').value,
+        government_id_url:   govIdUrl,
+        business_permit_url: bizUrl,
+      });
+
+      document.getElementById('form-state').classList.add('d-none');
+      document.getElementById('success-state').classList.remove('d-none');
+    } catch(err) {
+      showToast('Error: ' + err.message, 'danger');
+    } finally {
+      hideLoader();
+      setButtonLoading(btn, false, 'Submit Application →');
+    }
+  }
+</script>
+</body>
+</html>
