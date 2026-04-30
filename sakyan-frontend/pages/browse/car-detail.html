@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Car Details — Sakyan</title>
+  <meta name="description" content="View full specs, photos, and book this rental car on Sakyan."/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root { --red: #e63946; --dark: #1a1a2e; }
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #f8f9fa; }
+    .sakyan-nav { background: white; box-shadow: 0 1px 12px rgba(0,0,0,.07); position: sticky; top: 0; z-index: 1000; }
+    .navbar-brand { font-size: 1.4rem; font-weight: 800; color: var(--dark) !important; }
+    .navbar-brand span { color: var(--red); }
+    .btn-sakyan { background: var(--red); color: white; font-weight: 600; border-radius: 8px; border: none; }
+    .btn-sakyan:hover { background: #c1121f; color: white; }
+    .btn-outline-sakyan { border: 1.5px solid var(--red); color: var(--red); font-weight: 600; border-radius: 8px; }
+    .btn-outline-sakyan:hover { background: var(--red); color: white; }
+
+    /* Image gallery */
+    .main-image { width: 100%; height: 380px; object-fit: cover; border-radius: 14px; cursor: pointer; }
+    .thumb-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+    .thumb { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; cursor: pointer; opacity: .7; transition: opacity .2s; border: 2px solid transparent; }
+    .thumb:hover, .thumb.active { opacity: 1; border-color: var(--red); }
+
+    /* Detail card */
+    .detail-card { background: white; border-radius: 14px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,.06); border: 1px solid #f1f3f5; }
+    .price-tag { font-size: 2rem; font-weight: 800; color: var(--red); }
+    .price-tag span { font-size: 1rem; font-weight: 400; color: #6c757d; }
+    .spec-badge { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 10px 14px; text-align: center; }
+    .spec-badge .icon { font-size: 1.2rem; }
+    .spec-badge .label { font-size: .72rem; color: #6c757d; margin-top: 2px; }
+    .spec-badge .value { font-size: .88rem; font-weight: 600; color: var(--dark); }
+    .feature-chip { background: #f1f8ff; border: 1px solid #cce5ff; color: #0066cc; border-radius: 20px; padding: 4px 12px; font-size: .8rem; font-weight: 500; }
+
+    /* Booking summary box */
+    .book-box { background: white; border-radius: 14px; padding: 24px; box-shadow: 0 2px 16px rgba(0,0,0,.08); border: 1px solid #f1f3f5; position: sticky; top: 80px; }
+    .book-box .form-control:focus { border-color: var(--red); box-shadow: 0 0 0 .2rem rgba(230,57,70,.12); }
+    .total-line { display: flex; justify-content: space-between; font-size: .9rem; padding: 6px 0; color: #495057; }
+    .total-line.grand { font-weight: 800; font-size: 1.05rem; color: var(--dark); border-top: 1px solid #f1f3f5; padding-top: 12px; margin-top: 4px; }
+    .booking-note { font-size: .8rem; color: #6c757d; }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar sakyan-nav navbar-expand-lg py-3">
+  <div class="container">
+    <a class="navbar-brand" href="/public/index.html">🚗 Sak<span>yan</span></a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto align-items-center gap-2">
+        <li class="nav-item"><a class="nav-link" href="/pages/browse/cars.html">← Back to Browse</a></li>
+        <li class="nav-item" id="auth-buttons">
+          <a class="btn btn-outline-sakyan me-2" href="/pages/auth/login.html">Sign In</a>
+          <a class="btn btn-sakyan" href="/pages/auth/register.html">Sign Up</a>
+        </li>
+        <li class="nav-item d-none" id="user-menu">
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" id="user-name-btn">My Account</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="/pages/booking/my-bookings.html">My Bookings</a></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="logout()">Sign Out</a></li>
+            </ul>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4" id="car-page">
+  <div class="d-flex justify-content-center py-5">
+    <div class="spinner-border" style="color:var(--red)" role="status"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/public/assets/js/config.js"></script>
+<script src="/public/assets/js/utils.js"></script>
+<script src="/public/assets/js/api.js"></script>
+<script src="/public/assets/js/auth.js"></script>
+<script>
+  const carId = new URLSearchParams(window.location.search).get('id');
+  let currentCar = null;
+  let bookingFee = 100;
+
+  async function init() {
+    if (!carId) { window.location.href = '/pages/browse/cars.html'; return; }
+
+    try {
+      // Load car + booking fee in parallel
+      const [carRes, feeRes] = await Promise.all([
+        api.get('/cars/' + carId),
+        api.get('/bookings/fee')
+      ]);
+      currentCar = carRes.data;
+      bookingFee = feeRes.data?.booking_fee ?? 100;
+      renderPage();
+    } catch (err) {
+      document.getElementById('car-page').innerHTML = `<div class="text-center py-5"><h4>Car not found</h4><a href="/pages/browse/cars.html" class="btn btn-sakyan">Back to Browse</a></div>`;
+    }
+
+    // Auth nav
+    const token = localStorage.getItem('sakyan_token');
+    if (token) {
+      try {
+        const user = await fetchMe();
+        if (user) {
+          document.getElementById('auth-buttons').classList.add('d-none');
+          document.getElementById('user-menu').classList.remove('d-none');
+          document.getElementById('user-name-btn').textContent = user.full_name?.split(' ')[0] || 'Account';
+        }
+      } catch {}
+    }
+  }
+
+  function renderPage() {
+    const car = currentCar;
+    const images = car.images?.length ? car.images : [{ image_url: 'https://via.placeholder.com/800x400?text=No+Photo' }];
+    const features = car.features || [];
+    const today = new Date().toISOString().split('T')[0];
+
+    document.title = `${car.name} — Sakyan`;
+    document.getElementById('car-page').innerHTML = `
+      <nav class="mb-3" aria-label="breadcrumb" style="font-size:.85rem">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><a href="/public/index.html" style="color:var(--red)">Home</a></li>
+          <li class="breadcrumb-item"><a href="/pages/browse/cars.html" style="color:var(--red)">Cars</a></li>
+          <li class="breadcrumb-item active">${car.name}</li>
+        </ol>
+      </nav>
+
+      <div class="row g-4">
+        <!-- LEFT: Images + Details -->
+        <div class="col-lg-7">
+          <!-- Image gallery -->
+          <img id="main-img" src="${images[0].image_url}" alt="${car.name}" class="main-image"/>
+          <div class="thumb-grid">
+            ${images.slice(0,4).map((img, i) => `
+              <img src="${img.image_url}" class="thumb ${i===0?'active':''}"
+                   onclick="setMainImage(this, '${img.image_url}')"/>
+            `).join('')}
+          </div>
+
+          <!-- Car Details -->
+          <div class="detail-card mt-4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h1 style="font-size:1.5rem;font-weight:800;color:var(--dark)">${car.name}</h1>
+                <p class="mb-0" style="color:#6c757d;font-size:.9rem">📍 ${car.location ?? '—'} &nbsp;·&nbsp; by <strong>${car.partner?.business_name ?? 'Partner'}</strong></p>
+              </div>
+              <div class="text-end">
+                <div class="price-tag">₱${parseFloat(car.price_per_day).toLocaleString()}<span>/day</span></div>
+              </div>
+            </div>
+
+            <!-- Specs grid -->
+            <div class="row g-2 my-3">
+              <div class="col-6 col-md-3"><div class="spec-badge"><div class="icon">⚙️</div><div class="label">Transmission</div><div class="value">${car.transmission ?? '—'}</div></div></div>
+              <div class="col-6 col-md-3"><div class="spec-badge"><div class="icon">⛽</div><div class="label">Fuel</div><div class="value">${car.fuel_type ?? '—'}</div></div></div>
+              <div class="col-6 col-md-3"><div class="spec-badge"><div class="icon">🪑</div><div class="label">Seats</div><div class="value">${car.seats ?? 5}</div></div></div>
+              <div class="col-6 col-md-3"><div class="spec-badge"><div class="icon">📅</div><div class="label">Year</div><div class="value">${car.year ?? '—'}</div></div></div>
+            </div>
+
+            ${car.description ? `<p style="color:#495057;font-size:.92rem;line-height:1.7">${car.description}</p>` : ''}
+
+            ${features.length ? `
+            <div class="mt-3">
+              <h6 class="fw-700 mb-2" style="font-weight:700">Included Features</h6>
+              <div class="d-flex flex-wrap gap-2">
+                ${features.map(f => `<span class="feature-chip">✓ ${f}</span>`).join('')}
+              </div>
+            </div>` : ''}
+          </div>
+
+          <!-- Partner info -->
+          <div class="detail-card mt-3">
+            <h6 class="fw-700 mb-2" style="font-weight:700">About the Owner</h6>
+            <p class="mb-1"><strong>${car.partner?.business_name ?? 'Partner'}</strong></p>
+            ${car.partner?.business_address ? `<p class="mb-1" style="font-size:.88rem;color:#6c757d">📍 ${car.partner.business_address}</p>` : ''}
+            ${car.partner?.contact_phone ? `<p class="mb-0" style="font-size:.88rem;color:#6c757d">📞 ${car.partner.contact_phone}</p>` : ''}
+          </div>
+        </div>
+
+        <!-- RIGHT: Booking Box -->
+        <div class="col-lg-5">
+          <div class="book-box">
+            <h5 class="fw-700 mb-3" style="font-weight:700">Book This Car</h5>
+            <div class="mb-3">
+              <label class="form-label fw-600" style="font-weight:600;font-size:.85rem">Pick-up Date</label>
+              <input type="date" id="start-date" class="form-control" min="${today}" onchange="calcTotal()"/>
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-600" style="font-weight:600;font-size:.85rem">Return Date</label>
+              <input type="date" id="end-date" class="form-control" min="${today}" onchange="calcTotal()"/>
+            </div>
+
+            <!-- Price breakdown -->
+            <div id="price-breakdown" class="d-none mb-3">
+              <div class="total-line"><span id="days-label">₱0 × 0 days</span><span id="subtotal-val">₱0</span></div>
+              <div class="total-line"><span>Booking fee</span><span id="fee-val">₱${bookingFee.toLocaleString()}</span></div>
+              <div class="total-line grand"><span>Total</span><span id="total-val">₱0</span></div>
+            </div>
+
+            <button id="book-btn" class="btn btn-sakyan w-100 btn-lg" onclick="goToCheckout()">
+              Book Now
+            </button>
+            <p class="booking-note text-center mt-2">🔒 No charge until partner approves</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function setMainImage(thumbEl, url) {
+    document.getElementById('main-img').src = url;
+    document.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));
+    thumbEl.classList.add('active');
+  }
+
+  function calcTotal() {
+    const start = document.getElementById('start-date')?.value;
+    const end   = document.getElementById('end-date')?.value;
+    if (!start || !end) return;
+
+    document.getElementById('end-date').min = start;
+    const days = calcDays(start, end);
+    if (days <= 0) { document.getElementById('price-breakdown').classList.add('d-none'); return; }
+
+    const subtotal = parseFloat(currentCar.price_per_day) * days;
+    const total    = subtotal + bookingFee;
+
+    document.getElementById('days-label').textContent   = `₱${parseFloat(currentCar.price_per_day).toLocaleString()} × ${days} day${days>1?'s':''}`;
+    document.getElementById('subtotal-val').textContent = formatPHP(subtotal);
+    document.getElementById('fee-val').textContent      = formatPHP(bookingFee);
+    document.getElementById('total-val').textContent    = formatPHP(total);
+    document.getElementById('price-breakdown').classList.remove('d-none');
+  }
+
+  function goToCheckout() {
+    const start = document.getElementById('start-date')?.value;
+    const end   = document.getElementById('end-date')?.value;
+    if (!start || !end) { showToast('Please select pickup and return dates', 'warning'); return; }
+    if (calcDays(start, end) <= 0) { showToast('Return date must be after pickup date', 'warning'); return; }
+
+    const token = localStorage.getItem('sakyan_token');
+    if (!token) { window.location.href = '/pages/auth/login.html'; return; }
+
+    window.location.href = `/pages/booking/checkout.html?car_id=${carId}&start=${start}&end=${end}`;
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# Sakyan Platform — Root .gitignore
+*.env
+.env
+.env.local
+.env.production
+
+# PHP / Composer
+sakyan-backend/vendor/
+sakyan-backend/.env
+sakyan-backend/storage/logs/*.log
+
+# Node
+node_modules/
+npm-debug.log
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.swp
