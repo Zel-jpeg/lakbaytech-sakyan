@@ -60,6 +60,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'api.pagination.StandardPagination',
     'PAGE_SIZE': 12,
+    'UNAUTHENTICATED_USER': None,   # ← add this line
 }
 
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
