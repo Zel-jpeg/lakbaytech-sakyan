@@ -1,0 +1,74 @@
+from rest_framework import generics, filters, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from ..models import Car
+from ..serializers import CarListSerializer, CarDetailSerializer, CarWriteSerializer
+from ..permissions import IsPartner
+
+
+class CarListView(generics.ListAPIView):
+    serializer_class = CarListSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'brand', 'model', 'location']
+    ordering_fields = ['price_per_day', 'created_at', 'year']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        qs = Car.objects.filter(status='active', is_available=True).select_related('partner')
+        location     = self.request.query_params.get('location')
+        max_price    = self.request.query_params.get('max_price')
+        min_price    = self.request.query_params.get('min_price')
+        transmission = self.request.query_params.get('transmission')
+        fuel_type    = self.request.query_params.get('fuel_type')
+        seats        = self.request.query_params.get('seats')
+
+        if location:     qs = qs.filter(location__icontains=location)
+        if max_price:    qs = qs.filter(price_per_day__lte=max_price)
+        if min_price:    qs = qs.filter(price_per_day__gte=min_price)
+        if transmission: qs = qs.filter(transmission=transmission)
+        if fuel_type:    qs = qs.filter(fuel_type=fuel_type)
+        if seats:        qs = qs.filter(seats__gte=seats)
+        return qs
+
+
+class CarDetailView(generics.RetrieveAPIView):
+    queryset = Car.objects.all().select_related('partner').prefetch_related('images')
+    serializer_class = CarDetailSerializer
+    permission_classes = [AllowAny]
+
+
+class PartnerCarListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsPartner]
+
+    def get_serializer_class(self):
+        return CarWriteSerializer if self.request.method == 'POST' else CarListSerializer
+
+    def get_queryset(self):
+        return Car.objects.filter(
+            partner=self.request.user.partner
+        ).prefetch_related('images')
+
+
+class PartnerCarDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsPartner]
+
+    def get_serializer_class(self):
+        return CarWriteSerializer if self.request.method in ['PUT', 'PATCH'] else CarDetailSerializer
+
+    def get_queryset(self):
+        return Car.objects.filter(partner=self.request.user.partner)
+
+
+class ToggleCarAvailabilityView(APIView):
+    permission_classes = [IsPartner]
+
+    def patch(self, request, pk):
+        try:
+            car = Car.objects.get(pk=pk, partner=request.user.partner)
+        except Car.DoesNotExist:
+            return Response({'error': 'Not found'}, status=404)
+        car.is_available = not car.is_available
+        car.save()
+        return Response({'is_available': car.is_available})
