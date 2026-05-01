@@ -1,10 +1,10 @@
-import { useNavigate } from 'react-router-dom'
-import { useForm, Controller } from 'react-hook-form'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, Upload, X, CheckCircle2 } from 'lucide-react'
-import { useState } from 'react'
-import { useCreateCar } from '@/hooks/useCars'
+import { ArrowLeft, Upload, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useCar, useUpdateCar } from '@/hooks/useCars'
 import { useFileUpload } from '@/hooks/useFileUpload'
 
 const schema = z.object({
@@ -36,16 +36,41 @@ function Field({ label, error, required, children }) {
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 const selectCls = inputCls + " bg-white"
 
-export default function AddCarPage() {
+export default function EditCarPage() {
   const navigate = useNavigate()
-  const createCar = useCreateCar()
+  const { id } = useParams()
+  const { data: car, isLoading } = useCar(id)
+  const updateCar = useUpdateCar()
   const { uploadFile, uploading, deleteFile } = useFileUpload('car-images')
   const [imageUrls, setImageUrls] = useState([])
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { seats: 5, transmission: 'automatic', fuel_type: 'gasoline' }
   })
+
+  // Pre-fill form once car data loads
+  useEffect(() => {
+    if (car) {
+      reset({
+        name:          car.name,
+        brand:         car.brand,
+        model:         car.model,
+        year:          car.year,
+        plate_number:  car.plate_number,
+        transmission:  car.transmission,
+        fuel_type:     car.fuel_type,
+        seats:         car.seats,
+        price_per_day: car.price_per_day,
+        location:      car.location,
+        description:   car.description || '',
+      })
+      // Populate existing images
+      const existing = (car.images || [])
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(img => img.image_url)
+      setImageUrls(existing)
+    }
+  }, [car, reset])
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || [])
@@ -62,9 +87,19 @@ export default function AddCarPage() {
   }
 
   const onSubmit = (data) => {
-    createCar.mutate(
-      { ...data, images: imageUrls },
+    updateCar.mutate(
+      { id, ...data, image_urls: imageUrls },
       { onSuccess: () => navigate('/dashboard/cars') }
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-4 animate-pulse">
+        <div className="h-8 bg-gray-100 rounded-xl w-1/3" />
+        <div className="h-64 bg-gray-100 rounded-2xl" />
+        <div className="h-40 bg-gray-100 rounded-2xl" />
+      </div>
     )
   }
 
@@ -78,8 +113,8 @@ export default function AddCarPage() {
           <ArrowLeft size={18} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Add New Car</h1>
-          <p className="text-sm text-gray-500">Fill in your car details to start getting bookings.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Edit Car</h1>
+          <p className="text-sm text-gray-500">Update your car listing details.</p>
         </div>
       </div>
 
@@ -174,7 +209,6 @@ export default function AddCarPage() {
               </div>
             ))}
 
-            {/* Upload button */}
             <label className={`aspect-video rounded-xl border-2 border-dashed border-gray-200
                                flex flex-col items-center justify-center cursor-pointer
                                hover:border-blue-400 hover:bg-blue-50/40 transition
@@ -192,11 +226,11 @@ export default function AddCarPage() {
         {/* Submit */}
         <button
           type="submit"
-          disabled={createCar.isPending || uploading}
+          disabled={updateCar.isPending || uploading}
           className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200
                      text-white font-semibold rounded-xl transition text-sm"
         >
-          {createCar.isPending ? 'Listing car…' : 'List Car'}
+          {updateCar.isPending ? 'Saving…' : 'Save Changes'}
         </button>
       </form>
     </div>

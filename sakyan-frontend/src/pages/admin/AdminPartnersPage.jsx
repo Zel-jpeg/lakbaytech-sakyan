@@ -23,6 +23,87 @@ function StatusBadge({ status }) {
   )
 }
 
+// ── Document Preview (image thumbnail or PDF card) ────────────────────────────
+function DocPreview({ label, url }) {
+  const [lightbox, setLightbox] = useState(false)
+  const isPdf = url?.toLowerCase().includes('.pdf')
+
+  return (
+    <>
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        {/* Label bar */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50">
+          <span className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
+            <FileText size={12} className="text-gray-400" />
+            {label}
+          </span>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+          >
+            Open <ExternalLink size={10} />
+          </a>
+        </div>
+
+        {isPdf ? (
+          /* PDF card */
+          <div className="flex items-center justify-center py-8 bg-red-50/50 cursor-pointer"
+               onClick={() => window.open(url, '_blank')}>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <FileText size={24} className="text-red-500" />
+              </div>
+              <p className="text-xs text-gray-500">PDF Document</p>
+              <p className="text-xs text-blue-500 mt-1">Click to open</p>
+            </div>
+          </div>
+        ) : (
+          /* Image preview */
+          <div
+            className="relative group cursor-zoom-in bg-gray-100"
+            onClick={() => setLightbox(true)}
+          >
+            <img
+              src={url}
+              alt={label}
+              className="w-full max-h-48 object-contain p-2"
+            />
+            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100
+                            transition flex items-center justify-center text-white text-xs font-medium">
+              Click to enlarge
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightbox(false)}
+        >
+          <div className="relative max-w-4xl max-h-full" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setLightbox(false)}
+              className="absolute -top-10 right-0 text-white text-sm hover:text-gray-300"
+            >
+              ✕ Close
+            </button>
+            <img
+              src={url}
+              alt={label}
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+            />
+            <p className="text-center text-white/70 text-xs mt-3">{label}</p>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function PartnerCard({ partner, activeTab }) {
   const [expanded, setExpanded]           = useState(false)
   const [showRejectInput, setShowRejectInput] = useState(false)
@@ -99,29 +180,33 @@ function PartnerCard({ partner, activeTab }) {
 
           {/* Documents */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Documents</p>
-            <div className="flex gap-3 flex-wrap">
-              {partner.government_id_url && (
-                <a href={partner.government_id_url} target="_blank" rel="noopener noreferrer"
-                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200
-                              rounded-lg text-xs text-blue-600 hover:border-blue-300 transition">
-                  <FileText size={13} />
-                  Government ID
-                  <ExternalLink size={11} />
-                </a>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Submitted Documents</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {/* Government ID */}
+              {partner.government_id_url ? (
+                <DocPreview
+                  label="Government-issued ID"
+                  url={partner.government_id_url}
+                />
+              ) : (
+                <div className="border border-dashed border-gray-200 rounded-xl p-4 text-xs text-gray-400 flex items-center gap-2">
+                  <FileText size={14} /> No Government ID uploaded
+                </div>
               )}
-              {partner.business_permit_url && (
-                <a href={partner.business_permit_url} target="_blank" rel="noopener noreferrer"
-                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200
-                              rounded-lg text-xs text-blue-600 hover:border-blue-300 transition">
-                  <FileText size={13} />
-                  Business Permit / DTI
-                  <ExternalLink size={11} />
-                </a>
-              )}
-              {!partner.government_id_url && !partner.business_permit_url && (
-                <p className="text-xs text-gray-400">No documents uploaded.</p>
-              )}
+
+              {/* Business Permit */}
+              {partner.business_permit_url ? (
+                <DocPreview
+                  label="Business Permit / DTI"
+                  url={partner.business_permit_url}
+                />
+              ) : partner.partner_type === 'company' ? (
+                <div className="border border-dashed border-red-200 rounded-xl p-4 text-xs text-red-400 flex items-center gap-2">
+                  <FileText size={14} /> No Business Permit uploaded
+                </div>
+              ) : null}
+
             </div>
           </div>
 

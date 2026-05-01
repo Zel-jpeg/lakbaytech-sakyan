@@ -15,14 +15,19 @@ class SupabaseJWTAuthentication(BaseAuthentication):
 
         token = auth_header.split(' ')[1]
 
-        response = requests.get(
-            f"{settings.SUPABASE_URL}/auth/v1/user",
-            headers={
-                'Authorization': f'Bearer {token}',
-                'apikey': settings.SUPABASE_SERVICE_KEY,
-            },
-            timeout=5
-        )
+        try:
+            response = requests.get(
+                f"{settings.SUPABASE_URL}/auth/v1/user",
+                headers={
+                    'Authorization': f'Bearer {token}',
+                    'apikey': settings.SUPABASE_SERVICE_KEY,
+                },
+                timeout=10
+            )
+        except requests.exceptions.Timeout:
+            raise AuthenticationFailed('Authentication service timed out. Please try again.')
+        except requests.exceptions.RequestException:
+            raise AuthenticationFailed('Authentication service unavailable.')
 
         if response.status_code != 200:
             raise AuthenticationFailed('Invalid or expired token.')
@@ -38,4 +43,4 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         return (user, token)
 
     def authenticate_header(self, request):
-        return 'Bearer'
+        return 'Bearer'

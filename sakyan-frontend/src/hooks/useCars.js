@@ -57,11 +57,11 @@ export function useCreateCar() {
   })
 }
 
-export function useUpdateCar(id) {
+export function useUpdateCar() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data) => api.patch(`/partner/cars/${id}/`, data).then(r => r.data),
-    onSuccess: () => {
+    mutationFn: ({ id, ...data }) => api.patch(`/partner/cars/${id}/`, data).then(r => r.data),
+    onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: carKeys.myList() })
       qc.invalidateQueries({ queryKey: carKeys.detail(id) })
       toast.success('Car updated.')

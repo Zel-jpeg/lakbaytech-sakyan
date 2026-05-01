@@ -21,10 +21,7 @@ export default function PublicLayout() {
 
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Car size={16} className="text-white" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">Sakyan</span>
+            <img src="/sakyan-logo.png" alt="Sakyan" className="h-[30px] w-auto object-contain" />
           </Link>
 
           {/* Desktop nav */}
@@ -137,10 +134,7 @@ export default function PublicLayout() {
       <footer className="border-t border-gray-100 py-8 px-4">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center">
-              <Car size={12} className="text-white" />
-            </div>
-            <span className="text-sm font-semibold text-gray-700">Sakyan</span>
+            <img src="/sakyan-logo.png" alt="Sakyan" className="h-[20px] w-auto object-contain grayscale opacity-50" />
           </div>
           <p className="text-xs text-gray-400">© {new Date().getFullYear()} Sakyan. Ride the future, power small businesses. 🇵🇭</p>
         </div>

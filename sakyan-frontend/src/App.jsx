@@ -1,6 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from 'react-hot-toast'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import PublicLayout from '@/components/layout/PublicLayout'
 import DashboardLayout from '@/components/layout/DashboardLayout'
@@ -39,8 +37,9 @@ import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPartnersPage from '@/pages/admin/AdminPartnersPage'
 import AdminBookingsPage from '@/pages/admin/AdminBookingsPage'
 
-// Messages
+// Messages & Notifications
 import InboxPage from '@/pages/messages/InboxPage'
+import NotificationsPage from '@/pages/NotificationsPage'
 
 // 404
 import NotFoundPage from '@/pages/NotFoundPage'
@@ -54,81 +53,69 @@ function ProtectedRoute({ children, roles }) {
   return children
 }
 
-// ─── Query Client ─────────────────────────────────────────────────────────────
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, staleTime: 1000 * 60 },
-  },
-})
-
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Toaster position="top-right" />
-        <Routes>
+    <Routes>
 
-          {/* ── Public + Booking: share PublicLayout (Navbar + Footer) ── */}
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/cars" element={<CarsPage />} />
-            <Route path="/cars/:id" element={<CarDetailPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+      {/* ── Public + Booking: share PublicLayout (Navbar + Footer) ── */}
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/cars" element={<CarsPage />} />
+        <Route path="/cars/:id" element={<CarDetailPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-            {/* Booking */}
-            <Route path="/booking/checkout/:carId" element={
-              <ProtectedRoute roles={['customer']}><CheckoutPage /></ProtectedRoute>
-            } />
-            <Route path="/booking/confirmation/:bookingCode" element={
-              <ProtectedRoute roles={['customer']}><ConfirmationPage /></ProtectedRoute>
-            } />
-            <Route path="/booking/my-bookings" element={
-              <ProtectedRoute roles={['customer']}><MyBookingsPage /></ProtectedRoute>
-            } />
-          </Route>
+        {/* Booking */}
+        <Route path="/booking/checkout/:carId" element={
+          <ProtectedRoute roles={['customer']}><CheckoutPage /></ProtectedRoute>
+        } />
+        <Route path="/booking/confirmation/:bookingCode" element={
+          <ProtectedRoute roles={['customer']}><ConfirmationPage /></ProtectedRoute>
+        } />
+        <Route path="/booking/my-bookings" element={
+          <ProtectedRoute roles={['customer']}><MyBookingsPage /></ProtectedRoute>
+        } />
+      </Route>
 
-          {/* ── Auth callback (no layout) ── */}
-          <Route path="/auth/callback" element={<AuthCallback />} />
+      {/* ── Auth callback (no layout) ── */}
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
-          {/* ── Onboarding (no layout — full-screen steps) ── */}
-          <Route path="/onboarding/step1" element={<ProtectedRoute><Step1TypePage /></ProtectedRoute>} />
-          <Route path="/onboarding/step2" element={<ProtectedRoute><Step2InfoPage /></ProtectedRoute>} />
-          <Route path="/onboarding/step3" element={<ProtectedRoute><Step3DocsPage /></ProtectedRoute>} />
-          <Route path="/onboarding/pending" element={<ProtectedRoute><Step4PendingPage /></ProtectedRoute>} />
+      {/* ── Onboarding (no layout — full-screen steps) ── */}
+      <Route path="/onboarding/step1" element={<ProtectedRoute><Step1TypePage /></ProtectedRoute>} />
+      <Route path="/onboarding/step2" element={<ProtectedRoute><Step2InfoPage /></ProtectedRoute>} />
+      <Route path="/onboarding/step3" element={<ProtectedRoute><Step3DocsPage /></ProtectedRoute>} />
+      <Route path="/onboarding/pending" element={<ProtectedRoute><Step4PendingPage /></ProtectedRoute>} />
 
-          {/* ── Partner dashboard (DashboardLayout as parent) ── */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute roles={['partner']}><DashboardLayout role="partner" /></ProtectedRoute>
-          }>
-            <Route index element={<PartnerHomePage />} />
-            <Route path="cars" element={<MyCarsPage />} />
-            <Route path="cars/add" element={<AddCarPage />} />
-            <Route path="cars/:id/edit" element={<EditCarPage />} />
-            <Route path="bookings" element={<PartnerBookingsPage />} />
-            <Route path="earnings" element={<EarningsPage />} />
-          </Route>
+      {/* ── Partner dashboard (DashboardLayout as parent) ── */}
+      <Route path="/dashboard" element={
+        <ProtectedRoute roles={['partner']}><DashboardLayout role="partner" /></ProtectedRoute>
+      }>
+        <Route index element={<PartnerHomePage />} />
+        <Route path="cars" element={<MyCarsPage />} />
+        <Route path="cars/add" element={<AddCarPage />} />
+        <Route path="cars/:id/edit" element={<EditCarPage />} />
+        <Route path="bookings" element={<PartnerBookingsPage />} />
+        <Route path="earnings" element={<EarningsPage />} />
+      </Route>
 
-          {/* ── Admin dashboard (DashboardLayout as parent) ── */}
-          <Route path="/admin" element={
-            <ProtectedRoute roles={['admin']}><DashboardLayout role="admin" /></ProtectedRoute>
-          }>
-            <Route index element={<AdminHomePage />} />
-            <Route path="partners" element={<AdminPartnersPage />} />
-            <Route path="bookings" element={<AdminBookingsPage />} />
-          </Route>
+      {/* ── Admin dashboard (DashboardLayout as parent) ── */}
+      <Route path="/admin" element={
+        <ProtectedRoute roles={['admin']}><DashboardLayout role="admin" /></ProtectedRoute>
+      }>
+        <Route index element={<AdminHomePage />} />
+        <Route path="partners" element={<AdminPartnersPage />} />
+        <Route path="bookings" element={<AdminBookingsPage />} />
+      </Route>
 
-          {/* ── Inbox ── */}
-          <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+      {/* ── Inbox & Notifications ── */}
+      <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
-          {/* ── 404 ── */}
-          <Route path="*" element={<NotFoundPage />} />
+      {/* ── 404 ── */}
+      <Route path="*" element={<NotFoundPage />} />
 
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+    </Routes>
   )
 }

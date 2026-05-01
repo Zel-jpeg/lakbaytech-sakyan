@@ -7,12 +7,14 @@ export const useOnboardingStore = create(
       // Step 1
       partner_type: '',
       // Step 2
-      business_name: '',
+      business_name:    '',
       business_address: '',
-      contact_person: '',
-      contact_phone: '',
+      business_lat:     null,
+      business_lng:     null,
+      contact_person:   '',
+      contact_phone:    '',
       // Step 3
-      government_id_url: '',
+      government_id_url:   '',
       business_permit_url: '',
 
       // Actions
@@ -22,12 +24,14 @@ export const useOnboardingStore = create(
 
       // Call this after successful submission
       reset: () => set({
-        partner_type: '',
-        business_name: '',
-        business_address: '',
-        contact_person: '',
-        contact_phone: '',
-        government_id_url: '',
+        partner_type:        '',
+        business_name:       '',
+        business_address:    '',
+        business_lat:        null,
+        business_lng:        null,
+        contact_person:      '',
+        contact_phone:       '',
+        government_id_url:   '',
         business_permit_url: '',
       }),
 

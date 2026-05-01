@@ -44,7 +44,8 @@ class Partner(models.Model):
     approved_at         = models.DateTimeField(null=True, blank=True)
     approved_by         = models.ForeignKey(
         User, null=True, blank=True,
-        on_delete=models.SET_NULL, related_name='approved_partners'
+        on_delete=models.SET_NULL, related_name='approved_partners',
+        db_column='approved_by'
     )
     created_at          = models.DateTimeField(auto_now_add=True)
     updated_at          = models.DateTimeField(auto_now=True)

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Plus, ToggleLeft, ToggleRight, Pencil, MapPin } from 'lucide-react'
+import { Plus, ToggleLeft, ToggleRight, Pencil, MapPin, Car } from 'lucide-react'
 import { useMyPartnerCars, useToggleCarAvailability } from '@/hooks/useCars'
 import { formatCurrency } from '@/utils/formatters'
 

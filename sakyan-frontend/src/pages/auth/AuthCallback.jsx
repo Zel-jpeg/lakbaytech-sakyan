@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/config/supabase'
 import api from '@/config/axios'
@@ -7,64 +7,71 @@ import { useAuthStore } from '@/store/authStore'
 export default function AuthCallback() {
   const navigate = useNavigate()
   const { setUser, setToken } = useAuthStore()
+  const isProcessing = useRef(false)
 
-  useEffect(() => {
-    const handleCallback = async () => {
-      const { data, error } = await supabase.auth.getSession()
+  const handleAuth = async (session) => {
+    if (isProcessing.current || !session) return
+    isProcessing.current = true
 
-      if (error || !data.session) {
-        navigate('/login')
-        return
-      }
+    const token = session.access_token
+    setToken(token)
 
-      const session = data.session
-      const token = session.access_token
-      setToken(token)
-
+    try {
       // Try to get existing Django profile
+      const res = await api.get('/auth/me')
+      setUser(res.data)
+      redirectByRole(res.data.role)
+    } catch {
+      // Profile doesn't exist yet — create it from Google data
+      const supabaseUser = session.user
       try {
-        const res = await api.get('/auth/me')
-        setUser(res.data)
-        redirectByRole(res.data.role)
-      } catch {
-        // Profile doesn't exist yet — create it from Google data
-        const supabaseUser = session.user
-        try {
-          const res = await api.post('/auth/register', {
-            user_id: supabaseUser.id,
-            full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email,
-            email: supabaseUser.email,
-            phone: '',
+        const res = await api.post('/auth/register', {
+          user_id: supabaseUser.id,
+          full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email,
+          email: supabaseUser.email,
+          phone: '',
+        })
+        // After register, fetch the full profile
+        const meRes = await api.get('/auth/me')
+        setUser(meRes.data)
+
+        // Also update avatar from Google
+        const googleAvatar = supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture
+        if (googleAvatar) {
+          await api.patch('/auth/profile', {
+            avatar_url: googleAvatar
           })
-          // After register, fetch the full profile
-          const meRes = await api.get('/auth/me')
-          setUser(meRes.data)
-
-          // Also update avatar from Google
-          if (supabaseUser.user_metadata?.avatar_url) {
-            await api.patch('/auth/profile', {
-              avatar_url: supabaseUser.user_metadata.avatar_url
-            })
-          }
-
-          redirectByRole(meRes.data.role)
-        } catch (err) {
-          console.error('Profile creation failed', err)
-          navigate('/login')
         }
+
+        redirectByRole(meRes.data.role)
+      } catch (err) {
+        console.error('Profile creation failed', err)
+        navigate('/login')
       }
     }
+  }
 
-    handleCallback()
+  useEffect(() => {
+    // 1. Check current session immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) handleAuth(session)
+    })
+
+    // 2. Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        handleAuth(session)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   const redirectByRole = (role) => {
-    const routes = {
-      admin: '/admin',
-      partner: '/dashboard',
-      customer: '/cars'
-    }
-    navigate(routes[role] || '/cars')
+    if (role === 'admin') navigate('/admin')
+    else navigate('/')
   }
 
   return (

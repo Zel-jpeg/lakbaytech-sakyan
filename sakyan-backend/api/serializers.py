@@ -2,12 +2,18 @@ from rest_framework import serializers
 from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Message, Notification
 
 
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        exclude = ['user']
+
+
 class UserSerializer(serializers.ModelSerializer):
-    customer_profile = CustomerProfileSerializer(source='profile', read_only=True)  # add this
+    customer_profile = CustomerProfileSerializer(source='profile', read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'role', 'avatar_url', 'created_at', 'customer_profile']  # add customer_profile
+        fields = ['id', 'full_name', 'email', 'phone', 'role', 'avatar_url', 'created_at', 'customer_profile']
         read_only_fields = ['id', 'role', 'created_at']
 
 
@@ -18,13 +24,16 @@ class RegisterSerializer(serializers.Serializer):
     phone     = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     def create(self, validated_data):
-        return User.objects.create(
+        user, _ = User.objects.get_or_create(
             id=validated_data['user_id'],
-            full_name=validated_data['full_name'],
-            email=validated_data['email'],
-            phone=validated_data.get('phone', ''),
-            role='customer'
+            defaults={
+                'full_name': validated_data['full_name'],
+                'email':     validated_data['email'],
+                'phone':     validated_data.get('phone', ''),
+                'role':      'customer',
+            }
         )
+        return user
 
 
 class CarImageSerializer(serializers.ModelSerializer):
@@ -113,10 +122,7 @@ class PartnerApplySerializer(serializers.ModelSerializer):
         return Partner.objects.create(user=user, **validated_data)
 
 
-class CustomerProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomerProfile
-        exclude = ['user']
+
 
 
 class BookingCreateSerializer(serializers.ModelSerializer):

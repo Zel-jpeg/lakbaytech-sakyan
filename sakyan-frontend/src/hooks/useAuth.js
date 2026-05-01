@@ -63,12 +63,8 @@ export function useAuth() {
   }
 
   const redirectByRole = (role) => {
-    const routes = {
-      admin: '/admin',
-      partner: '/dashboard',
-      customer: '/cars'
-    }
-    navigate(routes[role] || '/cars')
+    if (role === 'admin') navigate('/admin')
+    else navigate('/')
   }
 
   return { user, loginMutation, registerMutation, loginWithGoogle, logoutAction }

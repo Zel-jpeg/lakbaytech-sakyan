@@ -12,7 +12,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return Response(UserSerializer(user).data, status=201)
+        return Response(UserSerializer(user).data, status=200)
 
 
 class MeView(APIView):

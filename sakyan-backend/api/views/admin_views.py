@@ -3,7 +3,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from django.db.models import Sum
 from django.utils import timezone
-from ..models import Partner, Booking, User
+from ..models import Partner, Booking, User, Car
 from ..serializers import PartnerSerializer, BookingSerializer, UserSerializer
 from ..permissions import IsAdmin
 from ..utils import push_notification
@@ -69,13 +69,16 @@ class AdminStatsView(APIView):
     def get(self, request):
         stats = {
             'total_users':       User.objects.count(),
-            'total_partners':    Partner.objects.filter(status='approved').count(),
-            'pending_partners':  Partner.objects.filter(status='pending').count(),
+            'total_cars':        Car.objects.count(),
             'total_bookings':    Booking.objects.count(),
-            'active_bookings':   Booking.objects.filter(booking_status='active').count(),
             'total_revenue':     Booking.objects.filter(
                 booking_status='completed'
             ).aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0,
+            
+            'pending_partners':  Partner.objects.filter(status='pending').count(),
+            'active_partners':   Partner.objects.filter(status='approved').count(),
+            'pending_bookings':  Booking.objects.filter(booking_status='pending').count(),
+            'active_bookings':   Booking.objects.filter(booking_status='active').count(),
         }
         return Response(stats)
 
