@@ -3,9 +3,11 @@ from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Mess
 
 
 class UserSerializer(serializers.ModelSerializer):
+    customer_profile = CustomerProfileSerializer(source='profile', read_only=True)  # add this
+
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'role', 'avatar_url', 'created_at']
+        fields = ['id', 'full_name', 'email', 'phone', 'role', 'avatar_url', 'created_at', 'customer_profile']  # add customer_profile
         read_only_fields = ['id', 'role', 'created_at']
 
 
@@ -173,6 +175,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 class BookingSerializer(serializers.ModelSerializer):
     car_name         = serializers.CharField(source='car.name', read_only=True)
     car_image        = serializers.SerializerMethodField()
+    car_location     = serializers.CharField(source='car.location', read_only=True)  # add this
     customer_name    = serializers.CharField(source='customer.full_name', read_only=True)
     customer_email   = serializers.CharField(source='customer.email', read_only=True)
     customer_phone   = serializers.CharField(source='customer.phone', read_only=True)
