@@ -55,6 +55,30 @@ export function useAuth() {
     if (error) toast.error(error.message)
   }
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ email }) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => toast.success('Password reset link sent to your email.'),
+    onError: (err) => toast.error(err.message)
+  })
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ password }) => {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      toast.success('Password updated successfully. You can now log in.')
+      logoutAction()
+      navigate('/login')
+    },
+    onError: (err) => toast.error(err.message)
+  })
+
   const logoutAction = async () => {
     await supabase.auth.signOut()
     logout()
@@ -67,5 +91,5 @@ export function useAuth() {
     else navigate('/')
   }
 
-  return { user, loginMutation, registerMutation, loginWithGoogle, logoutAction }
+  return { user, loginMutation, registerMutation, loginWithGoogle, logoutAction, resetPasswordMutation, updatePasswordMutation }
 }

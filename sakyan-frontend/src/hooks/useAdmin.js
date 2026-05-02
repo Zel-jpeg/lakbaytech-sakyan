@@ -6,6 +6,7 @@ export const adminKeys = {
   stats:    ['admin', 'stats'],
   partners: (status) => ['admin', 'partners', status],
   bookings: (filters) => ['admin', 'bookings', filters],
+  users:    (role) => ['admin', 'users', role],
 }
 
 export function useAdminStats() {
@@ -49,6 +50,16 @@ export function useAdminAllBookings(filters = {}) {
         Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
       )
       return api.get(`/admin/bookings/?${params}`).then(r => r.data)
+    },
+  })
+}
+
+export function useAdminUsers(role = '') {
+  return useQuery({
+    queryKey: adminKeys.users(role),
+    queryFn: () => {
+      const url = role ? `/admin/users/?role=${role}` : `/admin/users/`
+      return api.get(url).then(r => r.data)
     },
   })
 }

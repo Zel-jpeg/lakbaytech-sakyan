@@ -7,6 +7,8 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import AuthCallback from '@/pages/auth/AuthCallback'
+import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from '@/pages/auth/ResetPasswordPage'
 
 // Public
 import LandingPage from '@/pages/public/LandingPage'
@@ -25,6 +27,7 @@ import Step3DocsPage from '@/pages/onboarding/Step3DocsPage'
 import Step4PendingPage from '@/pages/onboarding/Step4PendingPage'
 
 // Partner dashboard
+import ProfilePage from '@/pages/dashboard/ProfilePage'
 import PartnerHomePage from '@/pages/dashboard/PartnerHomePage'
 import MyCarsPage from '@/pages/dashboard/MyCarsPage'
 import AddCarPage from '@/pages/dashboard/AddCarPage'
@@ -36,6 +39,9 @@ import EarningsPage from '@/pages/dashboard/EarningsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPartnersPage from '@/pages/admin/AdminPartnersPage'
 import AdminBookingsPage from '@/pages/admin/AdminBookingsPage'
+import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminReportsPage from '@/pages/admin/AdminReportsPage'
+import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
 
 // Messages & Notifications
 import InboxPage from '@/pages/messages/InboxPage'
@@ -66,16 +72,21 @@ export default function App() {
         <Route path="/cars/:id" element={<CarDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Booking */}
         <Route path="/booking/checkout/:carId" element={
-          <ProtectedRoute roles={['customer']}><CheckoutPage /></ProtectedRoute>
+          <ProtectedRoute roles={['customer', 'partner']}><CheckoutPage /></ProtectedRoute>
         } />
         <Route path="/booking/confirmation/:bookingCode" element={
-          <ProtectedRoute roles={['customer']}><ConfirmationPage /></ProtectedRoute>
+          <ProtectedRoute roles={['customer', 'partner']}><ConfirmationPage /></ProtectedRoute>
         } />
         <Route path="/booking/my-bookings" element={
-          <ProtectedRoute roles={['customer']}><MyBookingsPage /></ProtectedRoute>
+          <ProtectedRoute roles={['customer', 'partner']}><MyBookingsPage /></ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
       </Route>
 
@@ -107,6 +118,9 @@ export default function App() {
         <Route index element={<AdminHomePage />} />
         <Route path="partners" element={<AdminPartnersPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
+        <Route path="users" element={<AdminUsersPage />} />
+        <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
 
       {/* ── Inbox & Notifications ── */}

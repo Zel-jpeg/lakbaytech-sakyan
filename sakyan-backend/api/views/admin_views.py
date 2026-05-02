@@ -1,10 +1,11 @@
 from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from django.db.models import Sum
 from django.utils import timezone
-from ..models import Partner, Booking, User, Car
-from ..serializers import PartnerSerializer, BookingSerializer, UserSerializer
+from ..models import Partner, Booking, User, Car, PlatformSetting
+from ..serializers import PartnerSerializer, BookingSerializer, UserSerializer, PlatformSettingSerializer
 from ..permissions import IsAdmin
 from ..utils import push_notification
 
@@ -93,3 +94,43 @@ class AdminAllBookingsView(generics.ListAPIView):
         if status:
             qs = qs.filter(booking_status=status)
         return qs
+
+class AdminUserListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        role_filter = self.request.query_params.get('role')
+        qs = User.objects.all().order_by('-created_at')
+        if role_filter:
+            qs = qs.filter(role=role_filter)
+        return qs
+
+
+class AdminSettingsView(APIView):
+    """GET  /api/admin/settings/  → list all settings (public read)
+       PATCH via AdminSettingUpdateView"""
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAdmin()]
+
+    def get(self, request):
+        settings = PlatformSetting.objects.all()
+        return Response(PlatformSettingSerializer(settings, many=True).data)
+
+
+class AdminSettingUpdateView(APIView):
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, key):
+        setting, created = PlatformSetting.objects.get_or_create(
+            key=key,
+            defaults={'value': 0, 'label': key.replace('_', ' ').title()}
+        )
+        serializer = PlatformSettingSerializer(setting, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)

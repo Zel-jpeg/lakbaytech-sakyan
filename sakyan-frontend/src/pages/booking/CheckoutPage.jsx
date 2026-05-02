@@ -40,7 +40,7 @@ function isKycComplete(profile) {
 
 function SectionHeading({ children }) {
   return (
-    <h2 className="text-base font-semibold text-gray-900 mb-4">{children}</h2>
+    <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{children}</h2>
   )
 }
 
@@ -59,32 +59,32 @@ function FileUploadBox({ label, url, onUpload, onClear, uploading }) {
 
   return (
     <div>
-      <p className="text-sm font-medium text-gray-700 mb-1.5">{label}</p>
+      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{label}</p>
       {url ? (
-        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-          <CheckCircle2 size={16} className="text-green-600 shrink-0" />
+        <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+          <CheckCircle2 size={16} className="text-green-600 dark:text-green-500 shrink-0" />
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-green-700 hover:underline truncate flex-1"
+            className="text-sm text-green-700 dark:text-green-400 hover:underline truncate flex-1"
           >
             View uploaded file
           </a>
-          <button onClick={onClear} className="text-gray-400 hover:text-red-500 transition shrink-0">
+          <button onClick={onClear} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition shrink-0">
             <X size={15} />
           </button>
         </div>
       ) : (
         <label className={`flex flex-col items-center justify-center gap-2 p-4
-                           border-2 border-dashed border-gray-200 rounded-xl cursor-pointer
-                           hover:border-blue-400 hover:bg-blue-50/40 transition ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                           border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer bg-gray-50 dark:bg-gray-800/50
+                           hover:border-brand-400 dark:hover:border-brand-500 hover:bg-brand-50/40 dark:hover:bg-brand-900/20 transition ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
           {uploading ? (
-            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           ) : (
-            <Upload size={20} className="text-gray-400" />
+            <Upload size={20} className="text-gray-400 dark:text-gray-500" />
           )}
-          <span className="text-sm text-gray-500">{uploading ? 'Uploading…' : 'Click to upload'}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{uploading ? 'Uploading…' : 'Click to upload'}</span>
           <input type="file" className="hidden" accept="image/*,.pdf" onChange={handleChange} />
         </label>
       )}
@@ -93,6 +93,8 @@ function FileUploadBox({ label, url, onUpload, onClear, uploading }) {
 }
 
 // ─── KYC form ─────────────────────────────────────────────────────────────────
+
+const inputClsKyc = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 dark:focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
 
 function KycForm({ register, errors, licenseUrl, setLicenseUrl, idUrl, setIdUrl }) {
   const { uploadFile, uploading } = useFileUpload('documents')
@@ -110,22 +112,20 @@ function KycForm({ register, errors, licenseUrl, setLicenseUrl, idUrl, setIdUrl 
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Birthday</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Birthday</label>
           <input
             type="date"
             {...register('birthday')}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputClsKyc}
           />
           <FieldError message={errors.birthday?.message} />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Valid ID Type</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Valid ID Type</label>
           <select
             {...register('valid_id_type')}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className={inputClsKyc + " appearance-none"}
           >
             <option value="">Select ID type</option>
             <option value="passport">Passport</option>
@@ -140,37 +140,34 @@ function KycForm({ register, errors, licenseUrl, setLicenseUrl, idUrl, setIdUrl 
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">License Number</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">License Number</label>
           <input
             type="text"
             {...register('drivers_license_number')}
             placeholder="e.g. N01-23-456789"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputClsKyc}
           />
           <FieldError message={errors.drivers_license_number?.message} />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">License Expiry</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">License Expiry</label>
           <input
             type="date"
             {...register('license_expiry')}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputClsKyc}
           />
           <FieldError message={errors.license_expiry?.message} />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Home Address</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Home Address</label>
         <textarea
           {...register('address')}
           rows={2}
           placeholder="Complete address including city and province"
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className={inputClsKyc + " resize-y"}
         />
         <FieldError message={errors.address?.message} />
       </div>
@@ -197,23 +194,24 @@ function KycForm({ register, errors, licenseUrl, setLicenseUrl, idUrl, setIdUrl 
 
 // ─── price summary ────────────────────────────────────────────────────────────
 
-function PriceSummary({ pricePerDay, totalDays }) {
+function PriceSummary({ pricePerDay, totalDays, bookingFee = 0 }) {
   const subtotal = pricePerDay * totalDays
+  const total = subtotal + Number(bookingFee)
 
   return (
-    <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 text-sm">
-      <div className="flex justify-between text-gray-600">
+    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 space-y-2.5 text-sm">
+      <div className="flex justify-between text-gray-600 dark:text-gray-400">
         <span>₱{Number(pricePerDay).toLocaleString()} × {totalDays} day{totalDays !== 1 ? 's' : ''}</span>
         <span>₱{subtotal.toLocaleString()}</span>
       </div>
-      <div className="flex justify-between text-gray-600">
-        <span>Service fee</span>
-        <span className="text-green-600">Free</span>
+      <div className="flex justify-between text-gray-600 dark:text-gray-400">
+        <span>Booking fee</span>
+        <span className="font-medium">₱{Number(bookingFee).toLocaleString()}</span>
       </div>
-      <hr className="border-gray-200" />
-      <div className="flex justify-between font-semibold text-gray-900 text-base">
+      <hr className="border-gray-200 dark:border-gray-700" />
+      <div className="flex justify-between font-semibold text-gray-900 dark:text-white text-base">
         <span>Total</span>
-        <span>₱{subtotal.toLocaleString()}</span>
+        <span>₱{total.toLocaleString()}</span>
       </div>
     </div>
   )
@@ -233,6 +231,15 @@ export default function CheckoutPage() {
     queryFn: () => api.get('/auth/me/').then(r => r.data),
     enabled: !!user,
   })
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['platform-settings'],
+    queryFn: () => api.get('/admin/settings/').then(r => r.data),
+    staleTime: 1000 * 60 * 5,
+  })
+  const bookingFee = Number(
+    settingsData?.find(s => s.key === 'booking_fee')?.value ?? 100
+  )
 
   const kycDone = isKycComplete(profile?.customer_profile)
 
@@ -276,7 +283,7 @@ export default function CheckoutPage() {
   if (carLoading || profileLoading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -284,8 +291,8 @@ export default function CheckoutPage() {
   if (!car) {
     return (
       <div className="text-center py-32">
-        <p className="text-gray-500">Car not found.</p>
-        <button onClick={() => navigate('/cars')} className="mt-4 text-blue-600 text-sm hover:underline">
+        <p className="text-gray-500 dark:text-gray-400">Car not found.</p>
+        <button onClick={() => navigate('/cars')} className="mt-4 text-brand-600 dark:text-brand-400 text-sm hover:underline">
           Browse cars
         </button>
       </div>
@@ -337,69 +344,75 @@ export default function CheckoutPage() {
 
       <button
         onClick={() => navigate(`/cars/${carId}`)}
-        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6 transition"
+        className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition"
       >
         <ArrowLeft size={16} />
         Back to car
       </button>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Complete your booking</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-8">Complete your booking</h1>
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
 
           {/* ── LEFT ── */}
-          <div className="lg:col-span-3 space-y-8">
+          <div className="lg:col-span-3 space-y-6">
 
             {/* 1. Dates */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <div className="bg-white dark:bg-[#1a1d2e] rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
               <SectionHeading>
-                <span className="flex items-center gap-2">
-                  <CalendarDays size={18} className="text-blue-500" />
+                <span className="flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-full bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 flex items-center justify-center shrink-0">
+                    <CalendarDays size={16} />
+                  </span>
                   Pick your dates
                 </span>
               </SectionHeading>
 
-              <DayPicker
-                mode="range"
-                selected={range}
-                onSelect={setRange}
-                disabled={{ before: addDays(today, 1) }}
-                numberOfMonths={1}
-                className="!font-sans"
-              />
+              <div className="rdp-wrapper mt-6 flex justify-center sm:block">
+                 <div className="rdp-custom-container dark:[--rdp-color-background:#374151] dark:[--rdp-color-foreground:white] dark:[--rdp-color-background-active:#4F6BF6] dark:[--rdp-color-foreground-active:white]">
+                    <DayPicker
+                        mode="range"
+                        selected={range}
+                        onSelect={setRange}
+                        disabled={{ before: today }}
+                        numberOfMonths={1}
+                        className="!font-sans rdp"
+                    />
+                 </div>
+              </div>
 
               {range.from && range.to && (
-                <div className="mt-3 flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-4 py-2.5 rounded-xl">
-                  <CalendarDays size={15} />
+                <div className="mt-6 flex items-center gap-3 text-sm font-medium text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-900/30 px-5 py-3.5 rounded-xl border border-brand-100 dark:border-brand-800/50">
+                  <CalendarDays size={18} className="shrink-0" />
                   <span>
-                    {format(range.from, 'MMM d')} → {format(range.to, 'MMM d, yyyy')} · {totalDays} day{totalDays !== 1 ? 's' : ''}
+                    {format(range.from, 'MMM d')} → {format(range.to, 'MMM d, yyyy')} <span className="opacity-50 mx-1">•</span> {totalDays} day{totalDays !== 1 ? 's' : ''}
                   </span>
                 </div>
               )}
             </div>
 
             {/* 2. KYC */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white dark:bg-[#1a1d2e] rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-6">
                 <SectionHeading>Your details</SectionHeading>
                 {kycDone && (
                   <button
                     type="button"
                     onClick={() => setShowKycForm(v => !v)}
-                    className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+                    className="flex items-center gap-1.5 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300"
                   >
-                    {showKycForm ? <><ChevronUp size={15} /> Hide</> : <><ChevronDown size={15} /> Edit my info</>}
+                    {showKycForm ? <><ChevronUp size={16} /> Hide</> : <><ChevronDown size={16} /> Edit my info</>}
                   </button>
                 )}
               </div>
 
               {kycDone && !showKycForm && (
-                <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
-                  <CheckCircle2 size={18} className="text-green-600 mt-0.5 shrink-0" />
+                <div className="flex items-start gap-4 p-5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/50 rounded-2xl">
+                  <CheckCircle2 size={24} className="text-green-600 dark:text-green-500 shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-green-800">Your info is on file</p>
-                    <p className="text-sm text-green-700 mt-0.5">
+                    <p className="text-base font-medium text-green-900 dark:text-green-400 mb-1">Your info is on file</p>
+                    <p className="text-sm text-green-700 dark:text-green-500/80 leading-relaxed">
                       We'll use your saved license and ID for this booking.
                       You can update it anytime using the edit button above.
                     </p>
@@ -420,34 +433,34 @@ export default function CheckoutPage() {
             </div>
 
             {/* 3. Payment */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <div className="bg-white dark:bg-[#1a1d2e] rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
               <SectionHeading>Payment method</SectionHeading>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 {[
                   { value: 'gcash', label: 'GCash', icon: CreditCard },
-                  { value: 'cash',  label: 'Cash',  icon: Banknote  },
+                  { value: 'cash',  label: 'Cash on Pickup',  icon: Banknote  },
                 ].map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setPaymentMethod(value)}
-                    className={`flex items-center justify-center gap-2.5 py-3.5 rounded-xl
-                                border-2 text-sm font-medium transition ${
+                    className={`flex items-center justify-center gap-3 py-4 rounded-xl
+                                border-2 text-base font-medium transition ${
                       paymentMethod === value
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 text-gray-600 hover:border-blue-200'
+                        ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 shadow-sm'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/80'
                     }`}
                   >
-                    <Icon size={18} />
+                    <Icon size={20} className={paymentMethod === value ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'} />
                     {label}
                   </button>
                 ))}
               </div>
 
               {paymentMethod === 'gcash' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     GCash Reference Number
                   </label>
                   <input
@@ -455,32 +468,32 @@ export default function CheckoutPage() {
                     value={gcashRef}
                     onChange={e => setGcashRef(e.target.value)}
                     placeholder="e.g. 1234567890"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={inputClsKyc}
                   />
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Send payment to the partner's GCash first, then enter the reference number here.
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex gap-1.5 items-start">
+                    <span className="text-blue-500 shrink-0">ℹ️</span> 
+                    <span>You'll be able to message the partner to ask for their GCash number after they approve this request. Then, enter the reference number.</span>
                   </p>
                 </div>
               )}
 
               {paymentMethod === 'cash' && (
-                <div className="text-sm text-gray-500 bg-gray-50 rounded-xl p-3.5">
-                  💵 Cash payment is settled directly with the partner on pickup day.
+                <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 flex gap-3 items-start animate-in fade-in duration-300">
+                   <div className="text-xl">💵</div>
+                   <p className="pt-0.5">Cash payment is settled directly with the partner on the pickup day. Please prepare exact amount.</p>
                 </div>
               )}
             </div>
 
             {/* 4. Special Requests */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <SectionHeading>Special requests <span className="font-normal text-gray-400">(optional)</span></SectionHeading>
+            <div className="bg-white dark:bg-[#1a1d2e] rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
+              <SectionHeading>Special requests <span className="font-normal text-gray-400 dark:text-gray-500 ml-1">(optional)</span></SectionHeading>
               <textarea
                 value={specialRequests}
                 onChange={e => setSpecialRequests(e.target.value)}
-                rows={3}
-                placeholder="Any notes for the partner — preferred pickup time, child seats, etc."
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                rows={4}
+                placeholder="Any requests for the partner — e.g. preferred pickup time, need child seats, etc."
+                className={inputClsKyc + " resize-y"}
               />
             </div>
 
@@ -488,64 +501,56 @@ export default function CheckoutPage() {
 
           {/* ── RIGHT: Summary card ── */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-20 space-y-5">
+            <div className="bg-white dark:bg-[#1a1d2e] rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 md:p-8 sticky top-24 space-y-6">
 
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 {car.primary_image ? (
                   <img src={car.primary_image} alt={car.name}
-                       className="w-20 h-14 object-cover rounded-xl shrink-0" />
+                       className="w-24 h-20 object-cover rounded-xl shrink-0 border border-gray-100 dark:border-gray-700" />
                 ) : (
-                  <div className="w-20 h-14 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 text-2xl">
+                  <div className="w-24 h-20 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center shrink-0 text-3xl">
                     🚗
                   </div>
                 )}
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm leading-snug">{car.name}</p>
+                <div className="min-w-0 py-1">
+                  <p className="font-bold text-gray-900 dark:text-white text-base leading-snug">{car.name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{car.year} • {car.brand}</p>
                   {car.location && (
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                      <MapPin size={11} />
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mt-2 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-md">
+                      <MapPin size={12} className="text-gray-400" />
                       <span className="truncate">{car.location}</span>
                     </div>
                   )}
-                  <div className="flex gap-2 mt-1.5 flex-wrap">
-                    {car.transmission && (
-                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                        {car.transmission}
-                      </span>
-                    )}
-                    {car.seats && (
-                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                        {car.seats} seats
-                      </span>
-                    )}
-                  </div>
                 </div>
               </div>
 
-              <hr className="border-gray-100" />
+              <hr className="border-gray-100 dark:border-gray-800" />
 
               {totalDays > 0 ? (
-                <PriceSummary pricePerDay={car.price_per_day} totalDays={totalDays} />
+                <PriceSummary pricePerDay={car.price_per_day} totalDays={totalDays} bookingFee={bookingFee} />
               ) : (
-                <p className="text-sm text-gray-400 text-center py-2">
-                  Select dates to see total
-                </p>
+                <div className="py-8 text-center border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl">
+                  <CalendarDays size={24} className="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Select dates to see total
+                  </p>
+                </div>
               )}
 
               <button
                 type="submit"
                 disabled={!canSubmit || createBooking.isPending}
-                className={`w-full py-3.5 rounded-xl text-sm font-semibold transition ${
+                className={`w-full py-4 rounded-xl text-base font-bold transition shadow-sm ${
                   canSubmit && !createBooking.isPending
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'bg-brand-500 hover:bg-brand-600 text-white hover:shadow-md active:scale-[0.98]'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                 }`}
               >
                 {createBooking.isPending ? 'Submitting…' : 'Confirm Booking'}
               </button>
 
-              <p className="text-xs text-center text-gray-400">
-                Your booking will be reviewed by the partner before confirmation.
+              <p className="text-xs text-center text-gray-500 dark:text-gray-400 leading-relaxed">
+                You won't be charged yet.<br/>Your booking will be reviewed by the partner first.
               </p>
 
             </div>

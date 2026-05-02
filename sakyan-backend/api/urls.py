@@ -12,7 +12,8 @@ from .views.booking_views import (
 from .views.partner_views import PartnerApplyView, PartnerProfileView
 from .views.admin_views import (
     AdminPartnerListView, AdminPartnerActionView,
-    AdminStatsView, AdminAllBookingsView
+    AdminStatsView, AdminAllBookingsView, AdminUserListView,
+    AdminSettingsView, AdminSettingUpdateView
 )
 from .views.message_views import MessageListView, SendMessageView, ConversationListView
 from .views.notification_views import NotificationListView, MarkNotificationReadView
@@ -49,6 +50,9 @@ urlpatterns = [
     path('admin/partners/<uuid:pk>/<str:action>/', AdminPartnerActionView.as_view()),
     path('admin/stats/', AdminStatsView.as_view()),
     path('admin/bookings/', AdminAllBookingsView.as_view()),
+    path('admin/users/', AdminUserListView.as_view()),
+    path('admin/settings/', AdminSettingsView.as_view()),
+    path('admin/settings/<str:key>/', AdminSettingUpdateView.as_view()),
 
     # Messages
     path('messages/', SendMessageView.as_view()),

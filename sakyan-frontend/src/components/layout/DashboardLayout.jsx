@@ -1,9 +1,10 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { LayoutDashboard, Car, CalendarCheck, DollarSign,
-         Users, ClipboardList, LogOut, Menu, X, Bell, Home } from 'lucide-react'
+         Users, ClipboardList, LogOut, Menu, X, Bell, Home, BarChart, Sun, Moon, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useUIStore } from '@/store/uiStore'
 
 const PARTNER_NAV = [
   { to: '/dashboard',          label: 'Overview',  icon: LayoutDashboard, end: true },
@@ -16,22 +17,26 @@ const ADMIN_NAV = [
   { to: '/admin',          label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/admin/partners', label: 'Partners', icon: Users },
   { to: '/admin/bookings', label: 'Bookings', icon: ClipboardList },
+  { to: '/admin/users',    label: 'Platform Users', icon: Users },
+  { to: '/admin/reports',  label: 'Reports', icon: BarChart },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function DashboardLayout({ role }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, logoutAction } = useAuth()
   const { unreadCount } = useNotifications()
+  const { theme, toggleTheme } = useUIStore()
   const nav = role === 'admin' ? ADMIN_NAV : PARTNER_NAV
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-gray-100 flex flex-col items-start justify-center">
+      <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800 flex flex-col items-start justify-center">
         <Link to="/">
           <img src="/sakyan-logo.png" alt="Sakyan" className="h-8 w-auto object-contain" />
         </Link>
-        <p className="text-xs text-gray-400 mt-0.5 capitalize">{role} Dashboard</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 capitalize">{role} Dashboard</p>
       </div>
 
       {/* Nav */}
@@ -43,10 +48,10 @@ export default function DashboardLayout({ role }) {
             end={end}
             onClick={() => setSidebarOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-md shadow-brand-500/20'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
               }`
             }
           >
@@ -57,26 +62,31 @@ export default function DashboardLayout({ role }) {
       </nav>
 
       {/* User + logout */}
-      <div className="p-4 border-t border-gray-100">
+      <div className="p-4 border-t border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3 mb-3">
           {user?.avatar_url ? (
-            <img src={user.avatar_url} alt={user.full_name} className="w-8 h-8 rounded-full object-cover shadow-sm bg-gray-50" />
+            <img
+              src={user.avatar_url}
+              alt={user.full_name}
+              className="w-9 h-9 rounded-full object-cover ring-2 ring-brand-100 dark:ring-brand-900 shadow-sm"
+            />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center
-                            text-sm font-semibold text-blue-600 border border-blue-200">
+            <div className="w-9 h-9 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center
+                            text-sm font-semibold text-brand-600 dark:text-brand-400 ring-2 ring-brand-100 dark:ring-brand-900">
               {user?.full_name?.[0]?.toUpperCase()}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-800 truncate">{user?.full_name}</p>
-            <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{user?.full_name}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.email}</p>
           </div>
         </div>
         {role !== 'admin' && (
           <Link
             to="/"
-            className="flex items-center gap-2 w-full px-3 py-2 mb-1 text-sm text-gray-600
-                       hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
+            className="flex items-center gap-2 w-full px-3 py-2 mb-1 text-sm text-gray-600 dark:text-gray-400
+                       hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20
+                       rounded-xl transition"
           >
             <Home size={16} />
             Back to Home
@@ -84,8 +94,9 @@ export default function DashboardLayout({ role }) {
         )}
         <button
           onClick={logoutAction}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600
-                     hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400
+                     hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20
+                     rounded-xl transition"
         >
           <LogOut size={16} />
           Log out
@@ -95,18 +106,18 @@ export default function DashboardLayout({ role }) {
   )
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 dark:bg-[#0f1117] overflow-hidden">
 
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-100 shrink-0">
+      <aside className="hidden lg:flex flex-col w-60 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 shrink-0">
         <SidebarContent />
       </aside>
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white dark:bg-gray-900 shadow-xl z-50 animate-fade-in">
             <SidebarContent />
           </aside>
         </div>
@@ -115,23 +126,36 @@ export default function DashboardLayout({ role }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between lg:px-6">
+        <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800
+                           px-4 py-3 flex items-center justify-between lg:px-6">
           <button
-            className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+            className="lg:hidden p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={20} />
           </button>
           <div className="flex-1" />
-          <button className="relative p-2 text-gray-500 hover:text-gray-700">
-            <Bell size={20} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white
-                               text-[10px] font-bold rounded-full flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            {/* Notifications */}
+            <button className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200
+                               hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition">
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white
+                                 text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
         </header>
 
         {/* Page */}

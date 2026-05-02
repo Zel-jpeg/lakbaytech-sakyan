@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 
 const STEPS = [
   { number: 1, label: 'Account Type', path: '/onboarding/step1' },
@@ -9,14 +9,23 @@ const STEPS = [
 ]
 
 export default function OnboardingLayout({ children, currentStep }) {
+  const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-gray-50">
 
       {/* Top bar */}
       <div className="bg-white border-b border-gray-100 px-4 py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+        <div className="max-w-2xl mx-auto grid grid-cols-3 items-center">
           <span className="text-lg font-bold text-blue-600">Sakyan</span>
-          <span className="text-sm text-gray-400">Partner Onboarding</span>
+          <span className="text-sm text-gray-400 font-medium justify-self-center hidden sm:block">Partner Onboarding</span>
+          <div className="justify-self-end">
+             <button 
+                onClick={() => navigate('/')}
+                className="text-sm text-gray-500 hover:text-gray-900 transition flex items-center gap-1"
+             >
+                <X size={16} /> Cancel
+             </button>
+          </div>
         </div>
       </div>
 
@@ -51,7 +60,7 @@ export default function OnboardingLayout({ children, currentStep }) {
       </div>
 
       {/* Page content */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {children}
       </div>
     </div>

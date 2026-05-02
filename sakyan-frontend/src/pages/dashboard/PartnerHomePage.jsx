@@ -6,15 +6,16 @@ import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/utils/formatters'
 import { format } from 'date-fns'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts'
+import { useUIStore } from '@/store/uiStore'
 
 function StatCard({ icon: Icon, label, value, color }) {
   return (
-    <div className="bg-white rounded-2xl p-5 border border-gray-100">
+    <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${color}`}>
         <Icon size={20} className="text-white" />
       </div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{label}</p>
     </div>
   )
 }
@@ -23,6 +24,7 @@ export default function PartnerHomePage() {
   const { user } = useAuthStore()
   const { data: carsData } = useMyPartnerCars()
   const { data: bookingsData } = usePartnerBookings()
+  const { theme } = useUIStore()
 
   const cars     = carsData?.results     || carsData     || []
   const bookings = bookingsData?.results || bookingsData || []
@@ -83,20 +85,23 @@ export default function PartnerHomePage() {
   // 4. Fleet Utilization Rate
   const uniqueActiveCarsCount = new Set(activeBookings.map(b => b.car)).size
   const fleetUtilization = cars.length > 0 ? Math.round((uniqueActiveCarsCount / cars.length) * 100) : 0
+  
+  const chartTextColor = theme === 'dark' ? '#9CA3AF' : '#6B7280'
+  const chartGridColor = theme === 'dark' ? '#374151' : '#E5E7EB'
 
   return (
     <div>
       {/* Welcome */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Welcome back, {user?.full_name?.split(' ')[0]} 👋
         </h1>
-        <p className="text-gray-500 text-sm mt-1">Here's what's happening with your fleet today.</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Here's what's happening with your fleet today.</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <StatCard icon={Car}          label="Listed Cars"       value={cars.length}             color="bg-blue-500" />
+        <StatCard icon={Car}          label="Listed Cars"       value={cars.length}             color="bg-brand-500" />
         <StatCard icon={Clock}        label="Pending Reviews"   value={pendingBookings.length}  color="bg-amber-500" />
         <StatCard icon={CalendarCheck} label="Active Bookings"  value={activeBookings.length}   color="bg-green-500" />
         <StatCard icon={Car}          label="Utilization Rate"  value={`${fleetUtilization}%`}  color="bg-indigo-500" />
@@ -107,11 +112,11 @@ export default function PartnerHomePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         
         {/* Earnings Area Chart (Spans 2 cols) */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 lg:col-span-2">
-          <h2 className="font-semibold text-gray-800 mb-6">Earnings Trend</h2>
+        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5 lg:col-span-2">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-200 mb-6">Earnings Trend</h2>
           <div className="h-64 w-full">
             {earningsData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+              <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
                 No completed bookings yet to show earnings.
               </div>
             ) : (
@@ -119,26 +124,26 @@ export default function PartnerHomePage() {
                 <AreaChart data={earningsData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#4F6BF6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#4F6BF6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: chartTextColor }} dy={10} />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6B7280' }}
+                    tick={{ fontSize: 12, fill: chartTextColor }}
                     tickFormatter={(value) => `₱${value.toLocaleString()}`}
                   />
                   <Tooltip 
                     formatter={(value) => [`₱${value.toLocaleString()}`, 'Earnings']}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ borderRadius: '12px', border: `1px solid ${chartGridColor}`, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f3f4f6' : '#111827' }}
                   />
                   <Area 
                     type="monotone" 
                     dataKey="Earnings" 
-                    stroke="#8B5CF6" 
+                    stroke="#4F6BF6" 
                     strokeWidth={3}
                     fillOpacity={1} 
                     fill="url(#colorEarnings)" 
@@ -150,11 +155,11 @@ export default function PartnerHomePage() {
         </div>
 
         {/* Booking Status Pie Chart (Spans 1 col) */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-800 mb-6">Booking Statuses</h2>
+        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-200 mb-6">Booking Statuses</h2>
           <div className="h-64 w-full">
             {statusData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+              <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
                 No bookings.
               </div>
             ) : (
@@ -174,9 +179,9 @@ export default function PartnerHomePage() {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ borderRadius: '12px', border: `1px solid ${chartGridColor}`, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f3f4f6' : '#111827' }}
                   />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: chartTextColor }} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -186,24 +191,24 @@ export default function PartnerHomePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Performing Cars (Horizontal BarChart) */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-800 mb-6">Top Performing Cars</h2>
+        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-200 mb-6">Top Performing Cars</h2>
           <div className="h-64 w-full">
             {topCarsData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+              <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
                 Not enough data. Complete bookings to see stats!
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topCarsData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E5E7EB" />
-                  <XAxis type="number" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: '#374151' }} axisLine={false} tickLine={false} width={100} />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke={chartGridColor} />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: chartTextColor }} axisLine={false} tickLine={false} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: chartTextColor }} axisLine={false} tickLine={false} width={100} />
                   <Tooltip 
                     formatter={(value) => [`₱${value.toLocaleString()}`, 'Earnings']}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ borderRadius: '12px', border: `1px solid ${chartGridColor}`, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f3f4f6' : '#111827' }}
                   />
-                  <Bar dataKey="Earnings" fill="#8B5CF6" radius={[0, 4, 4, 0]} maxBarSize={30} />
+                  <Bar dataKey="Earnings" fill="#4F6BF6" radius={[0, 4, 4, 0]} maxBarSize={30} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -211,34 +216,34 @@ export default function PartnerHomePage() {
         </div>
 
         {/* Recent pending bookings */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">Pending Bookings</h2>
-          <Link to="/dashboard/bookings" className="text-sm text-blue-600 hover:underline">
+        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-200">Pending Bookings</h2>
+          <Link to="/dashboard/bookings" className="text-sm text-brand-600 dark:text-brand-400 hover:underline">
             View all
           </Link>
         </div>
 
         {pendingBookings.length === 0 ? (
           <div className="py-12 text-center">
-            <CalendarCheck size={32} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-sm text-gray-500">No pending bookings</p>
+            <CalendarCheck size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">No pending bookings</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50 dark:divide-gray-800/50">
             {pendingBookings.slice(0, 5).map((booking) => (
               <div key={booking.id} className="px-5 py-4 flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="font-medium text-gray-800 truncate">{booking.car_name}</p>
-                  <p className="text-sm text-gray-500">{booking.customer_name} · #{booking.booking_code}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="font-medium text-gray-800 dark:text-gray-200 truncate">{booking.car_name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{booking.customer_name} · #{booking.booking_code}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                     {booking.start_date} → {booking.end_date}
                   </p>
                 </div>
                 <Link
                   to="/dashboard/bookings"
-                  className="shrink-0 px-3 py-1.5 bg-blue-50 text-blue-600 text-xs
-                             font-semibold rounded-lg hover:bg-blue-100 transition"
+                  className="shrink-0 px-3 py-1.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 text-xs
+                             font-semibold rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/50 transition border border-brand-100 dark:border-brand-800"
                 >
                   Review
                 </Link>

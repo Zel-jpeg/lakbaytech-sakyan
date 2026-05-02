@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Message, Notification
+from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Message, Notification, PlatformSetting
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
@@ -64,10 +64,15 @@ class CarDetailSerializer(serializers.ModelSerializer):
     partner_name  = serializers.CharField(source='partner.business_name', read_only=True)
     partner_phone = serializers.CharField(source='partner.contact_phone', read_only=True)
     partner_id    = serializers.UUIDField(source='partner.id', read_only=True)
+    primary_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
         fields = '__all__'
+
+    def get_primary_image(self, obj):
+        img = obj.images.filter(is_primary=True).first() or obj.images.first()
+        return img.image_url if img else None
 
 
 class CarWriteSerializer(serializers.ModelSerializer):
@@ -162,6 +167,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         total_days = (end - start).days
         subtotal = car.price_per_day * total_days
         commission = subtotal * (car.partner.commission_rate / 100)
+        booking_fee = PlatformSetting.get('booking_fee', default=100)
 
         booking_code = f"SKY-{date.today().strftime('%Y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
 
@@ -173,7 +179,8 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             price_per_day=car.price_per_day,
             subtotal=subtotal,
             commission_amount=commission,
-            total_amount=subtotal,
+            total_amount=subtotal + booking_fee,
+            booking_fee=booking_fee,
             **validated_data
         )
 
@@ -217,3 +224,9 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = '__all__'
         read_only_fields = ['id', 'user', 'created_at']
+
+
+class PlatformSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlatformSetting
+        fields = ['key', 'value', 'label']

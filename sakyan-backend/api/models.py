@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
 
 
 class User(models.Model):
@@ -76,7 +77,7 @@ class Car(models.Model):
     price_per_day = models.DecimalField(max_digits=10, decimal_places=2)
     location      = models.CharField(max_length=255)
     description   = models.TextField(blank=True)
-    features      = models.JSONField(default=list)
+    features      = ArrayField(models.TextField(), default=list, blank=True)
     status        = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     is_available  = models.BooleanField(default=True)
     created_at    = models.DateTimeField(auto_now_add=True)
@@ -152,6 +153,7 @@ class Booking(models.Model):
     booking_status    = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending_review')
     special_requests  = models.TextField(blank=True)
     admin_notes       = models.TextField(blank=True)
+    booking_fee       = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at        = models.DateTimeField(auto_now_add=True)
     updated_at        = models.DateTimeField(auto_now=True)
 
@@ -186,3 +188,19 @@ class Notification(models.Model):
     class Meta:
         db_table = 'notifications'
         ordering = ['-created_at']
+
+
+class PlatformSetting(models.Model):
+    key   = models.CharField(max_length=100, unique=True)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    label = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        db_table = 'platform_settings'
+
+    @classmethod
+    def get(cls, key, default=0):
+        try:
+            return cls.objects.get(key=key).value
+        except cls.DoesNotExist:
+            return default

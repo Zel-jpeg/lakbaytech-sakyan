@@ -17,7 +17,7 @@ function StatusBadge({ status }) {
   const tab = STATUS_TABS.find(t => t.value === status)
   return (
     <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                      ${tab?.color || 'bg-gray-100 text-gray-500'}`}>
+                      ${tab?.color || 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
       {status}
     </span>
   )
@@ -30,11 +30,11 @@ function DocPreview({ label, url }) {
 
   return (
     <>
-      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+      <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden bg-white dark:bg-[#1a1d2e]">
         {/* Label bar */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50">
-          <span className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
-            <FileText size={12} className="text-gray-400" />
+        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+            <FileText size={12} className="text-gray-400 dark:text-gray-500" />
             {label}
           </span>
           <a
@@ -119,27 +119,27 @@ function PartnerCard({ partner, activeTab }) {
   }
 
   return (
-    <div className="border border-gray-100 rounded-2xl overflow-hidden">
+    <div className="border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
       {/* Summary row */}
-      <div className="bg-white px-4 py-4 flex items-center gap-4">
+      <div className="bg-white dark:bg-[#1a1d2e] px-4 py-4 flex items-center gap-4">
         {/* Avatar initial */}
-        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center
-                        shrink-0 text-blue-600 font-bold text-sm">
+        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center
+                        shrink-0 text-blue-600 dark:text-blue-400 font-bold text-sm">
           {partner.business_name?.[0]?.toUpperCase()}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-gray-800">{partner.business_name}</p>
+            <p className="font-semibold text-gray-800 dark:text-white">{partner.business_name}</p>
             <StatusBadge status={partner.status} />
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium
                               ${partner.partner_type === 'company'
-                                ? 'bg-purple-100 text-purple-700'
-                                : 'bg-gray-100 text-gray-600'}`}>
+                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
               {partner.partner_type}
             </span>
           </div>
-          <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 flex-wrap">
+          <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
             <span className="flex items-center gap-1"><User size={11} />{partner.contact_person}</span>
             <span className="flex items-center gap-1"><Mail size={11} />{partner.user_email}</span>
             <span>Applied {formatDate(partner.created_at)}</span>
@@ -156,23 +156,23 @@ function PartnerCard({ partner, activeTab }) {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-4">
+        <div className="border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30 px-4 py-4 space-y-4">
 
           {/* Business details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="flex items-start gap-2 text-gray-700">
+            <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
               <Building2 size={14} className="text-gray-400 mt-0.5 shrink-0" />
               <span>{partner.business_name}</span>
             </div>
-            <div className="flex items-start gap-2 text-gray-700">
+            <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
               <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
               <span>{partner.business_address || '—'}</span>
             </div>
-            <div className="flex items-center gap-2 text-gray-700">
+            <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
               <Phone size={14} className="text-gray-400" />
               <span>{partner.contact_phone || '—'}</span>
             </div>
-            <div className="flex items-center gap-2 text-gray-700">
+            <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
               <Mail size={14} className="text-gray-400" />
               <span>{partner.user_email}</span>
             </div>
@@ -180,7 +180,7 @@ function PartnerCard({ partner, activeTab }) {
 
           {/* Documents */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Submitted Documents</p>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Submitted Documents</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
               {/* Government ID */}
@@ -190,7 +190,7 @@ function PartnerCard({ partner, activeTab }) {
                   url={partner.government_id_url}
                 />
               ) : (
-                <div className="border border-dashed border-gray-200 rounded-xl p-4 text-xs text-gray-400 flex items-center gap-2">
+                <div className="border border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 text-xs text-gray-400 flex items-center gap-2">
                   <FileText size={14} /> No Government ID uploaded
                 </div>
               )}
@@ -300,8 +300,8 @@ export default function AdminPartnersPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Partner Applications</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Review, approve, and manage partner accounts.</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Partner Applications</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Review, approve, and manage partner accounts.</p>
       </div>
 
       {/* Status tabs */}
@@ -312,8 +312,8 @@ export default function AdminPartnersPage() {
             onClick={() => setActiveTab(tab.value)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
               activeTab === tab.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'bg-white dark:bg-[#1a1d2e] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brand-300 dark:hover:border-brand-600'
             }`}
           >
             {tab.label}
@@ -324,15 +324,15 @@ export default function AdminPartnersPage() {
       {isLoading && (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 h-20 animate-pulse" />
+            <div key={i} className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 h-20 animate-pulse" />
           ))}
         </div>
       )}
 
       {!isLoading && partners.length === 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
-          <Building2 size={36} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">No {activeTab} applications.</p>
+        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 py-16 text-center">
+          <Building2 size={36} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+          <p className="text-gray-500 dark:text-gray-400 text-sm">No {activeTab} applications.</p>
         </div>
       )}
 

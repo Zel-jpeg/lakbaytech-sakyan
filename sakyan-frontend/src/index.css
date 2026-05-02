@@ -1,3 +1,127 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Google Fonts (Inter) loaded via index.html <link> ── */
+
+/* ── Base layer ── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    @apply transition-colors duration-200;
+  }
+
+  html {
+    @apply scroll-smooth antialiased;
+  }
+
+  body {
+    @apply bg-white text-gray-900 dark:bg-[#0f1117] dark:text-gray-100 font-sans;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-gray-600;
+  }
+}
+
+/* ── Component layer ── */
+@layer components {
+  /* Glass effect */
+  .glass {
+    @apply bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border border-white/20 dark:border-gray-700/30;
+  }
+
+  .glass-strong {
+    @apply bg-white/90 dark:bg-gray-900/90 backdrop-blur-2xl border border-gray-200/50 dark:border-gray-700/50;
+  }
+
+  /* Gradient text helper */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-500 to-blue-400;
+  }
+
+  /* Shimmer skeleton */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      theme('colors.gray.100') 25%,
+      theme('colors.gray.200') 50%,
+      theme('colors.gray.100') 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+  }
+
+  .dark .shimmer {
+    background: linear-gradient(
+      90deg,
+      theme('colors.gray.800') 25%,
+      theme('colors.gray.700') 50%,
+      theme('colors.gray.800') 75%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* Modern input */
+  .input-modern {
+    @apply w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm
+           bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+           placeholder-gray-400 dark:placeholder-gray-500
+           focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500
+           transition-all duration-200;
+  }
+
+  /* Modern select */
+  .select-modern {
+    @apply input-modern appearance-none cursor-pointer;
+  }
+
+  /* Premium card */
+  .card {
+    @apply bg-white dark:bg-[#1a1d2e] border border-gray-100 dark:border-gray-800
+           rounded-2xl shadow-card dark:shadow-dark-card
+           transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:shadow-card-hover dark:hover:shadow-dark-card-hover
+           hover:-translate-y-1 active:translate-y-0;
+  }
+
+  /* Button variants */
+  .btn-primary {
+    @apply px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold
+           rounded-xl transition-all duration-200 shadow-sm hover:shadow-md
+           active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700
+           text-gray-700 dark:text-gray-200 text-sm font-semibold
+           rounded-xl transition-all duration-200;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400
+           hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200;
+  }
+}
+
+/* ── Utility layer ── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

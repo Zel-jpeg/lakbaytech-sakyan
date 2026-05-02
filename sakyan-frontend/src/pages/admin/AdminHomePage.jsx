@@ -11,32 +11,32 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 function StatCard({ icon: Icon, label, value, color, sub }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 flex gap-4 items-center">
+    <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5 flex gap-4 items-center">
       <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
         <Icon size={20} className="text-white" />
       </div>
       <div className="min-w-0">
-        <p className="text-2xl font-bold text-gray-900">{value ?? '—'}</p>
-        <p className="text-sm text-gray-500 truncate">{label}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value ?? '—'}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{label}</p>
+        {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
       </div>
     </div>
   )
 }
 
 const STATUS_STYLES = {
-  pending_review: 'bg-amber-100 text-amber-700',
-  approved:       'bg-blue-100 text-blue-700',
-  active:         'bg-green-100 text-green-700',
-  completed:      'bg-gray-100 text-gray-600',
-  rejected:       'bg-red-100 text-red-600',
-  cancelled:      'bg-red-50 text-red-400',
+  pending_review: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  approved:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  active:         'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  completed:      'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  rejected:       'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  cancelled:      'bg-red-50 text-red-400 dark:bg-red-900/20 dark:text-red-400',
 }
 
 function StatusBadge({ status }) {
   return (
     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium
-                      ${STATUS_STYLES[status] || 'bg-gray-100 text-gray-500'}`}>
+                      ${STATUS_STYLES[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
       {status?.replace('_', ' ')}
     </span>
   )
@@ -92,15 +92,15 @@ export default function AdminHomePage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Platform overview at a glance.</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Platform overview at a glance.</p>
       </div>
 
       {/* Stats grid */}
       {statsLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 h-24 animate-pulse" />
+            <div key={i} className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 h-24 animate-pulse" />
           ))}
         </div>
       ) : (
@@ -148,8 +148,8 @@ export default function AdminHomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           
           {/* Revenue Area Chart (Spans 2 cols) */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 lg:col-span-2">
-            <h2 className="font-semibold text-gray-800 mb-6">Platform Revenue Trend</h2>
+          <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5 lg:col-span-2">
+            <h2 className="font-semibold text-gray-800 dark:text-white mb-6">Platform Revenue Trend</h2>
             <div className="h-64 w-full">
               {revenueData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -191,8 +191,8 @@ export default function AdminHomePage() {
           </div>
 
           {/* Partner Distribution Pie Chart (Spans 1 col) */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h2 className="font-semibold text-gray-800 mb-6">Partner Distribution</h2>
+          <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+            <h2 className="font-semibold text-gray-800 dark:text-white mb-6">Partner Distribution</h2>
             <div className="h-64 w-full">
               {partnerDistributionData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -227,8 +227,8 @@ export default function AdminHomePage() {
       )}
 
       {/* Top Grossing Partners */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-2">
-        <h2 className="font-semibold text-gray-800 mb-6">Top Grossing Partners</h2>
+      <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5 mb-2">
+        <h2 className="font-semibold text-gray-800 dark:text-white mb-6">Top Grossing Partners</h2>
         <div className="h-64 w-full">
           {topPartnersData.length === 0 ? (
             <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -254,11 +254,11 @@ export default function AdminHomePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Pending Partners */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-800">Pending Partner Applications</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-white">Pending Partner Applications</h2>
             <Link to="/admin/partners"
-              className="text-xs text-blue-600 hover:underline font-medium">
+              className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-medium">
               View all →
             </Link>
           </div>
@@ -266,25 +266,25 @@ export default function AdminHomePage() {
           {partnerList.length === 0 ? (
             <div className="py-8 text-center">
               <CheckCircle2 size={28} className="mx-auto text-green-400 mb-2" />
-              <p className="text-sm text-gray-500">No pending applications 🎉</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">No pending applications 🎉</p>
             </div>
           ) : (
             <div className="space-y-3">
               {partnerList.slice(0, 5).map(partner => (
                 <div key={partner.id}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
                     <Users size={16} className="text-amber-600" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-800 truncate">
+                    <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
                       {partner.business_name}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
                       {partner.partner_type} · {partner.user?.email}
                     </p>
                   </div>
-                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+                  <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium shrink-0">
                     Pending
                   </span>
                 </div>
@@ -294,34 +294,34 @@ export default function AdminHomePage() {
         </div>
 
         {/* Recent Bookings */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-800">Recent Bookings</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-white">Recent Bookings</h2>
             <Link to="/admin/bookings"
-              className="text-xs text-blue-600 hover:underline font-medium">
+              className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-medium">
               View all →
             </Link>
           </div>
 
           {bookingList.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No bookings yet.</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No bookings yet.</p>
           ) : (
             <div className="space-y-3">
               {bookingList.map(booking => (
                 <div key={booking.id}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium text-gray-800 truncate">
+                      <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
                         {booking.car_name}
                       </p>
                       <StatusBadge status={booking.booking_status} />
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                       {booking.customer_name} · {formatDate(booking.start_date)} – {formatDate(booking.end_date)}
                     </p>
                   </div>
-                  <p className="text-sm font-bold text-gray-900 shrink-0">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white shrink-0">
                     {formatCurrency(booking.total_amount)}
                   </p>
                 </div>
