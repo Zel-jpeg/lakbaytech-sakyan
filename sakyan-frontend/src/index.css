@@ -125,3 +125,70 @@
     text-wrap: balance;
   }
 }
+
+/* ── react-day-picker: fill container width ── */
+.rdp-custom-container .rdp {
+  --rdp-cell-size: auto;
+  width: 100% !important;
+  max-width: 100%;
+}
+.rdp-custom-container .rdp-month {
+  width: 100%;
+}
+.rdp-custom-container .rdp-table {
+  width: 100%;
+}
+.rdp-custom-container .rdp-head_cell,
+.rdp-custom-container .rdp-cell {
+  text-align: center;
+  padding: 4px;
+}
+.rdp-custom-container .rdp-day {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+}
+
+/* Booked (confirmed) - custom modifier class, reliable in all rdp v9 versions */
+.rdp-custom-container .rdp-day_booked .rdp-day_button,
+.rdp-custom-container .rdp-day_booked button {
+  background-color: rgb(254 202 202 / 0.8) !important;
+  color: rgb(185 28 28) !important;
+  cursor: not-allowed !important;
+  text-decoration: line-through;
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+.dark .rdp-custom-container .rdp-day_booked .rdp-day_button,
+.dark .rdp-custom-container .rdp-day_booked button {
+  background-color: rgb(127 29 29 / 0.45) !important;
+  color: rgb(252 165 165) !important;
+}
+
+/* Fallback: also target aria-disabled in case rdp applies it */
+.rdp-custom-container .rdp-day_button[aria-disabled="true"],
+.rdp-custom-container button[aria-disabled="true"].rdp-day_button {
+  background-color: rgb(254 202 202 / 0.8) !important;
+  color: rgb(185 28 28) !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+  text-decoration: line-through;
+  border-radius: 0.5rem;
+}
+.dark .rdp-custom-container .rdp-day_button[aria-disabled="true"] {
+  background-color: rgb(127 29 29 / 0.45) !important;
+  color: rgb(252 165 165) !important;
+}
+
+/* Pending (under review) — amber, still selectable */
+.rdp-custom-container .rdp-day_pending .rdp-day_button,
+.rdp-custom-container .rdp-day_pending button {
+  background-color: rgb(253 230 138 / 0.6) !important;
+  color: rgb(146 64 14) !important;
+  border-radius: 0.5rem;
+}
+.dark .rdp-custom-container .rdp-day_pending .rdp-day_button,
+.dark .rdp-custom-container .rdp-day_pending button {
+  background-color: rgb(120 53 15 / 0.45) !important;
+  color: rgb(252 211 77) !important;
+}

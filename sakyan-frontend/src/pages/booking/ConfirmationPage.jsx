@@ -2,7 +2,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
   CheckCircle2, CalendarDays, CreditCard,
-  Banknote, MapPin, ClipboardList, Car,
+  Banknote, MapPin, ClipboardList, Car, MessageCircle,
 } from 'lucide-react'
 
 const STATUS_LABEL = {
@@ -84,7 +84,9 @@ export default function ConfirmationPage() {
         </div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Booking Submitted!</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-2 text-base">
-          The partner will review your request and confirm shortly.
+          {booking.payment_method === 'gcash'
+            ? 'Chat with the partner to coordinate your GCash payment.'
+            : 'The partner will review your request and confirm shortly.'}
         </p>
       </div>
 
@@ -147,20 +149,35 @@ export default function ConfirmationPage() {
 
       {/* Info note */}
       <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-900/50 rounded-2xl p-5 mb-8 text-sm text-brand-800 dark:text-brand-300 leading-relaxed shadow-sm">
-        <span className="text-base mr-2">💡</span> You'll be notified via email once the partner approves or rejects your booking.
-        You can also check the status anytime in <strong>My Bookings</strong>.
+        {booking.payment_method === 'gcash' ? (
+          <><span className="text-base mr-2">💬</span> Chat with the partner to coordinate your GCash payment. They will share their GCash number in the chat.<br/>
+          <span className="text-xs opacity-70 mt-1 block">You can check your booking status anytime in <strong>My Bookings</strong>.</span></>
+        ) : (
+          <><span className="text-base mr-2">💵</span> Pay the full amount in cash to the partner on pickup/delivery day. You'll be notified once they approve your booking.<br/>
+          <span className="text-xs opacity-70 mt-1 block">You can check your booking status anytime in <strong>My Bookings</strong>.</span></>
+        )}
       </div>
 
       {/* CTAs */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <button
-          onClick={() => navigate('/booking/my-bookings')}
-          className="flex-1 flex items-center justify-center gap-2 py-4 bg-brand-600
-                     hover:bg-brand-700 text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition active:scale-[0.98]"
-        >
-          <ClipboardList size={18} />
-          View my bookings
-        </button>
+        {booking.payment_method === 'gcash' ? (
+          <button
+            onClick={() => navigate(`/messages?booking=${booking.id}`)}
+            className="flex-1 flex items-center justify-center gap-2 py-4 bg-brand-600
+                       hover:bg-brand-700 text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition active:scale-[0.98]"
+          >
+            <MessageCircle size={18} /> Chat with Partner
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/booking/my-bookings')}
+            className="flex-1 flex items-center justify-center gap-2 py-4 bg-brand-600
+                       hover:bg-brand-700 text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition active:scale-[0.98]"
+          >
+            <ClipboardList size={18} />
+            View my bookings
+          </button>
+        )}
         <button
           onClick={() => navigate('/cars')}
           className="flex-1 py-4 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-white dark:bg-[#1a1d2e] rounded-xl

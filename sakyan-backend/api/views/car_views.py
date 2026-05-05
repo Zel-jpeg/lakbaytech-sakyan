@@ -2,7 +2,8 @@ from rest_framework import generics, filters, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from ..models import Car
+from django.utils import timezone
+from ..models import Car, Booking
 from ..serializers import CarListSerializer, CarDetailSerializer, CarWriteSerializer
 from ..permissions import IsPartner
 
@@ -37,6 +38,40 @@ class CarDetailView(generics.RetrieveAPIView):
     queryset = Car.objects.all().select_related('partner').prefetch_related('images')
     serializer_class = CarDetailSerializer
     permission_classes = [AllowAny]
+
+
+class CarBookedDatesView(APIView):
+    """
+    Returns upcoming/active booked date ranges for a car.
+    Used by the frontend to display availability on the calendar.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        try:
+            car = Car.objects.get(pk=pk)
+        except Car.DoesNotExist:
+            return Response({'error': 'Not found'}, status=404)
+
+        today = timezone.now().date()
+        bookings = Booking.objects.filter(
+            car=car,
+            booking_status__in=['pending_review', 'approved', 'active'],
+            end_date__gte=today,
+        ).values('start_date', 'end_date', 'booking_status')
+
+        ranges = [
+            {
+                'start': str(b['start_date']),
+                'end':   str(b['end_date']),
+                'status': (
+                    'confirmed' if b['booking_status'] in ['approved', 'active']
+                    else 'pending'
+                ),
+            }
+            for b in bookings
+        ]
+        return Response({'booked_ranges': ranges})
 
 
 class PartnerCarListCreateView(generics.ListCreateAPIView):

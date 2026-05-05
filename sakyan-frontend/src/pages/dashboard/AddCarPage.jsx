@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Upload, X } from 'lucide-react'
 import { useState } from 'react'
 import { useCreateCar } from '@/hooks/useCars'
 import { useFileUpload } from '@/hooks/useFileUpload'
+import CarLocationPicker from '@/components/cars/CarLocationPicker'
 
 const schema = z.object({
   name:          z.string().min(2, 'Car name is required'),
@@ -42,8 +43,9 @@ export default function AddCarPage() {
   const createCar = useCreateCar()
   const { uploadFile, uploading, deleteFile } = useFileUpload('car-images')
   const [imageUrls, setImageUrls] = useState([])
+  const [locationCoords, setLocationCoords] = useState({ lat: null, lng: null })
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { seats: 5, transmission: 'automatic', fuel_type: 'gasoline' }
   })
@@ -64,7 +66,12 @@ export default function AddCarPage() {
 
   const onSubmit = (data) => {
     createCar.mutate(
-      { ...data, image_urls: imageUrls },
+      {
+        ...data,
+        image_urls: imageUrls,
+        location_lat: locationCoords.lat,
+        location_lng: locationCoords.lng,
+      },
       { onSuccess: () => navigate('/dashboard/cars') }
     )
   }
@@ -140,14 +147,22 @@ export default function AddCarPage() {
         <div className={sectionCls}>
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-5">Pricing & Location</h2>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Price per Day (₱)" error={errors.price_per_day?.message} required>
-                <input {...register('price_per_day')} type="number" placeholder="1500" className={inputCls} />
-              </Field>
-              <Field label="Location" error={errors.location?.message} required>
-                <input {...register('location')} placeholder="Quezon City, Metro Manila" className={inputCls} />
-              </Field>
-            </div>
+            <Field label="Price per Day (₱)" error={errors.price_per_day?.message} required>
+              <input {...register('price_per_day')} type="number" placeholder="1500" className={inputCls} />
+            </Field>
+            <Field label="Pickup Location" error={errors.location?.message} required>
+              <Controller
+                name="location"
+                control={control}
+                render={({ field }) => (
+                  <CarLocationPicker
+                    onChange={field.onChange}
+                    onCoordsChange={(lat, lng) => setLocationCoords({ lat, lng })}
+                    error={errors.location?.message}
+                  />
+                )}
+              />
+            </Field>
             <Field label="Description" error={errors.description?.message}>
               <textarea {...register('description')} rows={4} placeholder="Any extra details about the car…"
                         className={inputCls + " resize-y"} />

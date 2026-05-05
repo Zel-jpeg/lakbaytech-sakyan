@@ -1,11 +1,43 @@
 from rest_framework import serializers
-from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Message, Notification, PlatformSetting
+from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Message, Notification, PlatformSetting, PartnerSettlement
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerProfile
         exclude = ['user']
+        read_only_fields = ['is_verified', 'kyc_status', 'kyc_rejection_reason',
+                            'kyc_submitted_at', 'kyc_reviewed_at', 'kyc_reviewed_by']
+
+
+class KYCSubmitSerializer(serializers.ModelSerializer):
+    """Used by customers to submit their KYC data."""
+    class Meta:
+        model = CustomerProfile
+        fields = [
+            'birthday', 'contact_number', 'address', 'address_lat', 'address_lng',
+            'drivers_license_number', 'license_expiry', 'valid_id_type',
+            'drivers_license_url', 'valid_id_url',
+        ]
+
+
+class KYCAdminSerializer(serializers.ModelSerializer):
+    """Used by admin to list & review KYC submissions."""
+    user_id    = serializers.UUIDField(source='user.id', read_only=True)
+    full_name  = serializers.CharField(source='user.full_name', read_only=True)
+    email      = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = CustomerProfile
+        fields = [
+            'id', 'user_id', 'full_name', 'email',
+            'contact_number', 'address', 'address_lat', 'address_lng',
+            'drivers_license_url', 'valid_id_url',
+            'kyc_status', 'kyc_rejection_reason',
+            'kyc_submitted_at', 'kyc_reviewed_at',
+            'is_verified',
+        ]
+        read_only_fields = ['id', 'user_id', 'full_name', 'email']
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -51,6 +83,7 @@ class CarListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'brand', 'model', 'year', 'transmission',
             'fuel_type', 'seats', 'price_per_day', 'location',
+            'location_lat', 'location_lng',
             'is_available', 'primary_image', 'partner_name'
         ]
 
@@ -136,7 +169,8 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         fields = [
             'car', 'start_date', 'end_date',
             'pickup_location', 'return_location',
-            'payment_method', 'gcash_reference', 'special_requests'
+            'payment_method', 'gcash_reference', 'special_requests',
+            'fulfillment_type', 'delivery_address', 'delivery_lat', 'delivery_lng',
         ]
 
     def validate(self, data):
@@ -187,8 +221,9 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     car_name         = serializers.CharField(source='car.name', read_only=True)
+    car_id           = serializers.UUIDField(source='car.id', read_only=True)
     car_image        = serializers.SerializerMethodField()
-    car_location     = serializers.CharField(source='car.location', read_only=True)  # add this
+    car_location     = serializers.CharField(source='car.location', read_only=True)
     customer_name    = serializers.CharField(source='customer.full_name', read_only=True)
     customer_email   = serializers.CharField(source='customer.email', read_only=True)
     customer_phone   = serializers.CharField(source='customer.phone', read_only=True)
@@ -229,4 +264,23 @@ class NotificationSerializer(serializers.ModelSerializer):
 class PlatformSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformSetting
-        fields = ['key', 'value', 'label']
+        fields = ['key', 'value', 'text_value', 'label']
+
+
+class PartnerSettlementSerializer(serializers.ModelSerializer):
+    partner_name         = serializers.CharField(source='partner.business_name', read_only=True)
+    partner_id           = serializers.UUIDField(source='partner.id', read_only=True)
+    booking_count        = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PartnerSettlement
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_booking_count(self, obj):
+        return Booking.objects.filter(
+            partner=obj.partner,
+            booking_status='completed',
+            start_date__gte=obj.period_start,
+            end_date__lte=obj.period_end,
+        ).count()

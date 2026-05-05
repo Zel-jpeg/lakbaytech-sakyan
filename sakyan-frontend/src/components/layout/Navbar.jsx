@@ -4,15 +4,22 @@ import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useAuth } from '@/hooks/useAuth'
 import { useUnreadCount } from '@/hooks/useNotifications'
+import { useConversations } from '@/hooks/useMessages'
 import { useUIStore } from '@/store/uiStore'
 
 export default function Navbar() {
-  const { user } = useAuthStore()
-  const { logoutAction } = useAuth()
-  const unreadCount = useUnreadCount()
+  const { user }          = useAuthStore()
+  const { logoutAction }  = useAuth()
+  const unreadCount       = useUnreadCount()
   const { theme, toggleTheme } = useUIStore()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen, setMenuOpen]       = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  // Unread message count across all conversations (only when logged in)
+  const { data: conversations } = useConversations({ enabled: !!user })
+  const unreadMsgCount = user
+    ? (conversations?.results || conversations || []).reduce((s, c) => s + (c.unread_count || 0), 0)
+    : 0
 
   const closeAll = () => { setDropdownOpen(false); setMenuOpen(false) }
 
@@ -46,10 +53,16 @@ export default function Navbar() {
 
             {user && (
               <>
-                {/* Messages */}
-                <Link to="/inbox" className="text-gray-600 dark:text-gray-300 hover:text-brand-500
+                {/* Messages icon with unread badge */}
+                <Link to="/messages" className="relative text-gray-600 dark:text-gray-300 hover:text-brand-500
                                             dark:hover:text-brand-400 transition">
                   <MessageCircle size={20} />
+                  {unreadMsgCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px]
+                                     font-bold rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                      {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
+                    </span>
+                  )}
                 </Link>
 
                 {/* Notifications bell */}
@@ -103,6 +116,11 @@ export default function Navbar() {
                                        hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                             <BookOpen size={15} className="text-gray-400" /> My Bookings
                           </Link>
+                          <Link to="/messages" onClick={closeAll}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300
+                                       hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                            <MessageCircle size={15} className="text-gray-400" /> Messages
+                          </Link>
                           <Link to="/onboarding/step1" onClick={closeAll}
                             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300
                                        hover:bg-gray-50 dark:hover:bg-gray-800 transition">
@@ -118,6 +136,11 @@ export default function Navbar() {
                             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300
                                        hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                             <BookOpen size={15} className="text-gray-400" /> My Bookings
+                          </Link>
+                          <Link to="/messages" onClick={closeAll}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300
+                                       hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                            <MessageCircle size={15} className="text-gray-400" /> Messages
                           </Link>
                           <Link to="/dashboard" onClick={closeAll}
                             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-brand-600 dark:text-brand-400
@@ -180,9 +203,16 @@ export default function Navbar() {
 
             {user ? (
               <>
-                <Link to="/inbox"
-                  className="block text-gray-700 dark:text-gray-300 py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-                  onClick={closeAll}>Messages</Link>
+                <Link to="/messages"
+                  className="flex items-center justify-between text-gray-700 dark:text-gray-300 py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                  onClick={closeAll}>
+                  <span>Messages</span>
+                  {unreadMsgCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                      {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
+                    </span>
+                  )}
+                </Link>
                 <Link to="/notifications"
                   className="block text-gray-700 dark:text-gray-300 py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
                   onClick={closeAll}>

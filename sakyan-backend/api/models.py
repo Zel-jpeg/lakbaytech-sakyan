@@ -76,6 +76,8 @@ class Car(models.Model):
     color         = models.CharField(max_length=50, blank=True)
     price_per_day = models.DecimalField(max_digits=10, decimal_places=2)
     location      = models.CharField(max_length=255)
+    location_lat  = models.FloatField(null=True, blank=True)
+    location_lng  = models.FloatField(null=True, blank=True)
     description   = models.TextField(blank=True)
     features      = ArrayField(models.TextField(), default=list, blank=True)
     status        = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
@@ -101,16 +103,40 @@ class CarImage(models.Model):
 
 
 class CustomerProfile(models.Model):
+    KYC_STATUS_CHOICES = [
+        ('not_submitted', 'Not Submitted'),
+        ('pending',       'Pending Review'),
+        ('approved',      'Approved'),
+        ('rejected',      'Rejected'),
+    ]
+
     id                      = models.UUIDField(primary_key=True, default=uuid.uuid4)
     user                    = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    birthday                = models.DateField(null=True)
+    birthday                = models.DateField(null=True, blank=True)
+    # KYC personal info
+    contact_number          = models.CharField(max_length=20, blank=True)
     address                 = models.TextField(blank=True)
+    address_lat             = models.FloatField(null=True, blank=True)
+    address_lng             = models.FloatField(null=True, blank=True)
+    # KYC documents
     drivers_license_number  = models.CharField(max_length=50, blank=True)
     drivers_license_url     = models.TextField(blank=True)
-    license_expiry          = models.DateField(null=True)
+    license_expiry          = models.DateField(null=True, blank=True)
     valid_id_type           = models.CharField(max_length=100, blank=True)
     valid_id_url            = models.TextField(blank=True)
     selfie_url              = models.TextField(blank=True)
+    # KYC review pipeline
+    kyc_status              = models.CharField(
+        max_length=20, choices=KYC_STATUS_CHOICES, default='not_submitted'
+    )
+    kyc_rejection_reason    = models.TextField(blank=True)
+    kyc_submitted_at        = models.DateTimeField(null=True, blank=True)
+    kyc_reviewed_at         = models.DateTimeField(null=True, blank=True)
+    kyc_reviewed_by         = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='kyc_reviews',
+        db_column='kyc_reviewed_by'
+    )
     is_verified             = models.BooleanField(default=False)
     created_at              = models.DateTimeField(auto_now_add=True)
     updated_at              = models.DateTimeField(auto_now=True)
@@ -130,7 +156,14 @@ class Booking(models.Model):
     ]
     PAYMENT_METHOD_CHOICES = [('gcash', 'GCash'), ('cash', 'Cash')]
     PAYMENT_STATUS_CHOICES = [
-        ('pending', 'Pending'), ('paid', 'Paid'), ('refunded', 'Refunded')
+        ('pending',  'Not Yet Paid'),
+        ('partial',  'Partially Paid'),
+        ('paid',     'Paid'),
+        ('refunded', 'Refunded'),
+    ]
+    FULFILLMENT_CHOICES = [
+        ('pickup',   'Self-Pickup'),
+        ('delivery', 'Delivery'),
     ]
 
     id                = models.UUIDField(primary_key=True, default=uuid.uuid4)
@@ -154,6 +187,17 @@ class Booking(models.Model):
     special_requests  = models.TextField(blank=True)
     admin_notes       = models.TextField(blank=True)
     booking_fee       = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Fulfillment
+    fulfillment_type  = models.CharField(max_length=20, choices=FULFILLMENT_CHOICES, default='pickup')
+    delivery_address  = models.TextField(blank=True)
+    delivery_lat      = models.FloatField(null=True, blank=True)
+    delivery_lng      = models.FloatField(null=True, blank=True)
+    # Partner-side payment recording (partner collects from customer)
+    partner_gcash_reference = models.CharField(max_length=100, blank=True)
+    payment_notes           = models.TextField(blank=True)
+    # Rental time tracking — logged by partner
+    actual_start_time  = models.DateTimeField(null=True, blank=True)   # when car was handed over
+    actual_return_time = models.DateTimeField(null=True, blank=True)   # when car was returned
     created_at        = models.DateTimeField(auto_now_add=True)
     updated_at        = models.DateTimeField(auto_now=True)
 
@@ -191,9 +235,10 @@ class Notification(models.Model):
 
 
 class PlatformSetting(models.Model):
-    key   = models.CharField(max_length=100, unique=True)
-    value = models.DecimalField(max_digits=10, decimal_places=2)
-    label = models.CharField(max_length=255, blank=True)
+    key        = models.CharField(max_length=100, unique=True)
+    value      = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    text_value = models.CharField(max_length=500, blank=True, default='')  # for non-numeric settings
+    label      = models.CharField(max_length=255, blank=True)
 
     class Meta:
         db_table = 'platform_settings'
@@ -201,6 +246,35 @@ class PlatformSetting(models.Model):
     @classmethod
     def get(cls, key, default=0):
         try:
-            return cls.objects.get(key=key).value
+            obj = cls.objects.get(key=key)
+            # Prefer text_value for string-type settings
+            if obj.text_value:
+                return obj.text_value
+            return obj.value
         except cls.DoesNotExist:
             return default
+
+
+class PartnerSettlement(models.Model):
+    STATUS_CHOICES = [
+        ('pending',  'Pending'),
+        ('settled',  'Settled'),
+    ]
+
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    partner          = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='settlements')
+    period_start     = models.DateField()
+    period_end       = models.DateField()
+    total_commission = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_fees       = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_owed       = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    amount_received  = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    settled_at       = models.DateTimeField(null=True, blank=True)
+    notes            = models.TextField(blank=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    updated_at       = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'partner_settlements'
+        ordering = ['-created_at']

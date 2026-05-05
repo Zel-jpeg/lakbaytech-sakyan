@@ -8,6 +8,7 @@ export const carKeys = {
   list: (filters) => [...carKeys.lists(), filters],
   detail: (id) => [...carKeys.all, 'detail', id],
   myList: () => [...carKeys.all, 'my'],
+  bookedDates: (id) => [...carKeys.all, 'booked-dates', id],
 }
 
 export function useCars(filters = {}) {
@@ -32,6 +33,18 @@ export function useCar(id) {
       return res.data
     },
     enabled: !!id,
+  })
+}
+
+export function useCarBookedDates(id) {
+  return useQuery({
+    queryKey: carKeys.bookedDates(id),
+    queryFn: async () => {
+      const res = await api.get(`/cars/${id}/booked-dates/`)
+      return res.data.booked_ranges || []
+    },
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,  // 5 min cache
   })
 }
 

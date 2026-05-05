@@ -1,11 +1,12 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Upload, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useCar, useUpdateCar } from '@/hooks/useCars'
 import { useFileUpload } from '@/hooks/useFileUpload'
+import CarLocationPicker from '@/components/cars/CarLocationPicker'
 
 const schema = z.object({
   name:          z.string().min(2, 'Car name is required'),
@@ -44,8 +45,9 @@ export default function EditCarPage() {
   const updateCar = useUpdateCar()
   const { uploadFile, uploading, deleteFile } = useFileUpload('car-images')
   const [imageUrls, setImageUrls] = useState([])
+  const [locationCoords, setLocationCoords] = useState({ lat: null, lng: null })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
   })
 
@@ -65,6 +67,10 @@ export default function EditCarPage() {
         location:      car.location,
         description:   car.description || '',
       })
+      // Pre-load existing pin coordinates
+      if (car.location_lat && car.location_lng) {
+        setLocationCoords({ lat: car.location_lat, lng: car.location_lng })
+      }
       // Populate existing images
       const existing = (car.images || [])
         .sort((a, b) => a.sort_order - b.sort_order)
@@ -89,7 +95,13 @@ export default function EditCarPage() {
 
   const onSubmit = (data) => {
     updateCar.mutate(
-      { id, ...data, image_urls: imageUrls },
+      {
+        id,
+        ...data,
+        image_urls: imageUrls,
+        location_lat: locationCoords.lat,
+        location_lng: locationCoords.lng,
+      },
       { onSuccess: () => navigate('/dashboard/cars') }
     )
   }
@@ -181,14 +193,27 @@ export default function EditCarPage() {
         <div className={sectionCls}>
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-5">Pricing & Location</h2>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Price per Day (₱)" error={errors.price_per_day?.message} required>
-                <input {...register('price_per_day')} type="number" placeholder="1500" className={inputCls} />
-              </Field>
-              <Field label="Location" error={errors.location?.message} required>
-                <input {...register('location')} placeholder="Quezon City, Metro Manila" className={inputCls} />
-              </Field>
-            </div>
+            <Field label="Price per Day (₱)" error={errors.price_per_day?.message} required>
+              <input {...register('price_per_day')} type="number" placeholder="1500" className={inputCls} />
+            </Field>
+            <Field label="Pickup Location" error={errors.location?.message} required>
+              <Controller
+                name="location"
+                control={control}
+                render={({ field }) => (
+                  <CarLocationPicker
+                    onChange={field.onChange}
+                    onCoordsChange={(lat, lng) => setLocationCoords({ lat, lng })}
+                    error={errors.location?.message}
+                    initialPin={
+                      locationCoords.lat && locationCoords.lng
+                        ? { lat: locationCoords.lat, lng: locationCoords.lng }
+                        : null
+                    }
+                  />
+                )}
+              />
+            </Field>
             <Field label="Description" error={errors.description?.message}>
               <textarea {...register('description')} rows={4} placeholder="Any extra details about the car…"
                         className={inputCls + " resize-y"} />

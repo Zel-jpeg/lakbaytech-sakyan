@@ -1,13 +1,178 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   MapPin, Users, Fuel, Settings2, Palette, Calendar,
   ChevronLeft, ChevronRight, ArrowLeft, CheckCircle2,
   XCircle, Tag, Building2, Shield, Car,
 } from 'lucide-react'
-import { useCar } from '@/hooks/useCars'
+import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import L from 'leaflet'
+import { useCar, useCarBookedDates } from '@/hooks/useCars'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrency } from '@/utils/formatters'
+import 'leaflet/dist/leaflet.css'
+
+// Fix Leaflet marker icons
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+// ── Expand booked ranges into individual date strings ───────────────────────
+function expandRangesToDates(ranges = []) {
+  const confirmed = new Set()
+  const pending   = new Set()
+  ranges.forEach(({ start, end, status }) => {
+    const cur  = new Date(start)
+    const last = new Date(end)
+    while (cur <= last) {
+      const key = cur.toISOString().slice(0, 10)
+      if (status === 'confirmed') confirmed.add(key)
+      else pending.add(key)
+      cur.setDate(cur.getDate() + 1)
+    }
+  })
+  return { confirmed, pending }
+}
+
+// ── Availability Mini-Calendar ───────────────────────────────────────────────
+const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa']
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function AvailabilityCalendar({ ranges = [] }) {
+  const today     = new Date()
+  const [offset, setOffset] = useState(0)  // month offset from today
+  const { confirmed, pending } = expandRangesToDates(ranges)
+
+  const viewDate  = new Date(today.getFullYear(), today.getMonth() + offset, 1)
+  const year      = viewDate.getFullYear()
+  const month     = viewDate.getMonth()
+  const firstDay  = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  const todayStr   = today.toISOString().slice(0, 10)
+  const isPast = (d) => d < todayStr
+
+  const cells = []
+  for (let i = 0; i < firstDay; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+    cells.push(key)
+  }
+
+  // Legend
+  const totalBooked  = confirmed.size
+  const totalPending = pending.size
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+          <Calendar size={12} /> Availability
+        </p>
+        <div className="flex items-center gap-1">
+          <button disabled={offset === 0} onClick={() => setOffset(o => o - 1)}
+            className="p-1 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+            <ChevronLeft size={14} className="text-gray-500 dark:text-gray-400" />
+          </button>
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 min-w-[80px] text-center">
+            {MONTHS[month]} {year}
+          </span>
+          <button onClick={() => setOffset(o => o + 1)}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+            <ChevronRight size={14} className="text-gray-500 dark:text-gray-400" />
+          </button>
+        </div>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {DAYS.map(d => (
+          <div key={d} className="text-center text-[9px] font-bold text-gray-400 dark:text-gray-600 py-0.5">{d}</div>
+        ))}
+        {cells.map((key, i) => {
+          if (!key) return <div key={`e-${i}`} />
+          const isConfirmed = confirmed.has(key)
+          const isPending_  = pending.has(key)
+          const past        = isPast(key)
+          const isToday     = key === todayStr
+          return (
+            <div
+              key={key}
+              title={isConfirmed ? 'Booked' : isPending_ ? 'Pending confirmation' : 'Available'}
+              className={`aspect-square flex items-center justify-center rounded-md text-[11px] font-medium transition
+                ${ past
+                    ? 'text-gray-300 dark:text-gray-700'
+                  : isConfirmed
+                    ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 font-bold'
+                  : isPending_
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                  : isToday
+                    ? 'ring-2 ring-brand-500 text-brand-600 dark:text-brand-400 font-bold'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+            >
+              {parseInt(key.slice(-2), 10)}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
+        <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
+          <span className="w-2.5 h-2.5 rounded-sm bg-red-200 dark:bg-red-900/50" /> Booked ({totalBooked > 0 ? 'some dates' : 'none'})
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
+          <span className="w-2.5 h-2.5 rounded-sm bg-amber-200 dark:bg-amber-900/50" /> Pending
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
+          <span className="w-2.5 h-2.5 rounded-sm bg-gray-100 dark:bg-gray-800" /> Available
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Read-only location map for car detail ───────────────────────────────────
+function CarLocationMap({ lat, lng, locationStr }) {
+  const [coords, setCoords] = useState(lat && lng ? { lat, lng } : null)
+
+  useEffect(() => {
+    if (lat && lng) return // prefer stored coordinates
+    if (!locationStr) return
+    fetch(
+      `https://nominatim.openstreetmap.org/search?` +
+      new URLSearchParams({ q: locationStr + ', Philippines', format: 'json', limit: 1 }),
+      { headers: { 'Accept-Language': 'en' } }
+    )
+      .then(r => r.json())
+      .then(([result]) => { if (result) setCoords({ lat: +result.lat, lng: +result.lon }) })
+      .catch(() => {})
+  }, [lat, lng, locationStr])
+
+  if (!coords) return null
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 mt-3">
+      <MapContainer
+        center={[coords.lat, coords.lng]}
+        zoom={15}
+        style={{ height: '200px', width: '100%' }}
+        zoomControl={false}
+        dragging={false}
+        scrollWheelZoom={false}
+        doubleClickZoom={false}
+        attributionControl={false}
+      >
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <Marker position={[coords.lat, coords.lng]} />
+      </MapContainer>
+    </div>
+  )
+}
 
 // ─── Image Gallery ────────────────────────────────────────────────────────────
 
@@ -150,6 +315,7 @@ export default function CarDetailPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const { data: car, isLoading, isError } = useCar(id)
+  const { data: bookedRanges = [] }       = useCarBookedDates(id)
 
   if (isLoading) {
     return (
@@ -187,6 +353,20 @@ export default function CarDetailPage() {
       navigate('/login', { state: { from: `/booking/checkout/${car.id}` } })
       return
     }
+
+    if (user.role === 'customer') {
+      const kycStatus = user.customer_profile?.kyc_status
+      if (kycStatus === 'pending') {
+        navigate('/kyc/pending')
+        return
+      }
+      if (!kycStatus || kycStatus === 'not_submitted' || kycStatus === 'rejected') {
+        navigate('/kyc/verify', { state: { from: `/booking/checkout/${car.id}` } })
+        return
+      }
+      // kycStatus === 'approved' — proceed
+    }
+
     navigate(`/booking/checkout/${car.id}`)
   }
 
@@ -233,11 +413,18 @@ export default function CarDetailPage() {
                 <span>{car.partner_name}</span>
               </div>
             )}
-            {car.location && (
+          {car.location && (
               <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500 dark:text-gray-400">
                 <MapPin size={14} />
                 <span>{car.location}</span>
               </div>
+            )}
+            {car.location && (
+              <CarLocationMap
+                lat={car.location_lat}
+                lng={car.location_lng}
+                locationStr={car.location}
+              />
             )}
           </div>
 
@@ -319,6 +506,11 @@ export default function CarDetailPage() {
 
             <hr className="border-gray-100 dark:border-gray-700" />
 
+            {/* Availability calendar */}
+            <AvailabilityCalendar ranges={bookedRanges} />
+
+            <hr className="border-gray-100 dark:border-gray-700" />
+
             {/* Quick specs recap */}
             <div className="space-y-2.5 text-sm text-gray-600 dark:text-gray-400">
               {car.location && (
@@ -348,16 +540,50 @@ export default function CarDetailPage() {
             </div>
 
             {/* CTA */}
-            {user?.role === 'customer' && isAvailable && (
-              <button
-                onClick={handleBookNow}
-                className="w-full py-3.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
-                           text-white text-sm font-semibold rounded-xl transition-all shadow-md
-                           hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.98]"
-              >
-                Book Now
-              </button>
-            )}
+            {user?.role === 'customer' && isAvailable && (() => {
+              const kycStatus = user.customer_profile?.kyc_status
+              if (kycStatus === 'approved') {
+                return (
+                  <button
+                    onClick={handleBookNow}
+                    className="w-full py-3.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
+                               text-white text-sm font-semibold rounded-xl transition-all shadow-md
+                               hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.98]"
+                  >
+                    Book Now
+                  </button>
+                )
+              }
+              if (kycStatus === 'pending') {
+                return (
+                  <div className="space-y-2">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800
+                                    rounded-xl p-3 text-xs text-amber-700 dark:text-amber-300 text-center">
+                      ⏳ Your identity verification is under review. You'll be notified soon.
+                    </div>
+                    <button onClick={handleBookNow}
+                      className="w-full py-2.5 border border-amber-300 dark:border-amber-700
+                                 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-xl
+                                 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition">
+                      Check verification status
+                    </button>
+                  </div>
+                )
+              }
+              return (
+                <div className="space-y-2">
+                  <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800
+                                  rounded-xl p-3 text-xs text-orange-700 dark:text-orange-300 text-center">
+                    🪪 Identity verification required before booking.
+                  </div>
+                  <button onClick={handleBookNow}
+                    className="w-full py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
+                               text-white text-sm font-semibold rounded-xl transition-all shadow-md active:scale-[0.98]">
+                    Verify My Identity
+                  </button>
+                </div>
+              )
+            })()}
 
             {!user && (
               <div className="space-y-2">

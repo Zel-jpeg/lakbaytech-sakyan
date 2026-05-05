@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/config/axios'
 import { supabase } from '@/config/supabase'
 
-export function useConversations() {
+export function useConversations({ enabled = true } = {}) {
   return useQuery({
     queryKey: ['conversations'],
     queryFn: async () => {
       const res = await api.get('/messages/conversations/')
       return res.data
     },
+    enabled,
   })
 }
 

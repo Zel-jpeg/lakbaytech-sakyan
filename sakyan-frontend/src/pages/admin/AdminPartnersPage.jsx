@@ -3,7 +3,8 @@ import { useAdminPartners, useAdminPartnerAction } from '@/hooks/useAdmin'
 import { formatDate } from '@/utils/formatters'
 import {
   CheckCircle2, XCircle, ShieldOff, ChevronDown, ChevronUp,
-  User, Phone, Mail, FileText, Building2, MapPin, ExternalLink
+  User, Phone, Mail, FileText, Building2, MapPin, ExternalLink,
+  Percent, Edit2, Check, X as XIcon,
 } from 'lucide-react'
 
 const STATUS_TABS = [
@@ -101,6 +102,60 @@ function DocPreview({ label, url }) {
         </div>
       )}
     </>
+  )
+}
+
+function CommissionEditor({ partner }) {
+  const [editing, setEditing]   = useState(false)
+  const [rate, setRate]         = useState(String(partner.commission_rate ?? 10))
+  const actionMutation          = useAdminPartnerAction()
+
+  const current = Number(partner.commission_rate ?? 10)
+  const badge =
+    current <= 8  ? { label: `${current}% — Small Fleet`,  cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' } :
+    current <= 10 ? { label: `${current}% — Standard`,     cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' } :
+                   { label: `${current}% — Custom`,        cls: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400' }
+
+  const handleSave = () => {
+    const n = parseFloat(rate)
+    if (isNaN(n) || n < 0 || n > 100) return
+    actionMutation.mutate({ id: partner.id, action: 'update-commission', commission_rate: n })
+    setEditing(false)
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Percent size={14} className="text-gray-400" />
+      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Commission Rate:</span>
+      {editing ? (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number" min="0" max="100" step="0.5"
+            value={rate}
+            onChange={e => setRate(e.target.value)}
+            className="w-20 border border-brand-300 dark:border-brand-600 rounded-lg px-2 py-1 text-sm
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+          <span className="text-xs text-gray-400">%</span>
+          <button onClick={handleSave} disabled={actionMutation.isPending}
+            className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition">
+            <Check size={12} />
+          </button>
+          <button onClick={() => { setEditing(false); setRate(String(current)) }}
+            className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition">
+            <XIcon size={12} />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+          <button onClick={() => setEditing(true)}
+            className="p-1 rounded-lg text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+            <Edit2 size={12} />
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -209,6 +264,17 @@ function PartnerCard({ partner, activeTab }) {
 
             </div>
           </div>
+
+          {/* Commission rate editor — approved partners only */}
+          {partner.status === 'approved' && (
+            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl p-3">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Commission Rate</p>
+              <CommissionEditor partner={partner} />
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5 leading-relaxed">
+                Applied to each completed booking. Typical: 8% (≤3 cars), 10% (standard), 12% (custom deal).
+              </p>
+            </div>
+          )}
 
           {/* Rejection reason if rejected */}
           {partner.status === 'rejected' && partner.rejection_reason && (

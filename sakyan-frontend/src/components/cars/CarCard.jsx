@@ -1,10 +1,27 @@
 import { Link } from 'react-router-dom'
-import { MapPin, Users, Fuel, Settings2 } from 'lucide-react'
+import { MapPin, Users, Fuel, Settings2, Clock } from 'lucide-react'
 import { formatCurrency } from '@/utils/formatters'
 import { useAuthStore } from '@/store/authStore'
+import { useCarBookedDates } from '@/hooks/useCars'
+
+// Derive availability status from booked ranges
+function getAvailabilityInfo(ranges = []) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const upcoming = ranges.filter(r => new Date(r.end) >= today)
+  if (!upcoming.length) return { label: 'Available', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', dot: 'bg-emerald-500' }
+
+  const hasConfirmed = upcoming.some(r => r.status === 'confirmed')
+  if (hasConfirmed) return { label: 'Booked', color: 'text-red-700 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20', dot: 'bg-red-500' }
+
+  return { label: 'Pending', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20', dot: 'bg-amber-500' }
+}
 
 export default function CarCard({ car }) {
   const { user } = useAuthStore()
+  const { data: bookedRanges = [] } = useCarBookedDates(car.id)
+  const avail = getAvailabilityInfo(bookedRanges)
 
   return (
     <div className="card card-hover overflow-hidden group">
@@ -30,6 +47,13 @@ export default function CarCard({ car }) {
         <span className="absolute top-3 left-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm text-xs font-semibold
                          text-gray-700 dark:text-gray-200 px-2.5 py-1 rounded-lg capitalize shadow-sm">
           {car.transmission}
+        </span>
+
+        {/* Availability badge */}
+        <span className={`absolute top-3 right-3 flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg
+                          backdrop-blur-sm shadow-sm ${avail.bg} ${avail.color}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${avail.dot} ${avail.label === 'Pending' ? 'animate-pulse' : ''}`} />
+          {avail.label}
         </span>
       </div>
 

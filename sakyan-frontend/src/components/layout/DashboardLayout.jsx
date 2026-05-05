@@ -1,9 +1,10 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { LayoutDashboard, Car, CalendarCheck, DollarSign,
-         Users, ClipboardList, LogOut, Menu, X, Bell, Home, BarChart, Sun, Moon, Settings } from 'lucide-react'
+         Users, ClipboardList, LogOut, Menu, X, Bell, Home, BarChart, Sun, Moon, Settings, ShieldCheck, Wallet, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useConversations } from '@/hooks/useMessages'
 import { useUIStore } from '@/store/uiStore'
 
 const PARTNER_NAV = [
@@ -11,15 +12,18 @@ const PARTNER_NAV = [
   { to: '/dashboard/cars',     label: 'My Cars',   icon: Car },
   { to: '/dashboard/bookings', label: 'Bookings',  icon: CalendarCheck },
   { to: '/dashboard/earnings', label: 'Earnings',  icon: DollarSign },
+  { to: '/dashboard/messages', label: 'Messages',  icon: MessageCircle },
 ]
 
 const ADMIN_NAV = [
-  { to: '/admin',          label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/admin/partners', label: 'Partners', icon: Users },
-  { to: '/admin/bookings', label: 'Bookings', icon: ClipboardList },
-  { to: '/admin/users',    label: 'Platform Users', icon: Users },
-  { to: '/admin/reports',  label: 'Reports', icon: BarChart },
-  { to: '/admin/settings', label: 'Settings', icon: Settings },
+  { to: '/admin',              label: 'Overview',        icon: LayoutDashboard, end: true },
+  { to: '/admin/partners',     label: 'Partners',        icon: Users },
+  { to: '/admin/kyc',         label: 'Customer KYC',    icon: ShieldCheck },
+  { to: '/admin/settlements',  label: 'Settlements',     icon: Wallet },
+  { to: '/admin/bookings',     label: 'Bookings',        icon: ClipboardList },
+  { to: '/admin/users',        label: 'Platform Users',  icon: Users },
+  { to: '/admin/reports',      label: 'Reports',         icon: BarChart },
+  { to: '/admin/settings',     label: 'Settings',        icon: Settings },
 ]
 
 export default function DashboardLayout({ role }) {
@@ -27,7 +31,12 @@ export default function DashboardLayout({ role }) {
   const { user, logoutAction } = useAuth()
   const { unreadCount } = useNotifications()
   const { theme, toggleTheme } = useUIStore()
+  const { data: conversations } = useConversations({ enabled: role === 'partner' })
   const nav = role === 'admin' ? ADMIN_NAV : PARTNER_NAV
+
+  // Total unread messages across all conversations
+  const unreadMsgCount = (conversations?.results || conversations || [])
+    .reduce((sum, c) => sum + (c.unread_count || 0), 0)
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -56,7 +65,14 @@ export default function DashboardLayout({ role }) {
             }
           >
             <Icon size={18} />
-            {label}
+            <span className="flex-1">{label}</span>
+            {/* Unread badge — only for Messages link */}
+            {label === 'Messages' && unreadMsgCount > 0 && (
+              <span className="ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px]
+                               font-bold rounded-full flex items-center justify-center px-1 animate-pulse">
+                {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

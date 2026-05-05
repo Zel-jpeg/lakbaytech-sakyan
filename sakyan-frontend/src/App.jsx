@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import PublicLayout from '@/components/layout/PublicLayout'
 import DashboardLayout from '@/components/layout/DashboardLayout'
@@ -34,6 +35,7 @@ import AddCarPage from '@/pages/dashboard/AddCarPage'
 import EditCarPage from '@/pages/dashboard/EditCarPage'
 import PartnerBookingsPage from '@/pages/dashboard/PartnerBookingsPage'
 import EarningsPage from '@/pages/dashboard/EarningsPage'
+import PartnerInboxPage from '@/pages/dashboard/PartnerInboxPage'
 
 // Admin
 import AdminHomePage from '@/pages/admin/AdminHomePage'
@@ -42,6 +44,12 @@ import AdminBookingsPage from '@/pages/admin/AdminBookingsPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import AdminReportsPage from '@/pages/admin/AdminReportsPage'
 import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
+import AdminKYCPage from '@/pages/admin/AdminKYCPage'
+import AdminSettlementPage from '@/pages/admin/AdminSettlementPage'
+
+// KYC
+import KYCVerificationPage from '@/pages/kyc/KYCVerificationPage'
+import KYCPendingPage from '@/pages/kyc/KYCPendingPage'
 
 // Messages & Notifications
 import InboxPage from '@/pages/messages/InboxPage'
@@ -59,11 +67,29 @@ function ProtectedRoute({ children, roles }) {
   return children
 }
 
+// ─── App Init — refresh user profile on every page load ──────────────────────
+
+function AppInit() {
+  const { user, refreshUser } = useAuthStore()
+
+  useEffect(() => {
+    // If user is logged in (from persisted storage), fetch latest profile
+    // so that KYC status, avatar, etc. are always up-to-date
+    if (user) {
+      refreshUser()
+    }
+  }, []) // only on mount
+
+  return null
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <AppInit />
+      <Routes>
 
       {/* ── Public + Booking: share PublicLayout (Navbar + Footer) ── */}
       <Route element={<PublicLayout />}>
@@ -99,6 +125,10 @@ export default function App() {
       <Route path="/onboarding/step3" element={<ProtectedRoute><Step3DocsPage /></ProtectedRoute>} />
       <Route path="/onboarding/pending" element={<ProtectedRoute><Step4PendingPage /></ProtectedRoute>} />
 
+      {/* ── KYC (no layout — full-screen) ── */}
+      <Route path="/kyc/verify" element={<ProtectedRoute roles={['customer']}><KYCVerificationPage /></ProtectedRoute>} />
+      <Route path="/kyc/pending" element={<ProtectedRoute roles={['customer']}><KYCPendingPage /></ProtectedRoute>} />
+
       {/* ── Partner dashboard (DashboardLayout as parent) ── */}
       <Route path="/dashboard" element={
         <ProtectedRoute roles={['partner']}><DashboardLayout role="partner" /></ProtectedRoute>
@@ -109,6 +139,7 @@ export default function App() {
         <Route path="cars/:id/edit" element={<EditCarPage />} />
         <Route path="bookings" element={<PartnerBookingsPage />} />
         <Route path="earnings" element={<EarningsPage />} />
+        <Route path="messages" element={<PartnerInboxPage />} />
       </Route>
 
       {/* ── Admin dashboard (DashboardLayout as parent) ── */}
@@ -119,17 +150,21 @@ export default function App() {
         <Route path="partners" element={<AdminPartnersPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
         <Route path="users" element={<AdminUsersPage />} />
+        <Route path="kyc" element={<AdminKYCPage />} />
+        <Route path="settlements" element={<AdminSettlementPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
 
       {/* ── Inbox & Notifications ── */}
       <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
       {/* ── 404 ── */}
       <Route path="*" element={<NotFoundPage />} />
 
     </Routes>
+    </>
   )
 }

@@ -25,7 +25,7 @@ export default function AuthCallback() {
       // Profile doesn't exist yet — create it from Google data
       const supabaseUser = session.user
       try {
-        const res = await api.post('/auth/register', {
+        await api.post('/auth/register', {
           user_id: supabaseUser.id,
           full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email,
           email: supabaseUser.email,
@@ -52,17 +52,18 @@ export default function AuthCallback() {
   }
 
   useEffect(() => {
-    // 1. Check current session immediately
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) handleAuth(session)
-    })
-
-    // 2. Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        handleAuth(session)
+    // Listen for auth state changes — this reliably fires after
+    // Supabase finishes parsing the OAuth redirect URL hash.
+    // We intentionally do NOT call getSession() first, because on
+    // OAuth redirects the session isn't ready yet and returns null,
+    // causing a redirect to /login before the real SIGNED_IN event fires.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+          handleAuth(session)
+        }
       }
-    })
+    )
 
     return () => {
       subscription.unsubscribe()
@@ -75,10 +76,10 @@ export default function AuthCallback() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0f1117]">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Signing you in...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-400">Signing you in...</p>
       </div>
     </div>
   )
