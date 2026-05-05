@@ -21,11 +21,15 @@ export function useNotifications() {
   })
 
   // Supabase Realtime — listen for new notifications for this user
+  // Use a unique channel name per mount so React StrictMode's double-invoke
+  // doesn't try to add listeners to an already-subscribed channel.
   useEffect(() => {
     if (!user) return
 
+    const channelName = `notifications:${user.id}:${Date.now()}`
+
     const channel = supabase
-      .channel(`notifications:${user.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -63,8 +67,8 @@ export function useNotifications() {
       )
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
-  }, [user])
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.id]) // depend on user.id not user object to avoid extra re-runs
 
   return query
 }

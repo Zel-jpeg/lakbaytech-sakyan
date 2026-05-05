@@ -1,16 +1,36 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, DollarSign, CreditCard, CheckCircle2, Phone } from 'lucide-react'
+import { Settings, Save, Percent, DollarSign, CheckCircle2, Info } from 'lucide-react'
 import api from '@/config/axios'
 import toast from 'react-hot-toast'
 
 const inputCls = "w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
 
-// Numeric settings (booking_fee, commission_rate)
+// Per-setting metadata (icon, color, description, suffix)
+const SETTING_META = {
+  booking_fee: {
+    icon: DollarSign,
+    color: 'bg-brand-50 dark:bg-brand-900/30',
+    iconCls: 'text-brand-600 dark:text-brand-400',
+    description: 'One-time platform fee charged to customers per booking. Takes effect for new bookings immediately.',
+    suffix: '₱',
+  },
+  commission_rate: {
+    icon: Percent,
+    color: 'bg-indigo-50 dark:bg-indigo-900/30',
+    iconCls: 'text-indigo-600 dark:text-indigo-400',
+    description: 'Default commission % deducted from partner earnings per completed booking. Can be overridden per partner.',
+    suffix: '%',
+  },
+}
+
+// Numeric setting card
 function NumericSettingCard({ setting, onSave }) {
   const [value, setValue] = useState(Number(setting.value))
   const [saved, setSaved] = useState(false)
   const isDirty = value !== Number(setting.value)
+  const meta = SETTING_META[setting.key] || { icon: DollarSign, color: 'bg-gray-50 dark:bg-gray-800', iconCls: 'text-gray-500', description: '', suffix: '' }
+  const Icon = meta.icon
 
   const handleSave = () => {
     onSave(setting.key, { value }, () => { setSaved(true); setTimeout(() => setSaved(false), 2000) })
@@ -20,8 +40,8 @@ function NumericSettingCard({ setting, onSave }) {
     <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
-            <DollarSign size={18} className="text-brand-600 dark:text-brand-400" />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${meta.color}`}>
+            <Icon size={18} className={meta.iconCls} />
           </div>
           <div>
             <p className="font-semibold text-gray-900 dark:text-white">{setting.label}</p>
@@ -35,13 +55,13 @@ function NumericSettingCard({ setting, onSave }) {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 mb-3">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">{meta.suffix}</span>
           <input
-            type="number" min="0" step="0.01" value={value}
+            type="number" min="0" step={meta.suffix === '%' ? '0.5' : '1'} value={value}
             onChange={e => setValue(Number(e.target.value))}
-            className={inputCls + " pl-7"}
+            className={inputCls + ' pl-7'}
           />
         </div>
         <button onClick={handleSave} disabled={!isDirty}
@@ -51,72 +71,21 @@ function NumericSettingCard({ setting, onSave }) {
           <Save size={15} /> Save
         </button>
       </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-        Changes take effect immediately for new bookings.
-      </p>
+
+      {meta.description && (
+        <div className="flex items-start gap-2 text-xs text-gray-400 dark:text-gray-500">
+          <Info size={12} className="shrink-0 mt-0.5" />
+          <p>{meta.description}</p>
+        </div>
+      )}
     </div>
   )
 }
 
-// Text settings (platform_gcash)
-function TextSettingCard({ setting, onSave }) {
-  const [value, setValue] = useState(setting.text_value || '')
-  const [saved, setSaved]  = useState(false)
-  const isDirty = value !== (setting.text_value || '')
-
-  const handleSave = () => {
-    onSave(setting.key, { text_value: value }, () => { setSaved(true); setTimeout(() => setSaved(false), 2000) })
-  }
-
-  return (
-    <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-amber-200 dark:border-amber-900/50 p-6 shadow-sm ring-1 ring-amber-100/60 dark:ring-amber-900/20">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
-            <CreditCard size={18} className="text-amber-600 dark:text-amber-400" />
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900 dark:text-white">{setting.label}</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">{setting.key}</p>
-          </div>
-        </div>
-        {saved && (
-          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500 text-xs font-medium">
-            <CheckCircle2 size={14} /> Saved
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text" value={value}
-            onChange={e => setValue(e.target.value)}
-            placeholder="e.g. 09171234567"
-            className={inputCls + " pl-8"}
-          />
-        </div>
-        <button onClick={handleSave} disabled={!isDirty}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700
-                     disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600
-                     text-white text-sm font-semibold rounded-xl transition shrink-0">
-          <Save size={15} /> Save
-        </button>
-      </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-        This GCash number is shown to customers on the checkout page. Customers send the ₱100 booking fee here.
-      </p>
-    </div>
-  )
-}
-
-// Setting type router
+// Hide stale text-type settings (platform_gcash no longer needed)
 function SettingCard({ setting, onSave }) {
-  const textKeys = ['platform_gcash']
-  if (textKeys.includes(setting.key)) {
-    return <TextSettingCard setting={setting} onSave={onSave} />
-  }
+  const hiddenKeys = ['platform_gcash']
+  if (hiddenKeys.includes(setting.key)) return null
   return <NumericSettingCard setting={setting} onSave={onSave} />
 }
 
@@ -152,14 +121,14 @@ export default function AdminSettingsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Platform Settings</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Configure platform-wide fees, GCash number, and policies.
+            Configure platform-wide fees and commission rates.
           </p>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map(i => (
+        <div className="space-y-4 max-w-lg">
+          {[1, 2].map(i => (
             <div key={i} className="h-36 bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 animate-pulse" />
           ))}
         </div>

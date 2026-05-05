@@ -4,9 +4,10 @@ import { format } from 'date-fns'
 import {
   CalendarDays, MapPin, CreditCard, Banknote, ClipboardList,
   Truck, Building2, MessageCircle, CheckCircle2, X, Timer,
-  ChevronRight, Clock, BadgeCheck, AlertCircle, Flag,
+  ChevronRight, Clock, Flag, LayoutGrid, List,
 } from 'lucide-react'
 import { useMyBookings } from '@/hooks/useBookings'
+import { useResponsiveView } from '@/hooks/useResponsiveView'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -54,31 +55,33 @@ function formatPHTime(isoStr) {
   }
 }
 
+function StatusBadge({ status }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[status] || ''}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status] || 'bg-gray-400'}`} />
+      {STATUS_LABEL[status] || status}
+    </span>
+  )
+}
+
 // ─── Booking Detail Modal ─────────────────────────────────────────────────────
 
 function BookingDetailModal({ booking, onClose }) {
   const navigate = useNavigate()
   const canMessage = ['pending_review', 'approved', 'active'].includes(booking.booking_status)
-  const hasRentalData = booking.actual_start_time
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div
-        className="w-full sm:max-w-lg bg-white dark:bg-[#1a1d2e] rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col"
+        className="w-full sm:max-w-lg bg-white dark:bg-[#1a1d2e] rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base font-bold text-gray-900 dark:text-white">Booking Details</h2>
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[booking.booking_status]}`}>
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[booking.booking_status]}`} />
-                {STATUS_LABEL[booking.booking_status]}
-              </span>
+              <StatusBadge status={booking.booking_status} />
             </div>
             <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">#{booking.booking_code}</p>
           </div>
@@ -88,7 +91,7 @@ function BookingDetailModal({ booking, onClose }) {
           </button>
         </div>
 
-        {/* ── Body ── */}
+        {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
           {/* Car banner */}
@@ -110,8 +113,8 @@ function BookingDetailModal({ booking, onClose }) {
             </div>
           </div>
 
-          {/* ── Rental Timeline (active / completed) ── */}
-          {hasRentalData && (
+          {/* Rental Timeline */}
+          {booking.actual_start_time && (
             <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/40 rounded-2xl space-y-3">
               <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
                 <Timer size={12} /> Rental Timeline
@@ -121,9 +124,7 @@ function BookingDetailModal({ booking, onClose }) {
                   <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Car received
                   </span>
-                  <span className="font-semibold text-emerald-800 dark:text-emerald-300">
-                    {formatPHTime(booking.actual_start_time)}
-                  </span>
+                  <span className="font-semibold text-emerald-800 dark:text-emerald-300">{formatPHTime(booking.actual_start_time)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
@@ -134,18 +135,16 @@ function BookingDetailModal({ booking, onClose }) {
                 {booking.actual_return_time && (
                   <div className="flex items-center justify-between pt-1 border-t border-emerald-200 dark:border-emerald-900/40">
                     <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                      <CheckCircle2 size={11} /> Car returned
+                      <CheckCircle2 size={11} /> Returned
                     </span>
-                    <span className="font-semibold text-gray-800 dark:text-gray-200">
-                      {formatPHTime(booking.actual_return_time)}
-                    </span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">{formatPHTime(booking.actual_return_time)}</span>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* ── Booking Summary table ── */}
+          {/* Booking Summary */}
           <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
             <div className="px-4 pt-3 pb-2 bg-gray-50 dark:bg-gray-800/40">
               <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Booking Summary</p>
@@ -159,9 +158,7 @@ function BookingDetailModal({ booking, onClose }) {
               </div>
               <div className="flex justify-between items-center px-4 py-2.5 text-xs">
                 <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5"><Clock size={12} /> Duration</span>
-                <span className="font-semibold text-gray-800 dark:text-gray-200">
-                  {booking.total_days} day{booking.total_days !== 1 ? 's' : ''}
-                </span>
+                <span className="font-semibold text-gray-800 dark:text-gray-200">{booking.total_days} day{booking.total_days !== 1 ? 's' : ''}</span>
               </div>
               <div className="flex justify-between items-center px-4 py-2.5 text-xs">
                 <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
@@ -185,9 +182,7 @@ function BookingDetailModal({ booking, onClose }) {
               </div>
               <div className="flex justify-between items-center px-4 py-3">
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Total</span>
-                <span className="font-extrabold text-brand-600 dark:text-brand-400 text-sm">
-                  ₱{Number(booking.total_amount).toLocaleString()}
-                </span>
+                <span className="font-extrabold text-brand-600 dark:text-brand-400 text-sm">₱{Number(booking.total_amount).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -200,7 +195,7 @@ function BookingDetailModal({ booking, onClose }) {
             </div>
           )}
 
-          {/* ── Approved next-steps panel ── */}
+          {/* Approved next step */}
           {booking.booking_status === 'approved' && (
             <div className={`rounded-2xl border px-4 py-3 space-y-1.5 ${
               booking.fulfillment_type === 'delivery'
@@ -208,9 +203,7 @@ function BookingDetailModal({ booking, onClose }) {
                 : 'bg-emerald-50 dark:bg-emerald-900/15 border-emerald-200 dark:border-emerald-900/40'
             }`}>
               <p className={`text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 ${
-                booking.fulfillment_type === 'delivery'
-                  ? 'text-blue-700 dark:text-blue-400'
-                  : 'text-emerald-700 dark:text-emerald-400'
+                booking.fulfillment_type === 'delivery' ? 'text-blue-700 dark:text-blue-400' : 'text-emerald-700 dark:text-emerald-400'
               }`}>
                 {booking.fulfillment_type === 'delivery'
                   ? <><Truck size={13} /> Delivery Confirmed</>
@@ -218,14 +211,23 @@ function BookingDetailModal({ booking, onClose }) {
               </p>
               {booking.fulfillment_type === 'delivery' ? (
                 <p className="text-xs text-blue-800 dark:text-blue-300">
-                  🚚 The partner will deliver on <strong>{booking.start_date}</strong>. Chat to confirm the exact time.
+                  🚚 Delivery on <strong>{booking.start_date}</strong>. Chat to confirm the exact time.
                 </p>
               ) : (
                 <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                  📍 Pick up the car on <strong>{booking.start_date}</strong> at the partner's location.
-                  Chat to confirm pickup time.
+                  📍 Pick up on <strong>{booking.start_date}</strong>. Chat to confirm pickup time.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Active reminder */}
+          {booking.booking_status === 'active' && booking.actual_start_time && !booking.actual_return_time && (
+            <div className="flex items-center gap-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-xl px-4 py-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
+                Rental in progress — please return by <strong>{booking.end_date}</strong>
+              </p>
             </div>
           )}
 
@@ -238,7 +240,7 @@ function BookingDetailModal({ booking, onClose }) {
           )}
         </div>
 
-        {/* ── Footer ── */}
+        {/* Footer */}
         {canMessage && (
           <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 shrink-0">
             <button
@@ -250,9 +252,8 @@ function BookingDetailModal({ booking, onClose }) {
               <MessageCircle size={16} />
               {booking.booking_status === 'approved'
                 ? (booking.fulfillment_type === 'delivery' ? 'Chat to confirm delivery' : 'Chat for pickup details')
-                : booking.booking_status === 'active'
-                  ? 'Message partner'
-                  : 'Chat with partner'}
+                : booking.booking_status === 'active' ? 'Message partner'
+                : 'Chat with partner'}
             </button>
           </div>
         )}
@@ -261,7 +262,7 @@ function BookingDetailModal({ booking, onClose }) {
   )
 }
 
-// ─── Booking Card ─────────────────────────────────────────────────────────────
+// ─── Card View ────────────────────────────────────────────────────────────────
 
 function BookingCard({ booking, onClick }) {
   return (
@@ -270,7 +271,7 @@ function BookingCard({ booking, onClick }) {
       className="w-full text-left bg-white dark:bg-[#1a1d2e] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800
                  hover:shadow-lg hover:border-brand-200 dark:hover:border-brand-700/50 transition-all duration-200 group overflow-hidden"
     >
-      {/* Car image strip */}
+      {/* Car image */}
       <div className="relative h-28 bg-gray-100 dark:bg-gray-800 overflow-hidden">
         {booking.car_image ? (
           <img src={booking.car_image} alt={booking.car_name}
@@ -280,15 +281,11 @@ function BookingCard({ booking, onClick }) {
           <div className="w-full h-full flex items-center justify-center text-4xl">🚗</div>
         )}
         <div className="absolute top-2 right-2">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_STYLE[booking.booking_status]}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[booking.booking_status]}`} />
-            {STATUS_LABEL[booking.booking_status]}
-          </span>
+          <StatusBadge status={booking.booking_status} />
         </div>
       </div>
 
       <div className="p-4">
-        {/* Car name */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0">
             <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{booking.car_name}</p>
@@ -301,13 +298,12 @@ function BookingCard({ booking, onClick }) {
           <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 shrink-0 mt-0.5 group-hover:text-brand-400 transition" />
         </div>
 
-        {/* Dates & fulfillment */}
-        <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400 mb-3">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-3">
           <div className="flex items-center gap-1">
             <CalendarDays size={11} />
             <span>{format(new Date(booking.start_date), 'MMM d')} → {format(new Date(booking.end_date), 'MMM d, yyyy')}</span>
           </div>
-          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium ${
             booking.fulfillment_type === 'delivery'
               ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
               : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
@@ -317,29 +313,81 @@ function BookingCard({ booking, onClick }) {
           </div>
         </div>
 
-        {/* Active rental indicator */}
         {booking.booking_status === 'active' && booking.actual_start_time && (
           <div className="flex items-center gap-1.5 mb-3 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Rental in progress · Return by {booking.end_date}
+            In progress · Return by {booking.end_date}
           </div>
         )}
 
-        {/* Footer: booking code + amount */}
         <div className="border-t border-gray-100 dark:border-gray-800 pt-3 flex items-center justify-between">
           <p className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">#{booking.booking_code}</p>
-          <p className="text-sm font-bold text-brand-600 dark:text-brand-400">
-            ₱{Number(booking.total_amount).toLocaleString()}
-          </p>
+          <p className="text-sm font-bold text-brand-600 dark:text-brand-400">₱{Number(booking.total_amount).toLocaleString()}</p>
         </div>
       </div>
     </button>
   )
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── List View ────────────────────────────────────────────────────────────────
 
-function BookingSkeleton() {
+function BookingListRow({ booking, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800
+                 hover:border-brand-200 dark:hover:border-brand-700/50 hover:shadow-sm
+                 transition-all duration-150 group"
+    >
+      <div className="flex items-center gap-3 sm:gap-4 px-4 py-3.5">
+        {/* Car thumbnail */}
+        <div className="w-14 h-10 sm:w-16 sm:h-11 bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden shrink-0">
+          {booking.car_image ? (
+            <img src={booking.car_image} alt={booking.car_name}
+              className="w-full h-full object-cover"
+              onError={e => { e.target.style.display = 'none' }} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-xl">🚗</div>
+          )}
+        </div>
+
+        {/* Main info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{booking.car_name}</p>
+            <StatusBadge status={booking.booking_status} />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-1">
+              <CalendarDays size={10} />
+              {format(new Date(booking.start_date), 'MMM d')} → {format(new Date(booking.end_date), 'MMM d, yyyy')}
+            </span>
+            <span className="hidden sm:flex items-center gap-1">
+              {booking.fulfillment_type === 'delivery' ? <Truck size={10} /> : <Building2 size={10} />}
+              {booking.fulfillment_type === 'delivery' ? 'Delivery' : 'Self-Pickup'}
+            </span>
+          </div>
+          {booking.booking_status === 'active' && booking.actual_start_time && (
+            <div className="flex items-center gap-1. mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              In progress · Return by {booking.end_date}
+            </div>
+          )}
+        </div>
+
+        {/* Amount + chevron */}
+        <div className="flex items-center gap-2 shrink-0">
+          <p className="text-sm font-bold text-brand-600 dark:text-brand-400">₱{Number(booking.total_amount).toLocaleString()}</p>
+          <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-400 transition" />
+        </div>
+      </div>
+    </button>
+  )
+}
+
+// ─── Skeletons ────────────────────────────────────────────────────────────────
+
+function CardSkeleton() {
   return (
     <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-pulse">
       <div className="h-28 bg-gray-200 dark:bg-gray-700" />
@@ -355,11 +403,25 @@ function BookingSkeleton() {
   )
 }
 
+function ListSkeleton() {
+  return (
+    <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3.5 flex items-center gap-4 animate-pulse">
+      <div className="w-16 h-11 bg-gray-200 dark:bg-gray-700 rounded-xl shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3.5 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+      </div>
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 shrink-0" />
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function MyBookingsPage() {
   const navigate = useNavigate()
-  const [activeFilter, setActiveFilter] = useState('all')
+  const [activeFilter, setActiveFilter]       = useState('all')
+  const [viewMode, setViewMode]               = useResponsiveView('list')
   const [selectedBooking, setSelectedBooking] = useState(null)
 
   const { data, isLoading } = useMyBookings()
@@ -370,68 +432,101 @@ export default function MyBookingsPage() {
     : bookings.filter(b => b.booking_status === activeFilter)
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Bookings</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-          {isLoading ? 'Loading…' : `${bookings.length} booking${bookings.length !== 1 ? 's' : ''} · tap any card to see details`}
-        </p>
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Bookings</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-0.5 text-sm">
+            {isLoading ? 'Loading…' : `${bookings.length} booking${bookings.length !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+
+        {/* View toggle */}
+        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1">
+          <button onClick={() => setViewMode('card')} title="Card view"
+            className={`p-2 rounded-lg transition ${viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-brand-600 dark:text-brand-400' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}`}>
+            <LayoutGrid size={16} />
+          </button>
+          <button onClick={() => setViewMode('list')} title="List view"
+            className={`p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-brand-600 dark:text-brand-400' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}`}>
+            <List size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+      {/* ── Filter tabs ── */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
         {FILTERS.map(f => (
-          <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
+          <button key={f} onClick={() => setActiveFilter(f)}
             className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition ${
               activeFilter === f
-                ? 'bg-brand-600 text-white border-brand-600 shadow-sm shadow-brand-500/20'
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brand-300 dark:hover:border-brand-600'
-            }`}
-          >
+                ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                : 'bg-white dark:bg-[#1a1d2e] border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brand-300 dark:hover:border-brand-600'
+            }`}>
             {f === 'all' ? 'All' : STATUS_LABEL[f]}
           </button>
         ))}
       </div>
 
-      {/* Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <BookingSkeleton key={i} />)}
-        </div>
-      ) : filtered.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(b => (
-            <BookingCard key={b.id} booking={b} onClick={() => setSelectedBooking(b)} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-20">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
-            <ClipboardList size={28} className="text-gray-400 dark:text-gray-500" />
-          </div>
-          <p className="text-lg font-medium text-gray-700 dark:text-gray-300">No bookings yet</p>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
-            {activeFilter === 'all'
-              ? "You haven't made any bookings yet."
-              : `No ${STATUS_LABEL[activeFilter]?.toLowerCase()} bookings.`}
-          </p>
-          {activeFilter === 'all' && (
-            <button
-              onClick={() => navigate('/cars')}
-              className="mt-6 px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold hover:bg-brand-700 transition"
-            >
-              Browse cars
-            </button>
+      {/* ── Card View ── */}
+      {viewMode === 'card' && (
+        <>
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => <CardSkeleton key={i} />)}
+            </div>
+          ) : filtered.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map(b => <BookingCard key={b.id} booking={b} onClick={() => setSelectedBooking(b)} />)}
+            </div>
+          ) : (
+            <EmptyState activeFilter={activeFilter} navigate={navigate} />
           )}
-        </div>
+        </>
+      )}
+
+      {/* ── List View ── */}
+      {viewMode === 'list' && (
+        <>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => <ListSkeleton key={i} />)}
+            </div>
+          ) : filtered.length > 0 ? (
+            <div className="space-y-2">
+              {filtered.map(b => <BookingListRow key={b.id} booking={b} onClick={() => setSelectedBooking(b)} />)}
+            </div>
+          ) : (
+            <EmptyState activeFilter={activeFilter} navigate={navigate} />
+          )}
+        </>
       )}
 
       {/* Detail Modal */}
       {selectedBooking && (
         <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+      )}
+    </div>
+  )
+}
+
+function EmptyState({ activeFilter, navigate }) {
+  return (
+    <div className="text-center py-20">
+      <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
+        <ClipboardList size={28} className="text-gray-400 dark:text-gray-500" />
+      </div>
+      <p className="text-lg font-medium text-gray-700 dark:text-gray-300">No bookings yet</p>
+      <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
+        {activeFilter === 'all' ? "You haven't made any bookings yet." : `No ${STATUS_LABEL[activeFilter]?.toLowerCase()} bookings.`}
+      </p>
+      {activeFilter === 'all' && (
+        <button onClick={() => navigate('/cars')}
+          className="mt-6 px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold hover:bg-brand-700 transition">
+          Browse cars
+        </button>
       )}
     </div>
   )

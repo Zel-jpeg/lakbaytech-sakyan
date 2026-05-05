@@ -326,11 +326,11 @@ export default function AdminSettlementPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settlements</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Commissions &amp; Settlements</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Monthly commission &amp; fee remittances from partners
+            Track platform commissions owed by partners and mark them as received.
           </p>
         </div>
         <button
@@ -340,6 +340,16 @@ export default function AdminSettlementPage() {
         >
           <Plus size={16} /> Generate Settlement
         </button>
+      </div>
+
+      {/* Explainer banner */}
+      <div className="flex items-start gap-3 mb-6 bg-indigo-50 dark:bg-indigo-900/15 border border-indigo-200 dark:border-indigo-900/40 rounded-2xl px-4 py-3.5">
+        <TrendingUp size={18} className="text-indigo-500 shrink-0 mt-0.5" />
+        <div className="text-xs text-indigo-800 dark:text-indigo-300 leading-relaxed">
+          <p className="font-bold text-sm text-indigo-900 dark:text-indigo-200 mb-0.5">How it works</p>
+          Partners owe the platform a <strong>commission %</strong> (and booking fees where applicable) from each completed booking.
+          Generate a settlement for a partner's period to calculate the total owed, then mark it settled once you've received the payment.
+        </div>
       </div>
 
       {/* Stats */}

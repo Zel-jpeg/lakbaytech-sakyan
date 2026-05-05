@@ -116,7 +116,6 @@ export function useSubmitKYC() {
 }
 
 // ── Admin Settings ─────────────────────────────────────────────────────────────
-// Note: Refund queue removed — replaced by the partner-led settlement model.
 
 export function useAdminUpdateSetting() {
   const qc = useQueryClient()
@@ -128,6 +127,41 @@ export function useAdminUpdateSetting() {
       toast.success('Setting updated.')
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Update failed.'),
+  })
+}
+
+// ── Refund Queue ───────────────────────────────────────────────────────────────
+
+export function useAdminRefunds(status = 'pending') {
+  return useQuery({
+    queryKey: ['admin', 'refunds', status],
+    queryFn: () => api.get(`/admin/refunds/?status=${status}`).then(r => r.data),
+  })
+}
+
+export function useAdminProcessRefund() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, action }) =>
+      api.patch(`/admin/refunds/${id}/`, { status: action }).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'refunds'] })
+      toast.success('Refund status updated.')
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Failed to update refund.'),
+  })
+}
+
+export function useAdminVerifyBookingFee() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }) =>
+      api.patch(`/admin/bookings/${id}/verify-fee/`, {}).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'bookings'] })
+      toast.success('Booking fee verified — booking forwarded to partner.')
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Verification failed.'),
   })
 }
 

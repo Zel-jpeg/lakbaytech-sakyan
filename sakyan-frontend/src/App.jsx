@@ -46,6 +46,7 @@ import AdminReportsPage from '@/pages/admin/AdminReportsPage'
 import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
 import AdminKYCPage from '@/pages/admin/AdminKYCPage'
 import AdminSettlementPage from '@/pages/admin/AdminSettlementPage'
+import AdminRefundQueuePage from '@/pages/admin/AdminRefundQueuePage'
 
 // KYC
 import KYCVerificationPage from '@/pages/kyc/KYCVerificationPage'
@@ -147,13 +148,15 @@ export default function App() {
         <ProtectedRoute roles={['admin']}><DashboardLayout role="admin" /></ProtectedRoute>
       }>
         <Route index element={<AdminHomePage />} />
-        <Route path="partners" element={<AdminPartnersPage />} />
-        <Route path="bookings" element={<AdminBookingsPage />} />
-        <Route path="users" element={<AdminUsersPage />} />
-        <Route path="kyc" element={<AdminKYCPage />} />
+        <Route path="partners"    element={<AdminPartnersPage />} />
+        <Route path="bookings"    element={<AdminBookingsPage />} />
+        <Route path="users"       element={<AdminUsersPage />} />
+        <Route path="kyc"         element={<AdminKYCPage />} />
         <Route path="settlements" element={<AdminSettlementPage />} />
-        <Route path="reports" element={<AdminReportsPage />} />
-        <Route path="settings" element={<AdminSettingsPage />} />
+        <Route path="refunds"     element={<AdminRefundQueuePage />} />
+        <Route path="reports"     element={<AdminReportsPage />} />
+        <Route path="settings"    element={<AdminSettingsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
 
       {/* ── Inbox & Notifications ── */}

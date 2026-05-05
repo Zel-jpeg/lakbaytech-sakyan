@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useUnreadCount } from '@/hooks/useNotifications'
 import { useConversations } from '@/hooks/useMessages'
 import { useUIStore } from '@/store/uiStore'
+import LogoutModal from '@/components/ui/LogoutModal'
 
 export default function Navbar() {
   const { user }          = useAuthStore()
@@ -14,6 +15,7 @@ export default function Navbar() {
   const { theme, toggleTheme } = useUIStore()
   const [menuOpen, setMenuOpen]       = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [showLogout, setShowLogout]   = useState(false)
 
   // Unread message count across all conversations (only when logged in)
   const { data: conversations } = useConversations({ enabled: !!user })
@@ -161,7 +163,7 @@ export default function Navbar() {
 
                       <hr className="my-1 border-gray-100 dark:border-gray-700" />
                       <button
-                        onClick={() => { logoutAction(); closeAll() }}
+                        onClick={() => { setShowLogout(true); setDropdownOpen(false) }}
                         className="block w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400
                                    hover:bg-red-50 dark:hover:bg-red-900/20 transition"
                       >
@@ -248,7 +250,7 @@ export default function Navbar() {
                 )}
 
                 <button
-                  onClick={() => { logoutAction(); closeAll() }}
+                  onClick={() => { setShowLogout(true); closeAll() }}
                   className="block text-red-600 dark:text-red-400 py-2 px-2 font-medium w-full text-left rounded-lg
                              hover:bg-red-50 dark:hover:bg-red-900/20 transition">
                   Sign Out
@@ -269,6 +271,15 @@ export default function Navbar() {
           </div>
         )}
       </div>
+
+      <LogoutModal
+        open={showLogout}
+        onConfirm={() => {
+          logoutAction()
+          setShowLogout(false)
+        }}
+        onCancel={() => setShowLogout(false)}
+      />
     </nav>
   )
 }

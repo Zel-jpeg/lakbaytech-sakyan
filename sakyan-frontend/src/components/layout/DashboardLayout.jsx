@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Car, CalendarCheck, DollarSign,
          Users, ClipboardList, LogOut, Menu, X, Bell, Home, BarChart, Sun, Moon, Settings, ShieldCheck, Wallet, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useConversations } from '@/hooks/useMessages'
 import { useUIStore } from '@/store/uiStore'
+import LogoutModal from '@/components/ui/LogoutModal'
 
 const PARTNER_NAV = [
   { to: '/dashboard',          label: 'Overview',  icon: LayoutDashboard, end: true },
@@ -19,7 +20,7 @@ const ADMIN_NAV = [
   { to: '/admin',              label: 'Overview',        icon: LayoutDashboard, end: true },
   { to: '/admin/partners',     label: 'Partners',        icon: Users },
   { to: '/admin/kyc',         label: 'Customer KYC',    icon: ShieldCheck },
-  { to: '/admin/settlements',  label: 'Settlements',     icon: Wallet },
+  { to: '/admin/settlements',  label: 'Commissions',     icon: Wallet },
   { to: '/admin/bookings',     label: 'Bookings',        icon: ClipboardList },
   { to: '/admin/users',        label: 'Platform Users',  icon: Users },
   { to: '/admin/reports',      label: 'Reports',         icon: BarChart },
@@ -27,7 +28,9 @@ const ADMIN_NAV = [
 ]
 
 export default function DashboardLayout({ role }) {
+  const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showLogout, setShowLogout] = useState(false)
   const { user, logoutAction } = useAuth()
   const { unreadCount } = useNotifications()
   const { theme, toggleTheme } = useUIStore()
@@ -109,7 +112,7 @@ export default function DashboardLayout({ role }) {
           </Link>
         )}
         <button
-          onClick={logoutAction}
+          onClick={() => setShowLogout(true)}
           className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400
                      hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20
                      rounded-xl transition"
@@ -161,8 +164,12 @@ export default function DashboardLayout({ role }) {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             {/* Notifications */}
-            <button className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200
-                               hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition">
+            <button
+              onClick={() => navigate(role === 'admin' ? '/admin/notifications' : '/notifications')}
+              className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200
+                         hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition"
+              aria-label="Notifications"
+            >
               <Bell size={20} />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white
@@ -179,6 +186,13 @@ export default function DashboardLayout({ role }) {
           <Outlet />
         </main>
       </div>
+
+      {/* Logout Confirmation */}
+      <LogoutModal
+        open={showLogout}
+        onConfirm={logoutAction}
+        onCancel={() => setShowLogout(false)}
+      />
     </div>
   )
 }

@@ -8,6 +8,7 @@ import {
   MapPin, Mail, Globe, MessageSquare, Camera,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import LogoutModal from '@/components/ui/LogoutModal'
 
 export default function PublicLayout() {
   const { user } = useAuthStore()
@@ -15,6 +16,7 @@ export default function PublicLayout() {
   const { theme, toggleTheme } = useUIStore()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [showLogout, setShowLogout] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
   const dropdownRef = useRef(null)
@@ -166,7 +168,7 @@ export default function PublicLayout() {
 
                       <hr className="my-1 border-gray-100 dark:border-gray-700" />
 
-                      <button onClick={() => { logoutAction(); setDropdownOpen(false) }}
+                      <button onClick={() => { setShowLogout(true); setDropdownOpen(false) }}
                         className="flex items-center gap-2.5 w-full text-left px-4 py-2.5 text-sm text-red-600
                                    dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
                         <LogOut size={15} /> Sign Out
@@ -250,7 +252,7 @@ export default function PublicLayout() {
                     {user.role === 'admin' ? 'Admin Panel' : 'Partner Dashboard'}
                   </Link>
                 )}
-                <button onClick={logoutAction}
+                <button onClick={() => { setShowLogout(true); setMobileOpen(false) }}
                   className="w-full text-left px-3 py-2.5 text-sm text-red-500 dark:text-red-400
                              rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition">
                   Log out
@@ -338,6 +340,14 @@ export default function PublicLayout() {
         </div>
       </footer>
 
+      <LogoutModal
+        open={showLogout}
+        onConfirm={() => {
+          logoutAction()
+          setShowLogout(false)
+        }}
+        onCancel={() => setShowLogout(false)}
+      />
     </div>
   )
 }
