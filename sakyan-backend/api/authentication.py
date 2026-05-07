@@ -38,7 +38,11 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            raise AuthenticationFailed('User profile not found. Please complete registration.')
+            # Return None (anonymous) instead of raising AuthenticationFailed.
+            # This is critical for AllowAny endpoints like /auth/register — a new
+            # Google user has a valid Supabase token but no Django profile yet.
+            # Raising here would bypass AllowAny and return 401, blocking registration.
+            return None
 
         return (user, token)
 
