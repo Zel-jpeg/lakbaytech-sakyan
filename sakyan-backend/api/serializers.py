@@ -253,6 +253,12 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'booking', 'sender', 'receiver', 'sender_name', 'content', 'is_read', 'created_at']
         read_only_fields = ['id', 'sender', 'created_at']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # booking is optional — null means it's a support message
+        self.fields['booking'].required = False
+        self.fields['booking'].allow_null = True
+
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

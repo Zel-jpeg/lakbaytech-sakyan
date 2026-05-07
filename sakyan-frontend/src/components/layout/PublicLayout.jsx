@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import LogoutModal from '@/components/ui/LogoutModal'
+import ApprovalBanner from '@/components/common/ApprovalBanner'
 
 export default function PublicLayout() {
   const { user } = useAuthStore()
@@ -262,6 +263,9 @@ export default function PublicLayout() {
           </div>
         )}
       </header>
+
+      {/* Approval banner — persists until partner visits dashboard */}
+      <ApprovalBanner />
 
       {/* Page content */}
       <main className="flex-1">

@@ -1,28 +1,44 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, MessageSquare, ArrowLeft, X } from 'lucide-react'
+import { Send, MessageSquare, ArrowLeft, X, ShieldCheck } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useConversations, useMessages, useSendMessage } from '@/hooks/useMessages'
+import {
+  useConversations,
+  useMessages,
+  useSendMessage,
+  useSupportMessages,
+  useSendSupportMessage,
+} from '@/hooks/useMessages'
 import { useAuthStore } from '@/store/authStore'
 import { formatDate } from '@/utils/formatters'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+const SUPPORT_ID = 'support'
+
+function isSupportConv(conv) {
+  return conv?.is_support === true || conv?.booking_id === SUPPORT_ID || String(conv?.booking_id || '').startsWith('support:')
+}
+
 /**
- * The backend conversation object has:
- *   customer_id, customer_name, partner_user_id, partner_name
- * We compute "other_user_name" and "other_user_id" from those based on who
- * the logged-in user is.
+ * For regular booking conversations, resolve the "other" user.
+ * For support convs, the other party label depends on the viewer's role.
  */
-function resolveOtherUser(conv, userId) {
+function resolveOtherUser(conv, userId, userRole) {
   if (!conv || !userId) return { name: 'Unknown', id: null }
+  if (isSupportConv(conv)) {
+    if (userRole === 'admin') {
+      // Admin sees partner's name
+      return { name: conv.customer_name || 'Partner', id: conv.customer_id || conv.support_partner_id }
+    }
+    return { name: 'Sakyan Support', id: null }
+  }
   const isCustomer = String(userId) === String(conv.customer_id)
   return {
-    name: isCustomer ? (conv.partner_name || 'Partner')   : (conv.customer_name || 'Customer'),
-    id:   isCustomer ? conv.partner_user_id                : conv.customer_id,
+    name: isCustomer ? (conv.partner_name || 'Partner') : (conv.customer_name || 'Customer'),
+    id:   isCustomer ? conv.partner_user_id : conv.customer_id,
   }
 }
 
-// Last message display (backend may return { content, created_at } or just a string)
 function lastMsgText(conv) {
   if (!conv.last_message) return 'No messages yet'
   if (typeof conv.last_message === 'string') return conv.last_message
@@ -31,9 +47,10 @@ function lastMsgText(conv) {
 
 // ─── Conversation List Item ───────────────────────────────────────────────────
 
-function ConversationItem({ conv, isActive, onClick, userId }) {
-  const other     = resolveOtherUser(conv, userId)
+function ConversationItem({ conv, isActive, onClick, userId, userRole }) {
+  const other     = resolveOtherUser(conv, userId, userRole)
   const hasUnread = conv.unread_count > 0
+  const isSupport = isSupportConv(conv)
 
   return (
     <button
@@ -42,13 +59,22 @@ function ConversationItem({ conv, isActive, onClick, userId }) {
                   transition hover:bg-gray-50 dark:hover:bg-gray-800/60
                   ${isActive ? 'bg-brand-50 dark:bg-brand-900/20 border-l-2 border-l-brand-500' : ''}`}
     >
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center shrink-0 text-white font-bold text-sm">
-        {(other.name || '?')[0].toUpperCase()}
-      </div>
+      {/* Avatar */}
+      {isSupport ? (
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0">
+          <ShieldCheck size={18} className="text-white" />
+        </div>
+      ) : (
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center shrink-0 text-white font-bold text-sm">
+          {(other.name || '?')[0].toUpperCase()}
+        </div>
+      )}
+
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <p className={`text-sm truncate ${hasUnread ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'}`}>
             {other.name}
+            {isSupport && <span className="ml-1.5 text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-medium">Support</span>}
           </p>
           {hasUnread && (
             <span className="bg-brand-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
@@ -57,7 +83,7 @@ function ConversationItem({ conv, isActive, onClick, userId }) {
           )}
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-          Re: {conv.car_name || conv.booking_code || 'Booking'}
+          {isSupport ? 'Ask questions or report issues' : `Re: ${conv.car_name || conv.booking_code || 'Booking'}`}
         </p>
         <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
           {lastMsgText(conv)}
@@ -93,6 +119,7 @@ export default function InboxPage() {
   const navigate           = useNavigate()
   const [searchParams]     = useSearchParams()
   const targetBookingId    = searchParams.get('booking')
+  const targetSupport      = searchParams.get('support') === '1'
 
   const { data: conversations, isLoading: convsLoading } = useConversations()
   const [activeConv, setActiveConv] = useState(null)
@@ -100,26 +127,43 @@ export default function InboxPage() {
   const [mobileView, setMobileView] = useState('list')
   const bottomRef = useRef(null)
 
-  const convList = conversations?.results || conversations || []
+  const convList = conversations || []
 
-  // Auto-select conversation when arriving from booking flow (?booking=id)
+  // Auto-select from URL params
   useEffect(() => {
-    if (!targetBookingId || !convList.length || activeConv) return
-    const match = convList.find(c => String(c.booking_id) === String(targetBookingId))
-    if (match) {
-      setActiveConv(match)
-      setMobileView('chat')
-    } else {
-      // Conversation exists in list but no match yet — keep polling handled by react-query
-      // Just select the first conversation if any
-      // (The booking's auto-message means the conversation should appear immediately)
+    if (!convList.length) return
+    if (targetSupport && !activeConv) {
+      const supportConv = convList.find(c => isSupportConv(c))
+      if (supportConv) { setActiveConv(supportConv); setMobileView('chat') }
+      return
     }
-  }, [targetBookingId, convList, activeConv])
+    if (targetBookingId && !activeConv) {
+      const match = convList.find(c => String(c.booking_id) === String(targetBookingId))
+      if (match) { setActiveConv(match); setMobileView('chat') }
+    }
+  }, [targetBookingId, targetSupport, convList, activeConv])
 
-  const { data: messages, isLoading: msgsLoading } = useMessages(activeConv?.booking_id)
-  const sendMessage = useSendMessage()
+  // ── Booking messages (only for non-support convs) ────────────────────────
+  const isSupport  = isSupportConv(activeConv)
+  // For admin support convs, extract the partner_id from 'support:<uuid>'
+  const adminSupportPartnerId = isSupport && user?.role === 'admin' && activeConv
+    ? (activeConv.support_partner_id || activeConv.customer_id || null)
+    : null
 
-  const msgList = messages?.results || messages || []
+  const { data: bookingMessages, isLoading: bookingMsgsLoading } = useMessages(
+    !isSupport && activeConv ? activeConv.booking_id : null
+  )
+  const sendBookingMsg = useSendMessage()
+
+  // ── Support messages ──────────────────────────────────────────────────────
+  const { data: supportMessages, isLoading: supportMsgsLoading } = useSupportMessages(
+    isSupport ? adminSupportPartnerId : undefined
+  )
+  const sendSupportMsg = useSendSupportMessage()
+
+  // Unify
+  const msgList       = isSupport ? (supportMessages || []) : (bookingMessages?.results || bookingMessages || [])
+  const msgsLoading   = isSupport ? supportMsgsLoading : bookingMsgsLoading
 
   // Auto-scroll
   useEffect(() => {
@@ -135,16 +179,26 @@ export default function InboxPage() {
   const handleSend = (e) => {
     e.preventDefault()
     if (!input.trim() || !activeConv) return
-    const { id: receiverId } = resolveOtherUser(activeConv, user?.id)
-    sendMessage.mutate({
-      bookingId:  activeConv.booking_id,
-      receiverId,
-      content:    input.trim(),
-    })
+
+    if (isSupport) {
+      sendSupportMsg.mutate({
+        content: input.trim(),
+        // Admin replies to a specific partner
+        ...(adminSupportPartnerId ? { receiverId: adminSupportPartnerId } : {}),
+      })
+    } else {
+      const { id: receiverId } = resolveOtherUser(activeConv, user?.id, user?.role)
+      sendBookingMsg.mutate({
+        bookingId:  activeConv.booking_id,
+        receiverId,
+        content:    input.trim(),
+      })
+    }
     setInput('')
   }
 
-  const activeOther = activeConv ? resolveOtherUser(activeConv, user?.id) : null
+  const isMsgPending = isSupport ? sendSupportMsg.isPending : sendBookingMsg.isPending
+  const activeOther  = activeConv ? resolveOtherUser(activeConv, user?.id, user?.role) : null
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117]">
@@ -178,7 +232,6 @@ export default function InboxPage() {
                          bg-white dark:bg-gray-900 flex flex-col overflow-hidden
                          ${mobileView === 'chat' ? 'hidden sm:flex' : 'flex'}`}>
 
-          {/* Skeletons */}
           {convsLoading && (
             <div className="flex-1 space-y-0">
               {[...Array(5)].map((_, i) => (
@@ -193,7 +246,6 @@ export default function InboxPage() {
             </div>
           )}
 
-          {/* Empty state */}
           {!convsLoading && convList.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center py-16 px-6 text-center">
               <MessageSquare size={36} className="text-gray-200 dark:text-gray-700 mb-3" />
@@ -204,13 +256,13 @@ export default function InboxPage() {
             </div>
           )}
 
-          {/* Conversation items */}
           <div className="flex-1 overflow-y-auto">
             {convList.map(conv => (
               <ConversationItem
                 key={conv.booking_id}
                 conv={conv}
                 userId={user?.id}
+                userRole={user?.role}
                 isActive={activeConv?.booking_id === conv.booking_id}
                 onClick={() => handleSelectConv(conv)}
               />
@@ -225,20 +277,30 @@ export default function InboxPage() {
           {activeConv ? (
             <>
               {/* Chat header */}
-              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 bg-white dark:bg-gray-900">
+              <div className={`px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 ${
+                isSupport ? 'bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10' : 'bg-white dark:bg-gray-900'
+              }`}>
                 <button
                   className="sm:hidden p-1.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                   onClick={() => setMobileView('list')}
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shrink-0">
-                  {(activeOther?.name || '?')[0].toUpperCase()}
-                </div>
+                {isSupport ? (
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0">
+                    <ShieldCheck size={16} className="text-white" />
+                  </div>
+                ) : (
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shrink-0">
+                    {(activeOther?.name || '?')[0].toUpperCase()}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <p className="font-bold text-gray-900 dark:text-white text-sm">{activeOther?.name}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                    Re: {activeConv.car_name || activeConv.booking_code}
+                    {isSupport
+                      ? (user?.role === 'admin' ? 'Partner support thread' : 'Ask Sakyan anything — we typically reply within 1 business day')
+                      : `Re: ${activeConv.car_name || activeConv.booking_code}`}
                   </p>
                 </div>
               </div>
@@ -252,8 +314,20 @@ export default function InboxPage() {
                 )}
                 {!msgsLoading && msgList.length === 0 && (
                   <div className="text-center py-12">
-                    <MessageSquare size={28} className="mx-auto text-gray-200 dark:text-gray-700 mb-2" />
-                    <p className="text-sm text-gray-400 dark:text-gray-500">No messages yet. Say hello!</p>
+                    {isSupport ? (
+                      <>
+                        <ShieldCheck size={32} className="mx-auto text-emerald-300 dark:text-emerald-700 mb-3" />
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Start a conversation with Sakyan Support</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 max-w-xs mx-auto leading-relaxed">
+                          Have a question or issue? Send us a message and we'll get back to you.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare size={28} className="mx-auto text-gray-200 dark:text-gray-700 mb-2" />
+                        <p className="text-sm text-gray-400 dark:text-gray-500">No messages yet. Say hello!</p>
+                      </>
+                    )}
                   </div>
                 )}
                 {msgList.map(msg => (
@@ -267,14 +341,14 @@ export default function InboxPage() {
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder="Type a message…"
+                  placeholder={isSupport ? 'Type your support message…' : 'Type a message…'}
                   className="flex-1 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm
                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400
                              focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition"
                 />
                 <button
                   type="submit"
-                  disabled={!input.trim() || sendMessage.isPending}
+                  disabled={!input.trim() || isMsgPending}
                   className="p-2.5 bg-brand-600 hover:bg-brand-700 disabled:bg-gray-200 dark:disabled:bg-gray-700
                              text-white rounded-xl transition"
                 >

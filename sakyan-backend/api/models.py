@@ -207,7 +207,8 @@ class Booking(models.Model):
 
 class Message(models.Model):
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    booking     = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='messages')
+    booking     = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='messages',
+                                    null=True, blank=True)   # null = support message
     sender      = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
     receiver    = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
     content     = models.TextField()

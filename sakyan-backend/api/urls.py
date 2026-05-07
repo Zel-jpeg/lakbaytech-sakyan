@@ -18,7 +18,7 @@ from .views.admin_views import (
     AdminKYCListView, AdminKYCActionView,
     AdminSettlementListView, AdminCreateSettlementView, AdminSettlementActionView,
 )
-from .views.message_views import MessageListView, SendMessageView, ConversationListView
+from .views.message_views import MessageListView, SendMessageView, ConversationListView, SupportThreadView
 from .views.notification_views import NotificationListView, MarkNotificationReadView
 
 urlpatterns = [
@@ -80,6 +80,7 @@ urlpatterns = [
 
     # Messages
     path('messages/', SendMessageView.as_view()),
+    path('messages/support/', SupportThreadView.as_view()),
     path('messages/conversations/', ConversationListView.as_view()),
     path('messages/<uuid:booking_id>/', MessageListView.as_view()),
 

@@ -158,7 +158,9 @@ export default function Step3DocsPage() {
   const applyMutation = useMutation({
     mutationFn: (data) => api.post('/partner/apply/', data).then(r => r.data),
     onSuccess: () => {
-      store.reset()
+      // NOTE: do NOT call store.reset() here — it would clear partner_type
+      // and trigger the guard useEffect to bounce back to step1 before we land.
+      // reset() is called in Step4PendingPage on mount instead.
       navigate('/onboarding/pending')
     },
     onError: (err) => {

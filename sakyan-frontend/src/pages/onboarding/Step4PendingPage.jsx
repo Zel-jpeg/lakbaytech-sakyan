@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock, CheckCircle2, Bell, Mail, Home } from 'lucide-react'
+import { Clock, CheckCircle2, Bell, Home } from 'lucide-react'
 import OnboardingLayout from './OnboardingLayout'
+import { useOnboardingStore } from '@/store/onboardingStore'
 
 const STEPS_AFTER = [
   {
@@ -25,6 +27,10 @@ const STEPS_AFTER = [
 
 export default function Step4PendingPage() {
   const navigate = useNavigate()
+  const store    = useOnboardingStore()
+
+  // Safe to reset here — we've already navigated away from Step3
+  useEffect(() => { store.reset() }, [])
 
   return (
     <OnboardingLayout currentStep={4}>

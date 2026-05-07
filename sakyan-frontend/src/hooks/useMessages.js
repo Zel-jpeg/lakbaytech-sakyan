@@ -63,6 +63,66 @@ export function useSendMessage() {
       }).then(r => r.data),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['messages', variables.bookingId] })
+      qc.invalidateQueries({ queryKey: ['conversations'] })
+    },
+  })
+}
+
+// ─── Support thread (partner ↔ admin) ────────────────────────────────────────
+
+export function useSupportMessages(partnerId = null) {
+  const qc = useQueryClient()
+  const queryKey = ['support-messages', partnerId]
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const url = partnerId
+        ? `/messages/support/?partner_id=${partnerId}`
+        : '/messages/support/'
+      const res = await api.get(url)
+      return res.data
+    },
+  })
+
+  // Supabase realtime: listen for new null-booking support messages
+  useEffect(() => {
+    const channel = supabase
+      .channel(`support-messages:${partnerId ?? 'self'}:${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          // We can't filter on booking_id IS NULL via Supabase realtime easily,
+          // so listen to all message inserts and invalidate; the query will dedupe
+          filter: `booking_id=is.null`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey })
+          qc.invalidateQueries({ queryKey: ['conversations'] })
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [partnerId])
+
+  return query
+}
+
+export function useSendSupportMessage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ content, receiverId }) =>
+      api.post('/messages/support/', {
+        content,
+        ...(receiverId ? { receiver_id: receiverId } : {}),
+      }).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['support-messages'] })
+      qc.invalidateQueries({ queryKey: ['conversations'] })
     },
   })
 }

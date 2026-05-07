@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Car, CalendarCheck, DollarSign,
          Users, ClipboardList, LogOut, Menu, X, Bell, Home, BarChart, Sun, Moon, Settings, ShieldCheck, Wallet, MessageCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useConversations } from '@/hooks/useMessages'
@@ -25,6 +25,7 @@ const ADMIN_NAV = [
   { to: '/admin/users',        label: 'Platform Users',  icon: Users },
   { to: '/admin/reports',      label: 'Reports',         icon: BarChart },
   { to: '/admin/settings',     label: 'Settings',        icon: Settings },
+  { to: '/messages',           label: 'Messages',        icon: MessageCircle },
 ]
 
 export default function DashboardLayout({ role }) {
@@ -34,8 +35,15 @@ export default function DashboardLayout({ role }) {
   const { user, logoutAction } = useAuth()
   const { unreadCount } = useNotifications()
   const { theme, toggleTheme } = useUIStore()
-  const { data: conversations } = useConversations({ enabled: role === 'partner' })
+  const { data: conversations } = useConversations({ enabled: true })
   const nav = role === 'admin' ? ADMIN_NAV : PARTNER_NAV
+
+  // Clear approval banner when partner lands on dashboard
+  useEffect(() => {
+    if (role === 'partner') {
+      localStorage.removeItem('sakyan_approval_banner')
+    }
+  }, [role])
 
   // Total unread messages across all conversations
   const unreadMsgCount = (conversations?.results || conversations || [])

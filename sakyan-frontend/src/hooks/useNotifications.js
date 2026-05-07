@@ -44,17 +44,26 @@ export function useNotifications() {
           // Refresh the notifications list in the bell
           qc.invalidateQueries({ queryKey: ['notifications'] })
 
-          // If this is a KYC notification, also refresh the user profile
-          // so kyc_status updates immediately without logout
+          // If this is a KYC or approval notification, refresh the user profile
+          // so role/kyc_status updates immediately without logout
           if (notif?.type === 'kyc') {
             refreshUser()
           }
+          if (notif?.type === 'approval' && notif?.title?.toLowerCase().includes('approved')) {
+            refreshUser()
+            // Set persistent banner flag — cleared when partner visits dashboard
+            localStorage.setItem('sakyan_approval_banner', '1')
+          }
 
-          // Show a toast for any incoming notification (avoid duplicates)
           if (notif?.id && !toastedIds.current.has(notif.id)) {
             toastedIds.current.add(notif.id)
-            const isKYCApproval = notif?.type === 'kyc' && notif?.title?.includes('Verified')
-            if (isKYCApproval) {
+            const isKYCApproval    = notif?.type === 'kyc' && notif?.title?.includes('Verified')
+            const isPartnerApproval = notif?.type === 'approval' && notif?.title?.toLowerCase().includes('approved')
+            if (isPartnerApproval) {
+              toast.success('🎉 Congratulations! You are now an approved Sakyan Partner!', {
+                duration: 8000,
+              })
+            } else if (isKYCApproval) {
               toast.success('🎉 Identity verified! You can now book cars.', {
                 duration: 6000,
                 icon: '✅',
