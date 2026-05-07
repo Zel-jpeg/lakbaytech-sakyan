@@ -17,12 +17,11 @@ export default function AuthCallback() {
     setToken(token)
 
     try {
-      // Try to get existing Django profile
       const res = await api.get('/auth/me')
       setUser(res.data)
       redirectByRole(res.data.role)
     } catch {
-      // Profile doesn't exist yet — create it from Google data
+      // No Django profile yet — register first
       const supabaseUser = session.user
       try {
         await api.post('/auth/register', {
@@ -31,21 +30,30 @@ export default function AuthCallback() {
           email: supabaseUser.email,
           phone: '',
         })
-        // After register, fetch the full profile
+      } catch (registerErr) {
+        // 409 = already exists (race condition / double fire), that's fine — continue
+        if (registerErr.response?.status !== 409) {
+          console.error('Registration failed', registerErr)
+          navigate('/login')
+          return
+        }
+      }
+
+      try {
         const meRes = await api.get('/auth/me')
         setUser(meRes.data)
 
-        // Also update avatar from Google
-        const googleAvatar = supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture
+        // ✅ Avatar update is non-blocking — never let it fail the login
+        const googleAvatar =
+          supabaseUser.user_metadata?.avatar_url ||
+          supabaseUser.user_metadata?.picture
         if (googleAvatar) {
-          await api.patch('/auth/profile', {
-            avatar_url: googleAvatar
-          })
+          api.patch('/auth/profile', { avatar_url: googleAvatar }).catch(() => {})
         }
 
         redirectByRole(meRes.data.role)
       } catch (err) {
-        console.error('Profile creation failed', err)
+        console.error('Profile fetch after register failed', err)
         navigate('/login')
       }
     }
