@@ -16,7 +16,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    // Allow callers to opt out of the auto-redirect (e.g. AuthCallback handles its own 401s)
+    const skip = error.config?._skipRedirectOn401
+    if (error.response?.status === 401 && !skip) {
       localStorage.removeItem('sakyan_token')
       window.location.href = '/login'
     }
