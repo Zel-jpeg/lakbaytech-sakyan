@@ -4,7 +4,7 @@ import { supabase } from '@/config/supabase'
 import api from '@/config/axios'
 import { useAuthStore } from '@/store/authStore'
 
-// Module-level flag — survives React StrictMode double-mount
+// Module-level flag — only resets when the page fully reloads (new OAuth attempt)
 let authInProgress = false
 
 export default function AuthCallback() {
@@ -28,7 +28,7 @@ export default function AuthCallback() {
       supabaseUser.user_metadata?.picture
 
     try {
-      // Existing user — patch avatar first so navbar gets it, then fetch profile
+      // Existing user — patch avatar first, then fetch profile
       if (avatar) {
         await api.patch('/auth/profile', { avatar_url: avatar }).catch(() => {})
       }
@@ -36,7 +36,7 @@ export default function AuthCallback() {
       setUser(res.data)
       redirectByRole(res.data.role)
     } catch {
-      // New user — create Django profile first
+      // New user — register first
       try {
         await api.post('/auth/register', {
           user_id:   supabaseUser.id,
@@ -45,7 +45,6 @@ export default function AuthCallback() {
           phone:     '',
         })
       } catch (registerErr) {
-        // 409 = already exists (race condition), safe to continue
         if (registerErr.response?.status !== 409) {
           console.error('Registration failed', registerErr)
           authInProgress = false
@@ -55,11 +54,9 @@ export default function AuthCallback() {
       }
 
       try {
-        // Patch avatar before fetching profile so setUser gets it
         if (avatar) {
           await api.patch('/auth/profile', { avatar_url: avatar }).catch(() => {})
         }
-
         const meRes = await api.get('/auth/me')
         setUser(meRes.data)
         redirectByRole(meRes.data.role)
@@ -72,8 +69,11 @@ export default function AuthCallback() {
   }
 
   useEffect(() => {
-    // Reset on every fresh mount so navigating back to /auth/callback works
-    authInProgress = false
+    // ❌ Removed: authInProgress = false  ← this was the bug
+    // The module-level initial false is enough.
+    // When user does a new Google login, the full page redirects
+    // to Google and back, which reloads the JS module and
+    // resets authInProgress = false automatically.
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
