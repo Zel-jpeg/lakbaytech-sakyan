@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
@@ -83,24 +83,30 @@ function Select({ value, onChange, options, placeholder, loading, disabled }) {
   )
 }
 
-// ── Map: auto-fly to selected location ───────────────────────────────────────
+// ── Map: auto-fly to selected location (debounced) ───────────────────────────
 function MapFlyTo({ query, zoom }) {
   const map = useMap()
   const lastQuery = useRef('')
+  const timer = useRef(null)
 
   useEffect(() => {
     if (!query || query === lastQuery.current) return
-    lastQuery.current = query
-    fetch(
-      `https://nominatim.openstreetmap.org/search?` +
-      new URLSearchParams({ q: query + ', Philippines', format: 'json', limit: 1 }),
-      { headers: { 'Accept-Language': 'en' } }
-    )
-      .then(r => r.json())
-      .then(([result]) => {
-        if (result) map.flyTo([+result.lat, +result.lon], zoom, { animate: true, duration: 1.2 })
-      })
-      .catch(() => {})
+    // Debounce: wait 400 ms after the last selection before calling Nominatim
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      lastQuery.current = query
+      fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        new URLSearchParams({ q: query + ', Philippines', format: 'json', limit: 1 }),
+        { headers: { 'Accept-Language': 'en' } }
+      )
+        .then(r => r.json())
+        .then(([result]) => {
+          if (result) map.flyTo([+result.lat, +result.lon], zoom, { animate: true, duration: 0.8 })
+        })
+        .catch(() => {})
+    }, 400)
+    return () => clearTimeout(timer.current)
   }, [query])
 
   return null
@@ -171,21 +177,21 @@ function AddressPicker({ onChange, onCoordsChange, error }) {
     onChange(parts.join(', '))
   }, [brgyName, cityName, provName])
 
-  // Map pin click → reverse geocode
-  const handleMapClick = async ({ lat, lng }) => {
+  // Map pin click → show coords instantly, then reverse-geocode in background
+  const handleMapClick = useCallback(async ({ lat, lng }) => {
     setPin({ lat, lng })
     onCoordsChange(lat, lng)
+    // Show coords immediately for instant feedback
+    setPinLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
     try {
       const res  = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`,
         { headers: { 'Accept-Language': 'en' } }
       )
       const data = await res.json()
-      setPinLabel(data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-    } catch {
-      setPinLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-    }
-  }
+      if (data.display_name) setPinLabel(data.display_name)
+    } catch { /* keep coordinate label */ }
+  }, [onCoordsChange])
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${error ? 'border-red-300' : 'border-gray-200'}`}>
@@ -218,42 +224,53 @@ function AddressPicker({ onChange, onCoordsChange, error }) {
         )}
       </div>
 
-      {/* Map */}
-      <div>
-        <div className="relative">
-          {/* Hint pill */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
-            <span className="bg-white/90 backdrop-blur text-xs text-gray-500 px-3 py-1
-                             rounded-full shadow-sm border border-gray-100">
-              {city ? 'Click to pin exact location' : 'Select a city to zoom the map'}
-            </span>
+      {/* Map — lazy-mounted only after province is chosen to avoid loading tiles on first render */}
+      {province ? (
+        <div>
+          <div className="relative">
+            {/* Hint pill */}
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
+              <span className="bg-white/90 backdrop-blur text-xs text-gray-500 px-3 py-1
+                               rounded-full shadow-sm border border-gray-100">
+                {city ? 'Click to pin exact location' : 'Select a city to zoom the map'}
+              </span>
+            </div>
+
+            <MapContainer
+              center={[12.8797, 121.774]}
+              zoom={6}
+              style={{ height: '250px', width: '100%' }}
+              zoomControl
+            >
+              {/* CartoDB Positron: lighter tiles, fewer requests, faster load */}
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+                subdomains="abcd"
+                maxZoom={19}
+              />
+              {/* Auto-fly when city/barangay changes (debounced) */}
+              {flyQuery && <MapFlyTo query={flyQuery} zoom={flyZoom} />}
+              <MapClickHandler onMapClick={handleMapClick} />
+              {pin && <Marker position={[pin.lat, pin.lng]} />}
+            </MapContainer>
           </div>
 
-          <MapContainer
-            center={[12.8797, 121.774]}
-            zoom={6}
-            style={{ height: '250px', width: '100%' }}
-            zoomControl
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            />
-            {/* Auto-fly when city/barangay changes */}
-            {flyQuery && <MapFlyTo query={flyQuery} zoom={flyZoom} />}
-            <MapClickHandler onMapClick={handleMapClick} />
-            {pin && <Marker position={[pin.lat, pin.lng]} />}
-          </MapContainer>
+          {/* Pin label */}
+          {pin && (
+            <div className="bg-blue-50 border-t border-blue-100 px-4 py-2 flex items-start gap-2">
+              <MapPin size={13} className="text-blue-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-blue-700 leading-snug">{pinLabel}</p>
+            </div>
+          )}
         </div>
-
-        {/* Pin label */}
-        {pin && (
-          <div className="bg-blue-50 border-t border-blue-100 px-4 py-2 flex items-start gap-2">
-            <MapPin size={13} className="text-blue-500 mt-0.5 shrink-0" />
-            <p className="text-xs text-blue-700 leading-snug">{pinLabel}</p>
-          </div>
-        )}
-      </div>
+      ) : (
+        /* Placeholder shown before province is picked — avoids loading map tiles early */
+        <div className="flex flex-col items-center justify-center gap-2 h-[250px] bg-gray-50 border-t border-gray-100">
+          <MapPin size={28} className="text-gray-300" />
+          <p className="text-xs text-gray-400">Select a province to load the map</p>
+        </div>
+      )}
     </div>
   )
 }

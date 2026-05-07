@@ -147,6 +147,14 @@ export default function Step3DocsPage() {
   const [govIdUrl,  setGovIdUrl]  = useState(store.government_id_url  || '')
   const [permitUrl, setPermitUrl] = useState(store.business_permit_url || '')
 
+  // Business permit is required for both individual and company partners
+  const permitLabel = isCompany
+    ? 'Business Permit / DTI / SEC Registration'
+    : "Business / Mayor's Permit or DTI Registration"
+  const permitHint  = isCompany
+    ? 'Required for company accounts'
+    : "Required — proves your business is legally registered (Mayor's Permit, DTI, etc.)"
+
   const applyMutation = useMutation({
     mutationFn: (data) => api.post('/partner/apply/', data).then(r => r.data),
     onSuccess: () => {
@@ -158,7 +166,8 @@ export default function Step3DocsPage() {
     },
   })
 
-  const canSubmit = govIdUrl && (!isCompany || permitUrl) && !applyMutation.isPending
+  // Both individual and company must submit a government ID + business permit
+  const canSubmit = govIdUrl && permitUrl && !applyMutation.isPending
 
   const handleSubmit = () => {
     if (!canSubmit) return
@@ -194,16 +203,14 @@ export default function Step3DocsPage() {
           required
         />
 
-        {isCompany && (
-          <FileUploadBox
-            label="Business Permit / DTI / SEC Registration"
-            hint="Required for company accounts"
-            url={permitUrl}
-            onUploaded={(u) => { setPermitUrl(u); store.setStep3({ business_permit_url: u }) }}
-            onClear={() => setPermitUrl('')}
-            required
-          />
-        )}
+        <FileUploadBox
+          label={permitLabel}
+          hint={permitHint}
+          url={permitUrl}
+          onUploaded={(u) => { setPermitUrl(u); store.setStep3({ business_permit_url: u }) }}
+          onClear={() => setPermitUrl('')}
+          required
+        />
 
         {/* Summary of what they entered */}
         <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
