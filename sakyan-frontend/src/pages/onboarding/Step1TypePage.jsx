@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Building2, ArrowRight } from 'lucide-react'
 import OnboardingLayout from './OnboardingLayout'
 import { useOnboardingStore } from '@/store/onboardingStore'
+import { useAuthStore } from '@/store/authStore'
 
 const TYPES = [
   {
@@ -21,8 +22,17 @@ const TYPES = [
 
 export default function Step1TypePage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const { partner_type, setStep1 } = useOnboardingStore()
   const [selected, setSelected] = useState(partner_type) // pre-fills on refresh
+
+  // Guard: if they already submitted an application that is pending,
+  // send them to the waiting page — no need to restart from step 1.
+  useEffect(() => {
+    if (user?.partner_status === 'pending') {
+      navigate('/onboarding/pending', { replace: true })
+    }
+  }, [user?.partner_status])
 
   const handleNext = () => {
     if (!selected) return

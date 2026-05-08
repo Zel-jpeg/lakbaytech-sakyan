@@ -38,10 +38,11 @@ export default function DashboardLayout({ role }) {
   const { data: conversations } = useConversations({ enabled: true })
   const nav = role === 'admin' ? ADMIN_NAV : PARTNER_NAV
 
-  // Clear approval banner when partner lands on dashboard
+  // Clear approval banner permanently when partner lands on dashboard
   useEffect(() => {
     if (role === 'partner') {
       localStorage.removeItem('sakyan_approval_banner')
+      localStorage.setItem('sakyan_approval_banner_dismissed', '1')
     }
   }, [role])
 

@@ -151,10 +151,25 @@ export default function PublicLayout() {
                       )}
 
                       {user.role === 'customer' && (
-                        <Link to="/onboarding/step1" onClick={() => setDropdownOpen(false)}
+                        <Link
+                          to={
+                            user.partner_status === 'pending'  ? '/onboarding/pending' :
+                            user.partner_status === 'rejected' ? '/onboarding/step1'   :
+                            '/onboarding/step1'
+                          }
+                          onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300
-                                     hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                          <Car size={15} className="text-gray-400" /> Start Listing
+                                     hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                        >
+                          <Car size={15} className="text-gray-400" />
+                          {user.partner_status === 'pending' ? (
+                            <span className="flex items-center gap-2">
+                              Application Pending
+                              <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-medium">
+                                Waiting
+                              </span>
+                            </span>
+                          ) : 'Start Listing'}
                         </Link>
                       )}
 
@@ -240,10 +255,17 @@ export default function PublicLayout() {
                   </Link>
                 )}
                 {user.role === 'customer' && (
-                  <Link to="/onboarding/step1" onClick={() => setMobileOpen(false)}
+                  <Link
+                    to={
+                      user.partner_status === 'pending'  ? '/onboarding/pending' :
+                      user.partner_status === 'rejected' ? '/onboarding/step1'   :
+                      '/onboarding/step1'
+                    }
+                    onClick={() => setMobileOpen(false)}
                     className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
-                               hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                    Start Listing
+                               hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                  >
+                    {user.partner_status === 'pending' ? 'Application Pending ⏳' : 'Start Listing'}
                   </Link>
                 )}
                 {(user.role === 'partner' || user.role === 'admin') && (

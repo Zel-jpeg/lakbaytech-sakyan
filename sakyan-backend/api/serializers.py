@@ -42,11 +42,22 @@ class KYCAdminSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     customer_profile = CustomerProfileSerializer(source='profile', read_only=True)
+    # 'pending' | 'rejected' | None  — lets frontend redirect pending applicants
+    # to the waiting page instead of restarting onboarding from step 1
+    partner_status   = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'role', 'avatar_url', 'created_at', 'customer_profile']
+        fields = ['id', 'full_name', 'email', 'phone', 'role', 'avatar_url',
+                  'created_at', 'customer_profile', 'partner_status']
         read_only_fields = ['id', 'role', 'created_at']
+
+    def get_partner_status(self, obj):
+        try:
+            return obj.partner.status   # 'pending' | 'approved' | 'rejected'
+        except Exception:
+            return None
+
 
 
 class RegisterSerializer(serializers.Serializer):

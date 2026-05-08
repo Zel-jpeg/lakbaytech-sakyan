@@ -3,38 +3,49 @@ import { useNavigate } from 'react-router-dom'
 import { PartyPopper, X, LayoutDashboard } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 
-const BANNER_KEY = 'sakyan_approval_banner'
+const BANNER_KEY    = 'sakyan_approval_banner'
+const DISMISSED_KEY = 'sakyan_approval_banner_dismissed'
 
+/**
+ * ApprovalBanner
+ *
+ * A sticky full-width green gradient banner that appears below the navbar
+ * when a customer has just been approved as a Sakyan Partner.
+ *
+ * It stays visible until the partner:
+ *   a) Clicks "Partner Dashboard" on the banner (navigates to /dashboard), OR
+ *   b) Clicks the X dismiss button, OR
+ *   c) Visits the partner dashboard from anywhere
+ *
+ * After dismissal, it will never re-appear for the same approval event.
+ */
 export default function ApprovalBanner() {
   const { user } = useAuthStore()
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
   const [visible, setVisible] = useState(false)
 
-  // Show only if the localStorage flag is set AND user is now a partner
   useEffect(() => {
-    if (user?.role === 'partner' && localStorage.getItem(BANNER_KEY) === '1') {
-      setVisible(true)
-    } else {
-      setVisible(false)
-    }
-  }, [user?.role])
+    const bannerSet    = localStorage.getItem(BANNER_KEY) === '1'
+    const dismissed    = localStorage.getItem(DISMISSED_KEY) === '1'
+    const isPartner    = user?.role === 'partner'
 
-  const handleDismiss = () => {
-    localStorage.removeItem(BANNER_KEY)
-    setVisible(false)
-  }
+    // Show if: user is approved partner, banner flag is set, and NOT dismissed yet
+    setVisible(isPartner && bannerSet && !dismissed)
+  }, [user?.role, user?.id])
 
-  const handleGoToDashboard = () => {
+  const dismiss = (goToDashboard = false) => {
     localStorage.removeItem(BANNER_KEY)
+    localStorage.setItem(DISMISSED_KEY, '1')
     setVisible(false)
-    navigate('/dashboard')
+    if (goToDashboard) navigate('/dashboard')
   }
 
   if (!visible) return null
 
   return (
-    <div className="relative z-40 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 text-white px-4 py-3 shadow-lg">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+    <div className="relative z-40 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 text-white shadow-lg">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+        {/* Icon + message */}
         <div className="flex items-center gap-3">
           <div className="flex-shrink-0 w-9 h-9 bg-white/20 rounded-full flex items-center justify-center">
             <PartyPopper size={18} className="text-white" />
@@ -49,18 +60,19 @@ export default function ApprovalBanner() {
           </div>
         </div>
 
+        {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={handleGoToDashboard}
+            onClick={() => dismiss(true)}
             className="flex items-center gap-1.5 bg-white text-emerald-700 px-4 py-1.5
                        rounded-lg text-sm font-semibold hover:bg-emerald-50 transition shadow-sm"
           >
             <LayoutDashboard size={14} />
-            Partner Dashboard
+            Go to Partner Dashboard
           </button>
           <button
-            onClick={handleDismiss}
-            aria-label="Dismiss"
+            onClick={() => dismiss(false)}
+            aria-label="Dismiss banner"
             className="p-1.5 rounded-lg hover:bg-white/20 transition"
           >
             <X size={16} />

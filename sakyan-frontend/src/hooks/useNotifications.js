@@ -2,16 +2,16 @@ import { useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import api from '@/config/axios'
-
 import { supabase } from '@/config/supabase'
 import { useAuthStore } from '@/store/authStore'
+
+const BANNER_KEY     = 'sakyan_approval_banner'
+const DISMISSED_KEY  = 'sakyan_approval_banner_dismissed'
 
 export function useNotifications() {
   const qc = useQueryClient()
   const { user, refreshUser } = useAuthStore()
-  // Track notifications we've already toasted so we don't re-toast on re-render
-  const toastedIds   = useRef(new Set())
-  // Track if we already acted on existing approval notifs this session
+  const toastedIds      = useRef(new Set())
   const checkedApproval = useRef(false)
 
   const query = useQuery({
@@ -24,32 +24,49 @@ export function useNotifications() {
   })
 
   // ── Startup check ──────────────────────────────────────────────────────────
-  // When notification list loads, check for ANY unread approval notification.
-  // This handles the case where the admin approved while the user was offline
-  // (realtime wouldn't have fired), so on the next page load we catch it here.
+  // When notification list loads, look for ANY unread approval notification.
+  // This handles partners who were approved while offline — realtime won't
+  // have fired, so on their next login we catch it here via the query result.
+  //
+  // Banner logic:
+  //   BANNER_KEY    = '1'  → banner is visible
+  //   DISMISSED_KEY = '1'  → partner already visited the dashboard; don't re-show
   useEffect(() => {
-    if (checkedApproval.current) return
+    if (checkedApproval.current) return   // only run once per session
     if (!query.data) return
 
     const notifications = query.data?.results || query.data || []
-    const hasApproval = notifications.some(
-      n => n.type === 'approval' && n.title?.toLowerCase().includes('approved')
+
+    // Look for an UNREAD approval notification — unread means they haven't
+    // visited the dashboard and acknowledged it yet.
+    const hasUnreadApproval = notifications.some(
+      n => n.type === 'approval'
+        && n.title?.toLowerCase().includes('approved')
+        && !n.is_read                    // only unread = banner not yet seen
     )
 
-    if (hasApproval) {
+    // Fallback: show banner if there's any approval notification at all AND
+    // the partner hasn't permanently dismissed it (dashboard hasn't been visited
+    // since approval).
+    const hasAnyApproval = notifications.some(
+      n => n.type === 'approval' && n.title?.toLowerCase().includes('approved')
+    )
+    const alreadyDismissed = localStorage.getItem(DISMISSED_KEY) === '1'
+
+    if (hasAnyApproval) {
       checkedApproval.current = true
-      // Refresh the user profile so the stored role becomes 'partner'
+      // Always refresh user on load if they have an approval notification
+      // (handles role still showing 'customer' in persisted Zustand storage)
       refreshUser()
-      // Set the banner flag so the green banner appears
-      if (user?.role !== 'partner') {
-        localStorage.setItem('sakyan_approval_banner', '1')
+
+      // Only show the banner if it hasn't been permanently dismissed
+      if (!alreadyDismissed) {
+        localStorage.setItem(BANNER_KEY, '1')
       }
     }
-  }, [query.data])  // runs every time notifications data changes
+  }, [query.data])
 
   // ── Supabase Realtime ──────────────────────────────────────────────────────
-  // Listen for NEW notification inserts in real time so the role updates
-  // immediately when the admin approves while the partner is online.
   useEffect(() => {
     if (!user) return
 
@@ -68,18 +85,16 @@ export function useNotifications() {
         (payload) => {
           const notif = payload.new
 
-          // Refresh the notifications list in the bell
           qc.invalidateQueries({ queryKey: ['notifications'] })
 
-          // If this is a KYC or approval notification, refresh the user profile
-          // so role/kyc_status updates immediately without logout
           if (notif?.type === 'kyc') {
             refreshUser()
           }
           if (notif?.type === 'approval' && notif?.title?.toLowerCase().includes('approved')) {
             refreshUser()
-            // Set persistent banner flag — cleared when partner visits dashboard
-            localStorage.setItem('sakyan_approval_banner', '1')
+            // Clear any old dismissed flag so the new approval banner shows fresh
+            localStorage.removeItem(DISMISSED_KEY)
+            localStorage.setItem(BANNER_KEY, '1')
           }
 
           if (notif?.id && !toastedIds.current.has(notif.id)) {
@@ -104,7 +119,7 @@ export function useNotifications() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [user?.id]) // depend on user.id not user object to avoid extra re-runs
+  }, [user?.id])
 
   return query
 }
