@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePartnerBookings, useUpdateBookingStatus, useUpdatePaymentStatus, useUpdateRentalTimes } from '@/hooks/useBookings'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import {
@@ -429,10 +429,17 @@ function BookingModal({ booking, onClose }) {
   const isPending    = booking.booking_status === 'pending_review'
   const cp           = booking.customer_profile
 
-  const handleApprove = () => updateStatus.mutate({ id: booking.id, action: 'approve' })
+  const handleApprove = () =>
+    updateStatus.mutate(
+      { id: booking.id, action: 'approve' },
+      { onSuccess: () => onClose() }
+    )
   const handleReject  = () => {
     if (!rejectReason.trim()) return
-    updateStatus.mutate({ id: booking.id, action: 'reject', reason: rejectReason })
+    updateStatus.mutate(
+      { id: booking.id, action: 'reject', reason: rejectReason },
+      { onSuccess: () => onClose() }
+    )
     setShowRejectInput(false)
     setRejectReason('')
   }
@@ -937,6 +944,15 @@ export default function PartnerBookingsPage() {
     statusFilter ? { booking_status: statusFilter } : {}
   )
   const bookings = data?.results || data || []
+
+  // ── Keep the open modal in sync whenever the list refetches ───────────────
+  // Fixes: payment status / rental times / booking status showing stale data
+  // after a mutation invalidates + refetches the partner bookings query.
+  useEffect(() => {
+    if (!selectedBooking) return
+    const fresh = bookings.find(b => b.id === selectedBooking.id)
+    if (fresh) setSelectedBooking(fresh)
+  }, [bookings]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>

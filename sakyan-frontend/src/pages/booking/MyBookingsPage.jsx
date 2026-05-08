@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useMyBookings } from '@/hooks/useBookings'
 import { useResponsiveView } from '@/hooks/useResponsiveView'
+import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -426,6 +427,18 @@ export default function MyBookingsPage() {
 
   const { data, isLoading } = useMyBookings()
   const bookings = data?.results || data || []
+
+  // ── Auto-clear booking notification badge when page is visited ─────────────
+  const { data: notifData } = useNotifications()
+  const markRead = useMarkNotificationRead()
+  useEffect(() => {
+    if (!notifData) return
+    const list = notifData?.results || notifData || []
+    const unreadBookingNotifs = list.filter(n => !n.is_read && n.type === 'booking')
+    unreadBookingNotifs.forEach(n => markRead.mutate(n.id))
+  // run once when notif data loads (adding markRead would cause infinite loop)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifData])
 
   const filtered = activeFilter === 'all'
     ? bookings

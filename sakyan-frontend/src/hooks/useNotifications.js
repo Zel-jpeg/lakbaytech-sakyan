@@ -128,11 +128,22 @@ export function useNotifications() {
           toastedIds.current.add(notif.id)
           const isApproval = notif?.type === 'approval' && notif?.title?.toLowerCase().includes('approved')
           const isKYC      = notif?.type === 'kyc' && notif?.title?.includes('Verified')
+          const isBooking  = notif?.type === 'booking'
 
           if (isApproval) {
             // Handled by role-change detector — skip to avoid duplicate toast
           } else if (isKYC) {
             toast.success('🎉 Identity verified! You can now book cars.', { duration: 6000, icon: '✅' })
+          } else if (isBooking) {
+            // Invalidate bookings query so the badge + list update instantly
+            qc.invalidateQueries({ queryKey: ['bookings', 'my'] })  // = bookingKeys.my()
+            const title = notif?.title || ''
+            const icon  = title.includes('Approved') ? '🎉'
+                        : title.includes('Not Approved') || title.includes('rejected') ? '❌'
+                        : title.includes('Completed') ? '✅'
+                        : title.includes('Handed Over') ? '🚗'
+                        : '📋'
+            toast(title, { icon, duration: 5000 })
           } else if (notif?.title) {
             toast(notif.title, { icon: '🔔', duration: 4000 })
           }

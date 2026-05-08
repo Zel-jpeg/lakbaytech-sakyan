@@ -10,6 +10,7 @@ import {
 import { useState, useRef, useEffect } from 'react'
 import LogoutModal from '@/components/ui/LogoutModal'
 import ApprovalBanner from '@/components/common/ApprovalBanner'
+import { useNotifications } from '@/hooks/useNotifications'
 
 export default function PublicLayout() {
   const { user } = useAuthStore()
@@ -21,6 +22,14 @@ export default function PublicLayout() {
   const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
   const dropdownRef = useRef(null)
+
+  // ── Unread booking notifications count (live via Supabase realtime) ─────────
+  const { data: notifData } = useNotifications()
+  const unreadBookings = (() => {
+    if (!notifData) return 0
+    const list = notifData?.results || notifData || []
+    return list.filter(n => !n.is_read && n.type === 'booking').length
+  })()
 
   // Scroll detection for header background
   useEffect(() => {
@@ -146,7 +155,14 @@ export default function PublicLayout() {
                         <Link to="/booking/my-bookings" onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300
                                      hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                          <CalendarCheck size={15} className="text-gray-400" /> My Bookings
+                          <CalendarCheck size={15} className="text-gray-400" />
+                          <span className="flex-1">My Bookings</span>
+                          {unreadBookings > 0 && (
+                            <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center
+                                             bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                              {unreadBookings > 9 ? '9+' : unreadBookings}
+                            </span>
+                          )}
                         </Link>
                       )}
 
@@ -249,9 +265,15 @@ export default function PublicLayout() {
                 </Link>
                 {(user.role === 'customer' || user.role === 'partner') && (
                   <Link to="/booking/my-bookings" onClick={() => setMobileOpen(false)}
-                    className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                                hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                    My Bookings
+                    <span className="flex-1">My Bookings</span>
+                    {unreadBookings > 0 && (
+                      <span className="min-w-[18px] h-[18px] flex items-center justify-center
+                                       bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                        {unreadBookings > 9 ? '9+' : unreadBookings}
+                      </span>
+                    )}
                   </Link>
                 )}
                 {user.role === 'customer' && (
