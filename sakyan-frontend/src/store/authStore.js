@@ -15,21 +15,18 @@ export const useAuthStore = create(
         localStorage.removeItem('sakyan_token')
         set({ user: null, token: null })
       },
-      // Re-fetch /api/auth/me and update stored user without logout/login
+      // Re-fetch /api/auth/me and update stored user without logout/login.
+      // Uses the same axios instance as all other API calls so auth headers
+      // and error handling are consistent.
       refreshUser: async () => {
         try {
-          const token = localStorage.getItem('sakyan_token')
-          if (!token) return
-          const apiUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '')
-          const res = await fetch(`${apiUrl}/auth/me`, {
-
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          if (res.ok) {
-            const data = await res.json()
-            set({ user: data })
+          // Lazy import to avoid circular dep (api imports from authStore indirectly)
+          const { default: api } = await import('@/config/axios')
+          const res = await api.get('/auth/me', { _skipRedirectOn401: true })
+          if (res.status === 200) {
+            set({ user: res.data })
           }
-        } catch { /* silent fail */ }
+        } catch { /* silent fail — token expired or network error */ }
       },
     }),
     { name: 'sakyan-auth', partialize: (state) => ({ user: state.user }) }
