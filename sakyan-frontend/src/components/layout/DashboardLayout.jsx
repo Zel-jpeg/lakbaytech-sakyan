@@ -25,7 +25,7 @@ const ADMIN_NAV = [
   { to: '/admin/users',        label: 'Platform Users',  icon: Users },
   { to: '/admin/reports',      label: 'Reports',         icon: BarChart },
   { to: '/admin/settings',     label: 'Settings',        icon: Settings },
-  { to: '/messages',           label: 'Messages',        icon: MessageCircle },
+  { to: '/admin/messages',     label: 'Messages',        icon: MessageCircle },
 ]
 
 export default function DashboardLayout({ role }) {
