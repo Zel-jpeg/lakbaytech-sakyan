@@ -602,13 +602,18 @@ export default function CarDetailPage() {
               </div>
             )}
 
-            {user?.role === 'partner' && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 text-center bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-                Partner accounts can't book cars. Switch to a customer account to book.
-              </p>
+            {user?.role === 'partner' && isAvailable && (
+              <button
+                onClick={handleBookNow}
+                className="w-full py-3.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
+                           text-white text-sm font-semibold rounded-xl transition-all shadow-md
+                           hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.98]"
+              >
+                Book Now
+              </button>
             )}
 
-            {!isAvailable && user?.role === 'customer' && (
+            {!isAvailable && user && user.role !== 'admin' && (
               <p className="text-xs text-gray-400 dark:text-gray-500 text-center bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
                 This car is currently unavailable. Check back later or{' '}
                 <Link to="/cars" className="text-brand-600 dark:text-brand-400 hover:underline">browse similar cars</Link>.
