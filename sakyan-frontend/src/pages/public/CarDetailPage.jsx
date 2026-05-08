@@ -354,7 +354,8 @@ export default function CarDetailPage() {
       return
     }
 
-    if (user.role === 'customer') {
+    // Both customers and partners must have verified KYC before booking
+    if (user.role === 'customer' || user.role === 'partner') {
       const kycStatus = user.customer_profile?.kyc_status
       if (kycStatus === 'pending') {
         navigate('/kyc/pending')
@@ -602,16 +603,50 @@ export default function CarDetailPage() {
               </div>
             )}
 
-            {user?.role === 'partner' && isAvailable && (
-              <button
-                onClick={handleBookNow}
-                className="w-full py-3.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
-                           text-white text-sm font-semibold rounded-xl transition-all shadow-md
-                           hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.98]"
-              >
-                Book Now
-              </button>
-            )}
+            {user?.role === 'partner' && isAvailable && (() => {
+              const kycStatus = user.customer_profile?.kyc_status
+              if (kycStatus === 'approved') {
+                return (
+                  <button
+                    onClick={handleBookNow}
+                    className="w-full py-3.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
+                               text-white text-sm font-semibold rounded-xl transition-all shadow-md
+                               hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.98]"
+                  >
+                    Book Now
+                  </button>
+                )
+              }
+              if (kycStatus === 'pending') {
+                return (
+                  <div className="space-y-2">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800
+                                    rounded-xl p-3 text-xs text-amber-700 dark:text-amber-300 text-center">
+                      ⏳ Your identity verification is under review. You'll be notified soon.
+                    </div>
+                    <button onClick={handleBookNow}
+                      className="w-full py-2.5 border border-amber-300 dark:border-amber-700
+                                 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-xl
+                                 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition">
+                      Check verification status
+                    </button>
+                  </div>
+                )
+              }
+              return (
+                <div className="space-y-2">
+                  <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800
+                                  rounded-xl p-3 text-xs text-orange-700 dark:text-orange-300 text-center">
+                    🪪 Identity verification required before booking.
+                  </div>
+                  <button onClick={handleBookNow}
+                    className="w-full py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
+                               text-white text-sm font-semibold rounded-xl transition-all shadow-md active:scale-[0.98]">
+                    Verify My Identity
+                  </button>
+                </div>
+              )
+            })()}
 
             {!isAvailable && user && user.role !== 'admin' && (
               <p className="text-xs text-gray-400 dark:text-gray-500 text-center bg-gray-50 dark:bg-gray-800 rounded-xl p-3">

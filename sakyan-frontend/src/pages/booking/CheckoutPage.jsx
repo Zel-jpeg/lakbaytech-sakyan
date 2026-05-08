@@ -372,6 +372,20 @@ export default function CheckoutPage() {
 
   const { data: bookedRanges = [] } = useCarBookedDates(carId)
 
+  // ── KYC guard: both customers and partners must be verified before booking ──
+  useEffect(() => {
+    if (!user || !profile) return  // wait for profile to load
+    const kycStatus = profile?.customer_profile?.kyc_status
+    if (kycStatus === 'approved') return  // all good
+    if (kycStatus === 'pending') {
+      navigate('/kyc/pending', { replace: true })
+    } else {
+      navigate('/kyc/verify', { state: { from: `/booking/checkout/${carId}` }, replace: true })
+    }
+  }, [user, profile, carId, navigate])
+
+
+
   // ── Expand booked ranges into local Date arrays (avoid UTC timezone shift) ──
   const bookedDates  = []   // confirmed → blocked + styled red
   const pendingDates = []   // pending   → styled amber, still selectable

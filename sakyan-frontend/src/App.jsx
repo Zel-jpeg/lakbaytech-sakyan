@@ -128,8 +128,8 @@ export default function App() {
       <Route path="/onboarding/pending" element={<ProtectedRoute><Step4PendingPage /></ProtectedRoute>} />
 
       {/* ── KYC (no layout — full-screen) ── */}
-      <Route path="/kyc/verify" element={<ProtectedRoute roles={['customer']}><KYCVerificationPage /></ProtectedRoute>} />
-      <Route path="/kyc/pending" element={<ProtectedRoute roles={['customer']}><KYCPendingPage /></ProtectedRoute>} />
+      <Route path="/kyc/verify" element={<ProtectedRoute roles={['customer', 'partner']}><KYCVerificationPage /></ProtectedRoute>} />
+      <Route path="/kyc/pending" element={<ProtectedRoute roles={['customer', 'partner']}><KYCPendingPage /></ProtectedRoute>} />
 
       {/* ── Partner dashboard (DashboardLayout as parent) ── */}
       <Route path="/dashboard" element={
