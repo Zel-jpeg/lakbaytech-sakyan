@@ -20,7 +20,15 @@ api.interceptors.response.use(
     const skip = error.config?._skipRedirectOn401
     if (error.response?.status === 401 && !skip) {
       localStorage.removeItem('sakyan_token')
-      window.location.href = '/login'
+      localStorage.removeItem('sakyan-auth')
+      
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      } else {
+        import('@/store/authStore').then(({ useAuthStore }) => {
+          useAuthStore.getState().logout()
+        }).catch(() => {})
+      }
     }
     return Promise.reject(error)
   }
