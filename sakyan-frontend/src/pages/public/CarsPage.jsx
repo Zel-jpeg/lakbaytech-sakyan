@@ -129,7 +129,7 @@ export default function CarsPage() {
         {/* Cars grid */}
         <div className="flex-1 min-w-0">
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
               {[...Array(9)].map((_, i) => <CarSkeleton key={i} />)}
             </div>
           ) : cars.length === 0 ? (
@@ -148,7 +148,7 @@ export default function CarsPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
               {cars.map(car => <CarCard key={car.id} car={car} />)}
             </div>
           )}
