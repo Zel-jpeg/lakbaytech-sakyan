@@ -53,7 +53,7 @@ export default function CarCard({ car }) {
         <span className={`absolute top-2 sm:top-3 right-2 sm:right-3 flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[11px] font-bold px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg
                           backdrop-blur-sm shadow-sm ${avail.bg} ${avail.color}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${avail.dot} ${avail.label === 'Pending' ? 'animate-pulse' : ''}`} />
-          <span className="hidden sm:inline">{avail.label}</span>
+          {avail.label}
         </span>
       </div>
 
