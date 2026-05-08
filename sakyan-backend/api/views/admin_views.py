@@ -104,6 +104,32 @@ class AdminStatsView(APIView):
         return Response(stats)
 
 
+class PublicStatsView(APIView):
+    """Public (no auth) landing-page stats — only safe aggregate counts."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        total_users = User.objects.count()
+        available_cars = Car.objects.filter(status='active', is_available=True).count()
+        cities = (
+            Car.objects.filter(status='active', is_available=True)
+            .values_list('location', flat=True)
+            .distinct()
+            .count()
+        )
+        active_partners = Partner.objects.filter(status='approved').count()
+        completed_bookings = Booking.objects.filter(
+            booking_status__in=['completed', 'active', 'approved']
+        ).count()
+        return Response({
+            'total_users': total_users,
+            'available_cars': available_cars,
+            'cities': cities,
+            'active_partners': active_partners,
+            'completed_bookings': completed_bookings,
+        })
+
+
 class AdminAllBookingsView(generics.ListAPIView):
     serializer_class = BookingSerializer
     permission_classes = [IsAdmin]

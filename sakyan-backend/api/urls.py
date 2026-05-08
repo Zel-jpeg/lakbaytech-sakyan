@@ -13,7 +13,7 @@ from .views.booking_views import (
 from .views.partner_views import PartnerApplyView, PartnerProfileView
 from .views.admin_views import (
     AdminPartnerListView, AdminPartnerActionView,
-    AdminStatsView, AdminAllBookingsView, AdminUserListView,
+    AdminStatsView, PublicStatsView, AdminAllBookingsView, AdminUserListView,
     AdminSettingsView, AdminSettingUpdateView,
     AdminKYCListView, AdminKYCActionView,
     AdminSettlementListView, AdminCreateSettlementView, AdminSettlementActionView,
@@ -33,6 +33,9 @@ urlpatterns = [
     path('cars/', CarListView.as_view()),
     path('cars/<uuid:pk>/', CarDetailView.as_view()),
     path('cars/<uuid:pk>/booked-dates/', CarBookedDatesView.as_view()),
+
+    # Public stats (landing page)
+    path('public/stats/', PublicStatsView.as_view()),
 
     # Cars (partner)
     path('partner/cars/', PartnerCarListCreateView.as_view()),
