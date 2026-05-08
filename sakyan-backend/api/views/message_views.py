@@ -35,14 +35,16 @@ class SendMessageView(generics.CreateAPIView):
 
 class SupportThreadView(APIView):
     """
-    GET  /messages/support/          → return support messages for the current user
-    GET  /messages/support/?partner_id=<uuid> → admin fetches a specific partner's thread
-    POST /messages/support/          → send a support message
+    GET  /messages/support/                   → partner/customer sees own thread
+    GET  /messages/support/?partner_id=<uuid> → admin fetches a specific partner thread
+    POST /messages/support/                   → send a support message
+         body (partner): { content }
+         body (admin):   { content, receiver_id }
     """
     permission_classes = [IsAuthenticated]
 
     def _get_admin(self):
-        """Return the first admin user (used as the system support account)."""
+        """Return the first admin user as the system support account."""
         return User.objects.filter(role='admin').order_by('created_at').first()
 
     def get(self, request):
@@ -51,23 +53,30 @@ class SupportThreadView(APIView):
 
         if user.role == 'admin':
             if partner_id:
-                # Admin views a specific partner's thread
+                # Admin views specific partner thread — all messages where one
+                # side is the partner and the other is any admin
                 qs = Message.objects.filter(
-                    Q(sender_id=partner_id) | Q(receiver_id=partner_id),
-                    booking__isnull=True,
+                    booking__isnull=True
+                ).filter(
+                    Q(sender_id=partner_id) | Q(receiver_id=partner_id)
                 ).order_by('created_at')
+                # Mark unread messages sent to this admin as read
+                qs.filter(receiver=user, is_read=False).update(is_read=True)
             else:
-                # Admin gets list of all partners who have support threads
-                # Return latest message per unique partner
-                qs = Message.objects.filter(booking__isnull=True).order_by('created_at')
+                # Admin listing: return all support messages (ConversationListView
+                # handles the grouping; here just return all for completeness)
+                qs = Message.objects.filter(
+                    booking__isnull=True
+                ).order_by('created_at')
         else:
+            # Partner/customer sees their own support thread
             qs = Message.objects.filter(
-                Q(sender=user) | Q(receiver=user),
-                booking__isnull=True,
+                booking__isnull=True
+            ).filter(
+                Q(sender=user) | Q(receiver=user)
             ).order_by('created_at')
-            # Mark incoming as read
+            # Mark only messages received BY this user as read
             Message.objects.filter(
-                Q(sender=user) | Q(receiver=user),
                 booking__isnull=True,
                 receiver=user,
                 is_read=False,
@@ -85,16 +94,22 @@ class SupportThreadView(APIView):
             # Admin replies to a specific partner
             partner_id = request.data.get('receiver_id')
             if not partner_id:
-                return Response({'error': 'receiver_id is required for admin replies.'}, status=400)
+                return Response(
+                    {'error': 'receiver_id is required for admin replies.'},
+                    status=400
+                )
             try:
                 receiver = User.objects.get(pk=partner_id)
-            except User.DoesNotExist:
+            except (User.DoesNotExist, Exception):
                 return Response({'error': 'Receiver not found.'}, status=404)
         else:
             # Partner/customer messages the first admin
             receiver = self._get_admin()
             if not receiver:
-                return Response({'error': 'No admin available.'}, status=503)
+                return Response(
+                    {'error': 'No admin is available right now. Please try again later.'},
+                    status=503
+                )
 
         msg = Message.objects.create(
             booking=None,
@@ -113,16 +128,21 @@ class ConversationListView(APIView):
     def get(self, request):
         user = request.user
 
-        # ── 1. Booking-based conversations (existing logic) ──
+        # ── 1. Booking-based conversations ──────────────────────────────────
+        # NOTE: use messages__isnull=False or filter explicitly for non-null booking
+        # to avoid pulling in support messages via the related manager.
         bookings = Booking.objects.filter(
             Q(customer=user) | Q(partner__user=user)
-        ).select_related('car', 'customer', 'partner', 'partner__user') \
-         .prefetch_related('messages')
+        ).select_related('car', 'customer', 'partner', 'partner__user')
 
         conversations = []
         for booking in bookings:
-            last_message = booking.messages.order_by('-created_at').first()
-            unread_count = booking.messages.filter(
+            # Only fetch messages that belong to this specific booking (booking_id not null)
+            booking_messages = Message.objects.filter(
+                booking=booking
+            ).order_by('-created_at')
+            last_message = booking_messages.first()
+            unread_count = booking_messages.filter(
                 receiver=user, is_read=False
             ).count()
 
@@ -148,60 +168,69 @@ class ConversationListView(APIView):
             reverse=True
         )
 
-        # ── 2. Support thread ──
-        # Partners/customers always see "Sakyan Support" at the top.
-        # Admins see ALL partner support threads grouped by the non-admin party.
+        # ── 2. Support thread ────────────────────────────────────────────────
         if user.role == 'admin':
             # Build one entry per unique non-admin user who has a support thread
-            support_qs = Message.objects.filter(booking__isnull=True).select_related('sender', 'receiver').order_by('created_at')
+            support_msgs_all = (
+                Message.objects
+                .filter(booking__isnull=True)
+                .select_related('sender', 'receiver')
+                .order_by('created_at')
+            )
             seen_partner_ids = set()
             support_convs = []
-            for msg in support_qs:
+            for msg in support_msgs_all:
+                # The "other" party is whichever side is not the admin
                 other = msg.receiver if msg.sender.role == 'admin' else msg.sender
                 if other.id in seen_partner_ids:
                     continue
                 seen_partner_ids.add(other.id)
-                # Get last message and unread for this thread
+
+                # Get last message and unread count for this thread
                 thread_qs = Message.objects.filter(
-                    Q(sender=other) | Q(receiver=other),
-                    booking__isnull=True,
+                    booking__isnull=True
+                ).filter(
+                    Q(sender=other) | Q(receiver=other)
                 ).order_by('-created_at')
                 last = thread_qs.first()
                 unread = thread_qs.filter(receiver=user, is_read=False).count()
+
                 support_convs.append({
-                    'booking_id':      f'support:{other.id}',   # virtual ID
-                    'booking_code':    'Support',
-                    'car_name':        'Sakyan Support',
-                    'customer_name':   other.full_name,
-                    'partner_name':    'Sakyan Support',
-                    'customer_id':     str(other.id),
-                    'partner_user_id': str(user.id),
-                    'is_support':      True,
+                    'booking_id':         f'support:{other.id}',
+                    'booking_code':       'Support',
+                    'car_name':           'Sakyan Support',
+                    'customer_name':      other.full_name,
+                    'partner_name':       'Sakyan Support',
+                    'customer_id':        str(other.id),
+                    'partner_user_id':    str(user.id),
+                    'is_support':         True,
                     'support_partner_id': str(other.id),
-                    'unread_count':    unread,
+                    'unread_count':       unread,
                     'last_message': {
                         'content':    last.content,
                         'created_at': last.created_at,
                         'sender_id':  str(last.sender_id),
                     } if last else None,
                 })
-            # Sort support threads newest first
+
             support_convs.sort(
                 key=lambda x: x['last_message']['created_at'] if x['last_message'] else '',
                 reverse=True
             )
             conversations = support_convs + conversations
+
         else:
-            # For partner/customer: one "Sakyan Support" pinned entry
+            # Partner/customer: one pinned "Sakyan Support" entry
             support_msgs = Message.objects.filter(
-                Q(sender=user) | Q(receiver=user),
-                booking__isnull=True,
+                booking__isnull=True
+            ).filter(
+                Q(sender=user) | Q(receiver=user)
             ).order_by('-created_at')
-            last_support = support_msgs.first()
+            last_support  = support_msgs.first()
             unread_support = support_msgs.filter(receiver=user, is_read=False).count()
 
             support_entry = {
-                'booking_id':      'support',   # sentinel value the frontend checks for
+                'booking_id':      'support',
                 'booking_code':    'Support',
                 'car_name':        'Sakyan Support',
                 'customer_name':   'Sakyan Support',
@@ -216,7 +245,6 @@ class ConversationListView(APIView):
                     'sender_id':  str(last_support.sender_id),
                 } if last_support else None,
             }
-            # Pin support at the top
             conversations = [support_entry] + conversations
 
         return Response(conversations)

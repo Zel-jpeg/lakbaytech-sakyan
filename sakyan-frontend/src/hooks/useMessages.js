@@ -85,7 +85,9 @@ export function useSupportMessages(partnerId = null) {
     },
   })
 
-  // Supabase realtime: listen for new null-booking support messages
+  // Supabase realtime: listen for new support messages.
+  // Supabase postgres_changes does not support IS NULL filters,
+  // so we listen broadly and let the query (which filters server-side) dedupe.
   useEffect(() => {
     const channel = supabase
       .channel(`support-messages:${partnerId ?? 'self'}:${Date.now()}`)
@@ -95,19 +97,21 @@ export function useSupportMessages(partnerId = null) {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          // We can't filter on booking_id IS NULL via Supabase realtime easily,
-          // so listen to all message inserts and invalidate; the query will dedupe
-          filter: `booking_id=is.null`,
+          // No filter here — server side already scopes to null-booking messages
         },
-        () => {
-          qc.invalidateQueries({ queryKey })
-          qc.invalidateQueries({ queryKey: ['conversations'] })
+        (payload) => {
+          // Only invalidate if it looks like a support message (booking_id is null)
+          if (!payload.new?.booking_id) {
+            qc.invalidateQueries({ queryKey })
+            qc.invalidateQueries({ queryKey: ['conversations'] })
+          }
         }
       )
       .subscribe()
 
     return () => supabase.removeChannel(channel)
   }, [partnerId])
+
 
   return query
 }
