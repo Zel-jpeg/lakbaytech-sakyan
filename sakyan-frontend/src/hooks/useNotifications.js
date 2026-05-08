@@ -5,14 +5,16 @@ import api from '@/config/axios'
 import { supabase } from '@/config/supabase'
 import { useAuthStore } from '@/store/authStore'
 
-const BANNER_KEY     = 'sakyan_approval_banner'
-const DISMISSED_KEY  = 'sakyan_approval_banner_dismissed'
+const BANNER_KEY    = 'sakyan_approval_banner'
+const DISMISSED_KEY = 'sakyan_approval_banner_dismissed'
 
 export function useNotifications() {
   const qc = useQueryClient()
   const { user, refreshUser } = useAuthStore()
-  const toastedIds      = useRef(new Set())
-  const checkedApproval = useRef(false)
+  const toastedIds       = useRef(new Set())
+  const checkedApproval  = useRef(false)
+  // Track the previous role so we detect the exact moment it changes to 'partner'
+  const prevRoleRef      = useRef(null)
 
   const query = useQuery({
     queryKey: ['notifications'],
@@ -23,31 +25,65 @@ export function useNotifications() {
     enabled: !!user,
   })
 
-  // ── Startup check ──────────────────────────────────────────────────────────
-  // When notification list loads, look for ANY unread approval notification.
-  // This handles partners who were approved while offline — realtime won't
-  // have fired, so on their next login we catch it here via the query result.
-  //
-  // Banner logic:
-  //   BANNER_KEY    = '1'  → banner is visible
-  //   DISMISSED_KEY = '1'  → partner already visited the dashboard; don't re-show
+  // ── 1. Role-change detector ────────────────────────────────────────────────
+  // Watches user.role. The instant it flips from anything → 'partner'
+  // (regardless of HOW it got there: polling, realtime, page load), we:
+  //   • Set the persistent banner flag
+  //   • Show the congratulatory toast
+  // This is the single source of truth for "just got approved" behaviour.
   useEffect(() => {
-    if (checkedApproval.current) return   // only run once per session
+    const prev    = prevRoleRef.current
+    const current = user?.role ?? null
+    prevRoleRef.current = current
+
+    // Skip on initial mount (prev is null)
+    if (prev === null) return
+
+    if (prev !== 'partner' && current === 'partner') {
+      // Role just upgraded live — show banner unless already permanently dismissed
+      const dismissed = localStorage.getItem(DISMISSED_KEY) === '1'
+      if (!dismissed) {
+        localStorage.removeItem(DISMISSED_KEY)   // clear any stale dismiss
+        localStorage.setItem(BANNER_KEY, '1')
+      }
+
+      // Toast — only show once per session via toastedIds
+      const toastId = 'partner-approval'
+      if (!toastedIds.current.has(toastId)) {
+        toastedIds.current.add(toastId)
+        toast.success(
+          '🎉 Congratulations! You are now an approved Sakyan Partner!',
+          { duration: 8000, id: toastId }
+        )
+      }
+    }
+  }, [user?.role])
+
+  // ── 2. Poll /auth/me while application is pending ─────────────────────────
+  // Every 15 s, re-fetch the user profile. The moment the admin approves,
+  // the next poll returns role='partner' → Zustand updates → detector above fires.
+  // This guarantees a maximum 15-second lag with NO Supabase realtime dependency.
+  useEffect(() => {
+    if (!user) return
+    if (user.role === 'partner') return         // already approved, stop polling
+    if (user.partner_status !== 'pending') return // only poll while pending
+
+    const interval = setInterval(() => {
+      refreshUser()
+    }, 15000) // 15 seconds
+
+    return () => clearInterval(interval)
+  }, [user?.id, user?.role, user?.partner_status])
+
+  // ── 3. Startup check (page-reload scenario) ───────────────────────────────
+  // On fresh load, if notifications list already contains an approval notification
+  // and the banner hasn't been permanently dismissed, show the banner.
+  // Also calls refreshUser() to fix any stale persisted role.
+  useEffect(() => {
+    if (checkedApproval.current) return
     if (!query.data) return
 
-    const notifications = query.data?.results || query.data || []
-
-    // Look for an UNREAD approval notification — unread means they haven't
-    // visited the dashboard and acknowledged it yet.
-    const hasUnreadApproval = notifications.some(
-      n => n.type === 'approval'
-        && n.title?.toLowerCase().includes('approved')
-        && !n.is_read                    // only unread = banner not yet seen
-    )
-
-    // Fallback: show banner if there's any approval notification at all AND
-    // the partner hasn't permanently dismissed it (dashboard hasn't been visited
-    // since approval).
+    const notifications  = query.data?.results || query.data || []
     const hasAnyApproval = notifications.some(
       n => n.type === 'approval' && n.title?.toLowerCase().includes('approved')
     )
@@ -55,18 +91,17 @@ export function useNotifications() {
 
     if (hasAnyApproval) {
       checkedApproval.current = true
-      // Always refresh user on load if they have an approval notification
-      // (handles role still showing 'customer' in persisted Zustand storage)
-      refreshUser()
+      refreshUser()  // fix stale persisted role
 
-      // Only show the banner if it hasn't been permanently dismissed
       if (!alreadyDismissed) {
         localStorage.setItem(BANNER_KEY, '1')
       }
     }
   }, [query.data])
 
-  // ── Supabase Realtime ──────────────────────────────────────────────────────
+  // ── 4. Supabase Realtime — notifications INSERT ───────────────────────────
+  // Belt-and-suspenders: if realtime fires before the next poll cycle,
+  // call refreshUser() immediately so the role update is instant.
   useEffect(() => {
     if (!user) return
 
@@ -90,21 +125,26 @@ export function useNotifications() {
           if (notif?.type === 'kyc') {
             refreshUser()
           }
-          if (notif?.type === 'approval' && notif?.title?.toLowerCase().includes('approved')) {
-            refreshUser()
-            // Clear any old dismissed flag so the new approval banner shows fresh
+
+          // For approval: just call refreshUser(). The role-change detector
+          // (effect #1 above) will handle showing the banner + toast automatically.
+          if (
+            notif?.type === 'approval' &&
+            notif?.title?.toLowerCase().includes('approved')
+          ) {
+            // Clear dismissed flag so re-approval always shows fresh banner
             localStorage.removeItem(DISMISSED_KEY)
-            localStorage.setItem(BANNER_KEY, '1')
+            refreshUser()
           }
 
+          // Toast for non-approval notifications
           if (notif?.id && !toastedIds.current.has(notif.id)) {
             toastedIds.current.add(notif.id)
-            const isKYCApproval     = notif?.type === 'kyc' && notif?.title?.includes('Verified')
-            const isPartnerApproval = notif?.type === 'approval' && notif?.title?.toLowerCase().includes('approved')
-            if (isPartnerApproval) {
-              toast.success('🎉 Congratulations! You are now an approved Sakyan Partner!', {
-                duration: 8000,
-              })
+            const isKYCApproval = notif?.type === 'kyc' && notif?.title?.includes('Verified')
+            const isApproval    = notif?.type === 'approval' && notif?.title?.toLowerCase().includes('approved')
+
+            if (isApproval) {
+              // Will be handled by role-change detector — skip duplicate toast here
             } else if (isKYCApproval) {
               toast.success('🎉 Identity verified! You can now book cars.', {
                 duration: 6000,
