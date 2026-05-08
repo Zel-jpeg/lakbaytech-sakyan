@@ -20,8 +20,9 @@ export const useAuthStore = create(
         try {
           const token = localStorage.getItem('sakyan_token')
           if (!token) return
-          const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+          const apiUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '')
           const res = await fetch(`${apiUrl}/auth/me`, {
+
             headers: { Authorization: `Bearer ${token}` },
           })
           if (res.ok) {
