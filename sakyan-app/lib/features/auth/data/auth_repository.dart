@@ -17,7 +17,9 @@ class AuthRepository {
 
     // 2. Wait for session (the deep link callback updates the session)
     final session = Supabase.instance.client.auth.currentSession;
-    if (session == null) throw Exception('Google sign-in was cancelled or failed.');
+    if (session == null) {
+      throw Exception('Google sign-in was cancelled or failed.');
+    }
 
     // 3. Save Supabase access token — ApiService interceptor will attach it
     await StorageService.saveToken(session.accessToken);
@@ -33,7 +35,15 @@ class AuthRepository {
     return UserModel.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// Sign out from Supabase and clear local storage.
+  /// Sign out from Supabase ONLY (local storage is handled by AuthNotifier
+  /// before this is called, so it's cleared regardless of network errors).
+  Future<void> signOutSupabaseOnly() async {
+    await Supabase.instance.client.auth.signOut();
+  }
+
+  /// Full sign out — clears Supabase session AND local storage.
+  /// Use signOutSupabaseOnly() + StorageService.clearAuth() separately
+  /// when you need ordering control (see AuthNotifier.signOut).
   Future<void> signOut() async {
     await Supabase.instance.client.auth.signOut();
     await StorageService.clearAuth();

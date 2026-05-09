@@ -139,9 +139,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final size   = MediaQuery.of(context).size;
     final isLast = _currentPage == _slides.length - 1;
     final slide  = _slides[_currentPage];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Content-area background — adaptive to current theme
+    final contentBg = isDark ? AppColors.bgBase : const Color(0xFFF8FAFF);
+    // Inactive dot color — visible on both light and dark
+    final dotInactive = isDark
+        ? Colors.white.withOpacity(0.25)
+        : Colors.black.withOpacity(0.18);
 
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: contentBg,
       body: Stack(
         children: [
           // ── Full-screen page view ────────────────────────────────────────
@@ -155,6 +163,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               fadeAnim:   i == _currentPage ? _fadeAnim   : const AlwaysStoppedAnimation(1.0),
               slideAnim:  i == _currentPage ? _slideAnim  : const AlwaysStoppedAnimation(Offset.zero),
               bounceAnim: i == _currentPage ? _bounceAnim : const AlwaysStoppedAnimation(1.0),
+              isDark:     isDark,
+              contentBg:  contentBg,
             ),
           ),
 
@@ -202,7 +212,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       decoration: BoxDecoration(
                         color: active
                             ? slide.accentColor
-                            : Colors.white.withOpacity(0.25),
+                            : dotInactive,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     );
@@ -267,21 +277,29 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
 // ── Single slide page ─────────────────────────────────────────────────────────
 class _SlidePage extends StatelessWidget {
-  final _SlideData       slide;
+  final _SlideData        slide;
   final Animation<double> fadeAnim;
   final Animation<Offset> slideAnim;
   final Animation<double> bounceAnim;
+  final bool              isDark;
+  final Color             contentBg;
 
   const _SlidePage({
     required this.slide,
     required this.fadeAnim,
     required this.slideAnim,
     required this.bounceAnim,
+    required this.isDark,
+    required this.contentBg,
   });
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+
+    // Text colors adapt to theme
+    final titleColor    = isDark ? AppColors.textPrimary    : const Color(0xFF111827);
+    final subtitleColor = isDark ? AppColors.textSecondary  : const Color(0xFF6B7280);
 
     return Column(
       children: [
@@ -312,7 +330,7 @@ class _SlidePage extends StatelessWidget {
                 alignment: Alignment.bottomCenter,
                 child: CustomPaint(
                   size: Size(size.width, 48),
-                  painter: _BottomCurvePainter(),
+                  painter: _BottomCurvePainter(color: contentBg),
                 ),
               ),
             ],
@@ -366,8 +384,8 @@ class _SlidePage extends StatelessWidget {
                     // Main title
                     Text(
                       slide.title,
-                      style: const TextStyle(
-                        color:       AppColors.textPrimary,
+                      style: TextStyle(
+                        color:       titleColor,
                         fontSize:    30,
                         fontWeight:  FontWeight.w800,
                         height:      1.12,
@@ -379,8 +397,8 @@ class _SlidePage extends StatelessWidget {
                     // Subtitle
                     Text(
                       slide.subtitle,
-                      style: const TextStyle(
-                        color:    AppColors.textSecondary,
+                      style: TextStyle(
+                        color:    subtitleColor,
                         fontSize: 14,
                         height:   1.65,
                       ),
@@ -930,12 +948,15 @@ class _GradientBgPainter extends CustomPainter {
 }
 
 /// Draws a smooth curve that transitions the illustration area into the
-/// dark content area below.
+/// content area below — color adapts to current theme.
 class _BottomCurvePainter extends CustomPainter {
+  final Color color;
+  const _BottomCurvePainter({required this.color});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.bgBase
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final path = Path()
@@ -954,5 +975,5 @@ class _BottomCurvePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_BottomCurvePainter _) => false;
+  bool shouldRepaint(_BottomCurvePainter old) => old.color != color;
 }

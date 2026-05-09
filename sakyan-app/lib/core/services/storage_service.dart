@@ -34,8 +34,14 @@ class StorageService {
       _p.setBool(AppConstants.keyOnboardingSeen, true);
 
   // ── Theme ─────────────────────────────────────────────────────────────────
-  static String getThemeMode() =>
-      _p.getString(AppConstants.keyThemeMode) ?? 'dark';
+
+  /// Returns true only if the user has explicitly set a theme preference.
+  /// On a fresh install this is false → ThemeModeNotifier falls back to the
+  /// system brightness instead of hardcoding dark mode.
+  static bool hasThemeMode() => _p.containsKey(AppConstants.keyThemeMode);
+
+  /// Returns the saved theme string, or null if never set by the user.
+  static String? getThemeMode() => _p.getString(AppConstants.keyThemeMode);
 
   static Future<void> saveThemeMode(String mode) =>
       _p.setString(AppConstants.keyThemeMode, mode);

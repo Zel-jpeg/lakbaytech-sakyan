@@ -243,9 +243,13 @@ class ProfileScreen extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
+        content: const Text(
+            'Are you sure you want to sign out?\nYou can sign back in anytime with Google.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -254,8 +258,29 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed == true && context.mounted) {
+
+    if (confirmed != true || !context.mounted) return;
+
+    // ── Show a brief loading overlay so the user sees feedback ──────────
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      ),
+    );
+
+    try {
+      // signOut() clears storage BEFORE setting state=null so the GoRouter
+      // redirect sees no token and stays on /login instead of bouncing back.
       await ref.read(authNotifierProvider.notifier).signOut();
+    } catch (_) {
+      // Even on error, navigate to login — local state is already cleared.
+    }
+
+    // ── Navigate to login immediately; don't rely on redirect alone ──────
+    // Using go() replaces the entire stack so the user can't press back.
+    if (context.mounted) {
       context.go(AppRoutes.login);
     }
   }
