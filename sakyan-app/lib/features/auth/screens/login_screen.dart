@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -28,25 +29,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void initState() {
     super.initState();
 
-    // ── Entrance animation ────────────────────────────────────────────────
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 650),
     );
-    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _fadeAnim =
+        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.07),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
     _animCtrl.forward();
 
-    // ── Supabase auth listener ────────────────────────────────────────────
-    _authSub =
-        Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+    _authSub = Supabase.instance.client.auth.onAuthStateChange
+        .listen((data) async {
       final session = data.session;
       if (session != null && mounted) {
         await StorageService.saveToken(session.accessToken);
-        await ref.read(authNotifierProvider.notifier).handleAuthCallback();
+        await ref
+            .read(authNotifierProvider.notifier)
+            .handleAuthCallback();
         if (!mounted) return;
         final user = ref.read(currentUserProvider);
         if (user?.isPartner == true) {
@@ -91,12 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    // ── Fully adaptive — reads current theme (light or dark) ─────────────
-    // The app's ThemeMode is determined by:
-    //   - First install → system brightness (phone's dark/light setting)
-    //   - After first install → whatever the user chose in Profile
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = ref.watch(isDarkModeProvider);
 
     final bgColor =
         isDark ? const Color(0xFF080D1A) : const Color(0xFFF8FAFF);
@@ -116,13 +113,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ? Colors.white.withOpacity(0.06)
         : Colors.black.withOpacity(0.04);
 
+    // Theme toggle icon adapts to current mode
+    final toggleIcon =
+        isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded;
+    final toggleBg = isDark
+        ? Colors.white.withOpacity(0.08)
+        : Colors.black.withOpacity(0.06);
+
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
       backgroundColor: bgColor,
       body: Stack(
         children: [
-          // ── Top-center radial glow ────────────────────────────────────
+          // ── Radial glows (decorative) ──────────────────────────────────
           Positioned(
             top: -100,
             left: size.width / 2 - 180,
@@ -131,13 +135,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               height: 360,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient:
-                    RadialGradient(colors: [glowColor, Colors.transparent]),
+                gradient: RadialGradient(
+                    colors: [glowColor, Colors.transparent]),
               ),
             ),
           ),
-
-          // ── Bottom-right accent glow ──────────────────────────────────
           Positioned(
             bottom: size.height * 0.22,
             right: -80,
@@ -157,7 +159,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
 
-          // ── Dot grids (decorative) ────────────────────────────────────
+          // ── Dot grids (decorative) ─────────────────────────────────────
           Positioned(
             top: 56,
             right: 18,
@@ -169,20 +171,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             child: _DotsGrid(dotColor: dotColor, columns: 4, rows: 4),
           ),
 
-          // ── Main content ──────────────────────────────────────────────
+          // ── Theme toggle — top-right ───────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () =>
+                    ref.read(themeModeProvider.notifier).toggle(),
+                child: Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: toggleBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Icon(toggleIcon,
+                      size: 20, color: textSecondary),
+                ),
+              ),
+            ),
+          ),
+
+          // ── Main content ───────────────────────────────────────────────
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnim,
               child: SlideTransition(
                 position: _slideAnim,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Spacer(flex: 2),
 
-                      // ── Logo + app name ───────────────────────────
+                      // ── Logo + app name ──────────────────────────
                       Center(
                         child: Column(
                           children: [
@@ -213,7 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                       const Spacer(flex: 2),
 
-                      // ── Headline ──────────────────────────────────
+                      // ── Headline ─────────────────────────────────
                       Text(
                         'Welcome back 👋',
                         style: TextStyle(
@@ -250,8 +277,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             child: Divider(
                                 color: borderColor, thickness: 1)),
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 14),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14),
                           child: Text(
                             'Secure OAuth 2.0',
                             style: TextStyle(
@@ -337,7 +364,6 @@ class _SakyanLogo extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Outer glow ring
         Container(
           width: 110,
           height: 110,
@@ -345,13 +371,13 @@ class _SakyanLogo extends StatelessWidget {
             shape: BoxShape.circle,
             gradient: RadialGradient(
               colors: [
-                AppColors.primary.withOpacity(isDark ? 0.22 : 0.12),
+                AppColors.primary
+                    .withOpacity(isDark ? 0.22 : 0.12),
                 Colors.transparent,
               ],
             ),
           ),
         ),
-        // Logo container
         Container(
           width: 84,
           height: 84,
@@ -365,13 +391,14 @@ class _SakyanLogo extends StatelessWidget {
                   : [Colors.white, const Color(0xFFF0F4FF)],
             ),
             border: Border.all(
-              color: AppColors.primary.withOpacity(isDark ? 0.35 : 0.20),
+              color: AppColors.primary
+                  .withOpacity(isDark ? 0.35 : 0.20),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color:
-                    AppColors.primary.withOpacity(isDark ? 0.25 : 0.12),
+                color: AppColors.primary
+                    .withOpacity(isDark ? 0.25 : 0.12),
                 blurRadius: 20,
                 spreadRadius: 1,
               ),
@@ -387,7 +414,8 @@ class _SakyanLogo extends StatelessWidget {
             child: Image.asset(
               'assets/icon.png',
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const _FallbackCarIcon(),
+              errorBuilder: (_, __, ___) =>
+                  const _FallbackCarIcon(),
             ),
           ),
         ),
@@ -417,7 +445,7 @@ class _FallbackCarIcon extends StatelessWidget {
   }
 }
 
-// ── Google Sign-In Button ─────────────────────────────────────────────────────
+// ── Google Sign-In button ─────────────────────────────────────────────────────
 class _GoogleSignInButton extends StatelessWidget {
   final bool loading;
   final bool isDark;
@@ -431,7 +459,6 @@ class _GoogleSignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The Google button is always white — Google's brand guideline
     return GestureDetector(
       onTap: loading ? null : onTap,
       child: AnimatedContainer(
@@ -448,7 +475,8 @@ class _GoogleSignInButton extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.30 : 0.10),
+              color:
+                  Colors.black.withOpacity(isDark ? 0.30 : 0.10),
               blurRadius: isDark ? 20 : 12,
               offset: const Offset(0, 4),
             ),
@@ -491,7 +519,7 @@ class _GoogleSignInButton extends StatelessWidget {
   }
 }
 
-// ── Google 4-color "G" painter ────────────────────────────────────────────────
+// ── Google 4-colour G painter ─────────────────────────────────────────────────
 class _GoogleLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -513,34 +541,32 @@ class _GoogleLogoPainter extends CustomPainter {
       );
     }
 
-    arc(-23, 113, const Color(0xFF4285F4)); // Blue
-    arc(90, 120, const Color(0xFF34A853));  // Green
-    arc(210, 93, const Color(0xFFFBBC05)); // Yellow
-    arc(303, 34, const Color(0xFFEA4335)); // Red
+    arc(-23, 113, const Color(0xFF4285F4));
+    arc(90, 120, const Color(0xFF34A853));
+    arc(210, 93, const Color(0xFFFBBC05));
+    arc(303, 34, const Color(0xFFEA4335));
 
-    // White donut hole
     paint.color = Colors.white;
     canvas.drawCircle(Offset(cx, cy), r * 0.58, paint);
 
-    // White block right side (open G)
     final barH = r * 0.36;
     canvas.drawRect(
-        Rect.fromLTRB(cx, cy - barH / 2, cx + r + 2, cy + barH / 2), paint);
-
-    // Blue crossbar
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawRect(
-        Rect.fromLTRB(cx * 0.98, cy - barH / 2, cx + r * 0.94, cy + barH / 2),
+        Rect.fromLTRB(cx, cy - barH / 2, cx + r + 2, cy + barH / 2),
         paint);
 
-    // Final white inner circle
+    paint.color = const Color(0xFF4285F4);
+    canvas.drawRect(
+        Rect.fromLTRB(
+            cx * 0.98, cy - barH / 2, cx + r * 0.94, cy + barH / 2),
+        paint);
+
     paint.color = Colors.white;
     canvas.drawCircle(Offset(cx, cy), r * 0.58, paint);
 
-    // Final blue bar
     paint.color = const Color(0xFF4285F4);
     canvas.drawRect(
-        Rect.fromLTRB(cx * 0.98, cy - barH / 2, cx + r * 0.94, cy + barH / 2),
+        Rect.fromLTRB(
+            cx * 0.98, cy - barH / 2, cx + r * 0.94, cy + barH / 2),
         paint);
   }
 
@@ -597,7 +623,9 @@ class _DotsGrid extends StatelessWidget {
   final int rows;
 
   const _DotsGrid(
-      {required this.dotColor, required this.columns, required this.rows});
+      {required this.dotColor,
+      required this.columns,
+      required this.rows});
 
   @override
   Widget build(BuildContext context) {
@@ -613,8 +641,8 @@ class _DotsGrid extends StatelessWidget {
               width: 3,
               height: 3,
               margin: const EdgeInsets.all(5),
-              decoration:
-                  BoxDecoration(color: dotColor, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: dotColor, shape: BoxShape.circle),
             ),
           ),
         ),

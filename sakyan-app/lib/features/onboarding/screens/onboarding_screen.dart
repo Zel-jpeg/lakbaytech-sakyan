@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/theme/theme_provider.dart';
 
 // ── Slide data ────────────────────────────────────────────────────────────────
 class _SlideData {
@@ -25,78 +27,75 @@ class _SlideData {
 
 const _slides = [
   _SlideData(
-    title:       'Find Your\nPerfect Ride',
-    subtitle:    'Browse hundreds of verified cars near you — from city sedans to rugged SUVs for every journey.',
+    title: 'Find Your\nPerfect Ride',
+    subtitle:
+        'Browse hundreds of verified cars near you — from city sedans to rugged SUVs for every journey.',
     accentColor: Color(0xFF2563EB),
-    bgFrom:      Color(0xFF1E3A8A),
-    bgTo:        Color(0xFF0F172A),
-    index:       0,
+    bgFrom: Color(0xFF1E3A8A),
+    bgTo: Color(0xFF0F172A),
+    index: 0,
   ),
   _SlideData(
-    title:       'Book\nin Minutes',
-    subtitle:    'Pick your dates, choose pickup or delivery, and confirm instantly. No hassle, just drive.',
+    title: 'Book\nin Minutes',
+    subtitle:
+        'Pick your dates, choose pickup or delivery, and confirm instantly. No hassle, just drive.',
     accentColor: Color(0xFF0891B2),
-    bgFrom:      Color(0xFF164E63),
-    bgTo:        Color(0xFF0F172A),
-    index:       1,
+    bgFrom: Color(0xFF164E63),
+    bgTo: Color(0xFF0F172A),
+    index: 1,
   ),
   _SlideData(
-    title:       'Earn With\nYour Car',
-    subtitle:    'List your vehicle as a partner and start earning extra income. Join hundreds of successful partners.',
+    title: 'Earn With\nYour Car',
+    subtitle:
+        'List your vehicle as a partner and start earning extra income. Join hundreds of successful partners.',
     accentColor: Color(0xFF7C3AED),
-    bgFrom:      Color(0xFF3B0764),
-    bgTo:        Color(0xFF0F172A),
-    index:       2,
+    bgFrom: Color(0xFF3B0764),
+    bgTo: Color(0xFF0F172A),
+    index: 2,
   ),
 ];
 
-// ── OnboardingScreen ──────────────────────────────────────────────────────────
-class OnboardingScreen extends StatefulWidget {
+// ── OnboardingScreen (ConsumerStatefulWidget for Riverpod theme access) ───────
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen>
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     with TickerProviderStateMixin {
   final _pageCtrl = PageController();
   int _currentPage = 0;
 
-  // Text/content reveal animation
   late AnimationController _revealCtrl;
-  late Animation<double>   _fadeAnim;
-  late Animation<Offset>   _slideAnim;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
 
-  // Illustration bounce animation
   late AnimationController _bounceCtrl;
-  late Animation<double>   _bounceAnim;
+  late Animation<double> _bounceAnim;
 
   @override
   void initState() {
     super.initState();
 
     _revealCtrl = AnimationController(
-      vsync:    this,
+      vsync: this,
       duration: const Duration(milliseconds: 480),
     );
-    _fadeAnim = CurvedAnimation(
-      parent: _revealCtrl,
-      curve:  Curves.easeOut,
-    );
+    _fadeAnim =
+        CurvedAnimation(parent: _revealCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.18),
-      end:   Offset.zero,
+      end: Offset.zero,
     ).animate(CurvedAnimation(parent: _revealCtrl, curve: Curves.easeOut));
 
     _bounceCtrl = AnimationController(
-      vsync:    this,
+      vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    _bounceAnim = CurvedAnimation(
-      parent: _bounceCtrl,
-      curve:  Curves.elasticOut,
-    );
+    _bounceAnim =
+        CurvedAnimation(parent: _bounceCtrl, curve: Curves.elasticOut);
 
     _revealCtrl.forward();
     _bounceCtrl.forward();
@@ -114,7 +113,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (_currentPage < _slides.length - 1) {
       _pageCtrl.nextPage(
         duration: const Duration(milliseconds: 420),
-        curve:    Curves.easeInOut,
+        curve: Curves.easeInOut,
       );
     } else {
       _finish();
@@ -136,64 +135,96 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final size   = MediaQuery.of(context).size;
     final isLast = _currentPage == _slides.length - 1;
-    final slide  = _slides[_currentPage];
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final slide = _slides[_currentPage];
 
-    // Content-area background — adaptive to current theme
-    final contentBg = isDark ? AppColors.bgBase : const Color(0xFFF8FAFF);
-    // Inactive dot color — visible on both light and dark
+    // ── Theme-aware values ────────────────────────────────────────────────
+    final isDark = ref.watch(isDarkModeProvider);
+    final contentBg =
+        isDark ? AppColors.bgBase : const Color(0xFFF8FAFF);
     final dotInactive = isDark
         ? Colors.white.withOpacity(0.25)
         : Colors.black.withOpacity(0.18);
+
+    // Theme toggle button visuals — always render on top of the gradient hero
+    // so white icon works regardless of content area theme.
+    final toggleIcon = isDark
+        ? Icons.light_mode_rounded
+        : Icons.dark_mode_rounded;
+    const toggleColor = Colors.white;
 
     return Scaffold(
       backgroundColor: contentBg,
       body: Stack(
         children: [
-          // ── Full-screen page view ────────────────────────────────────────
+          // ── Full-screen page view ──────────────────────────────────────
           PageView.builder(
-            controller:    _pageCtrl,
+            controller: _pageCtrl,
             onPageChanged: _onPageChanged,
-            itemCount:     _slides.length,
-            physics:       const BouncingScrollPhysics(),
-            itemBuilder:   (_, i) => _SlidePage(
-              slide:      _slides[i],
-              fadeAnim:   i == _currentPage ? _fadeAnim   : const AlwaysStoppedAnimation(1.0),
-              slideAnim:  i == _currentPage ? _slideAnim  : const AlwaysStoppedAnimation(Offset.zero),
-              bounceAnim: i == _currentPage ? _bounceAnim : const AlwaysStoppedAnimation(1.0),
-              isDark:     isDark,
-              contentBg:  contentBg,
+            itemCount: _slides.length,
+            physics: const BouncingScrollPhysics(),
+            itemBuilder: (_, i) => _SlidePage(
+              slide: _slides[i],
+              fadeAnim: i == _currentPage
+                  ? _fadeAnim
+                  : const AlwaysStoppedAnimation(1.0),
+              slideAnim: i == _currentPage
+                  ? _slideAnim
+                  : const AlwaysStoppedAnimation(Offset.zero),
+              bounceAnim: i == _currentPage
+                  ? _bounceAnim
+                  : const AlwaysStoppedAnimation(1.0),
+              isDark: isDark,
+              contentBg: contentBg,
             ),
           ),
 
-          // ── Skip button ──────────────────────────────────────────────────
+          // ── Theme toggle — top-left ────────────────────────────────────
           Positioned(
-            top:   MediaQuery.of(context).padding.top + 8,
-            right: 16,
-            child: AnimatedOpacity(
-              opacity:  isLast ? 0 : 1,
-              duration: const Duration(milliseconds: 250),
-              child: TextButton(
-                onPressed: isLast ? null : _finish,
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white.withOpacity(0.6),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 8),
+            top: MediaQuery.of(context).padding.top + 4,
+            left: 8,
+            child: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(toggleIcon, color: toggleColor, size: 22),
+                tooltip: isDark ? 'Switch to Light' : 'Switch to Dark',
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.all(8),
                 ),
-                child: const Text(
-                  'Skip',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
+                onPressed: () =>
+                    ref.read(themeModeProvider.notifier).toggle(),
               ),
             ),
           ),
 
-          // ── Bottom controls ──────────────────────────────────────────────
+          // ── Skip button — top-right ────────────────────────────────────
           Positioned(
-            left:   24,
-            right:  24,
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: AnimatedOpacity(
+              opacity: isLast ? 0 : 1,
+              duration: const Duration(milliseconds: 250),
+              child: TextButton(
+                onPressed: isLast ? null : _finish,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white.withOpacity(0.7),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 8),
+                ),
+                child: const Text('Skip',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+              ),
+            ),
+          ),
+
+          // ── Bottom controls ────────────────────────────────────────────
+          Positioned(
+            left: 24,
+            right: 24,
             bottom: MediaQuery.of(context).padding.bottom + 28,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -205,14 +236,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     final active = i == _currentPage;
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 320),
-                      curve:    Curves.easeInOut,
-                      margin:   const EdgeInsets.symmetric(horizontal: 4),
-                      width:    active ? 32 : 8,
-                      height:   8,
+                      curve: Curves.easeInOut,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: active ? 32 : 8,
+                      height: 8,
                       decoration: BoxDecoration(
-                        color: active
-                            ? slide.accentColor
-                            : dotInactive,
+                        color: active ? slide.accentColor : dotInactive,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     );
@@ -220,37 +249,37 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
                 const SizedBox(height: 28),
 
-                // ── Next / Get Started ─────────────────────────────────────
+                // Next / Get Started
                 SizedBox(
-                  width:  double.infinity,
+                  width: double.infinity,
                   height: 56,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     decoration: BoxDecoration(
-                      color:        slide.accentColor,
+                      color: slide.accentColor,
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          color:       slide.accentColor.withOpacity(0.35),
-                          blurRadius:  20,
-                          offset:      const Offset(0, 8),
+                          color: slide.accentColor.withOpacity(0.35),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
                     child: Material(
-                      color:        Colors.transparent,
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(18),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(18),
-                        onTap:        _next,
+                        onTap: _next,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
                               isLast ? 'Get Started' : 'Next',
                               style: const TextStyle(
-                                color:      Colors.white,
-                                fontSize:   16,
+                                color: Colors.white,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.2,
                               ),
@@ -277,12 +306,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
 // ── Single slide page ─────────────────────────────────────────────────────────
 class _SlidePage extends StatelessWidget {
-  final _SlideData        slide;
+  final _SlideData slide;
   final Animation<double> fadeAnim;
   final Animation<Offset> slideAnim;
   final Animation<double> bounceAnim;
-  final bool              isDark;
-  final Color             contentBg;
+  final bool isDark;
+  final Color contentBg;
 
   const _SlidePage({
     required this.slide,
@@ -296,36 +325,29 @@ class _SlidePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-
-    // Text colors adapt to theme
-    final titleColor    = isDark ? AppColors.textPrimary    : const Color(0xFF111827);
-    final subtitleColor = isDark ? AppColors.textSecondary  : const Color(0xFF6B7280);
+    final titleColor =
+        isDark ? AppColors.textPrimary : const Color(0xFF111827);
+    final subtitleColor =
+        isDark ? AppColors.textSecondary : const Color(0xFF6B7280);
 
     return Column(
       children: [
-        // ── Illustration area (top ~57%) ─────────────────────────────────
+        // ── Illustration area ──────────────────────────────────────────
         SizedBox(
           height: size.height * 0.57,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Gradient background
               CustomPaint(
                 painter: _GradientBgPainter(
-                  fromColor: slide.bgFrom,
-                  toColor:   slide.bgTo,
-                ),
+                    fromColor: slide.bgFrom, toColor: slide.bgTo),
               ),
-
-              // Illustration with bounce-in
               Center(
                 child: ScaleTransition(
                   scale: bounceAnim,
                   child: _Illustration(slide: slide),
                 ),
               ),
-
-              // Bottom curve into content area
               Align(
                 alignment: Alignment.bottomCenter,
                 child: CustomPaint(
@@ -337,7 +359,7 @@ class _SlidePage extends StatelessWidget {
           ),
         ),
 
-        // ── Text content (bottom ~43%) ───────────────────────────────────
+        // ── Text content ───────────────────────────────────────────────
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
@@ -348,7 +370,6 @@ class _SlidePage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Accent tag line
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
@@ -361,17 +382,14 @@ class _SlidePage extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            _tagIcon(slide.index),
-                            color: slide.accentColor,
-                            size:  12,
-                          ),
+                          Icon(_tagIcon(slide.index),
+                              color: slide.accentColor, size: 12),
                           const SizedBox(width: 5),
                           Text(
                             _tagLabel(slide.index),
                             style: TextStyle(
-                              color:      slide.accentColor,
-                              fontSize:   11,
+                              color: slide.accentColor,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.4,
                             ),
@@ -380,28 +398,21 @@ class _SlidePage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // Main title
                     Text(
                       slide.title,
                       style: TextStyle(
-                        color:       titleColor,
-                        fontSize:    30,
-                        fontWeight:  FontWeight.w800,
-                        height:      1.12,
+                        color: titleColor,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        height: 1.12,
                         letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 12),
-
-                    // Subtitle
                     Text(
                       slide.subtitle,
                       style: TextStyle(
-                        color:    subtitleColor,
-                        fontSize: 14,
-                        height:   1.65,
-                      ),
+                          color: subtitleColor, fontSize: 14, height: 1.65),
                     ),
                   ],
                 ),
@@ -415,22 +426,28 @@ class _SlidePage extends StatelessWidget {
 
   IconData _tagIcon(int index) {
     switch (index) {
-      case 0:  return Icons.search_rounded;
-      case 1:  return Icons.bolt_rounded;
-      default: return Icons.trending_up_rounded;
+      case 0:
+        return Icons.search_rounded;
+      case 1:
+        return Icons.bolt_rounded;
+      default:
+        return Icons.trending_up_rounded;
     }
   }
 
   String _tagLabel(int index) {
     switch (index) {
-      case 0:  return 'DISCOVER';
-      case 1:  return 'FAST BOOKING';
-      default: return 'EARN INCOME';
+      case 0:
+        return 'DISCOVER';
+      case 1:
+        return 'FAST BOOKING';
+      default:
+        return 'EARN INCOME';
     }
   }
 }
 
-// ── Illustration widget — one per slide ───────────────────────────────────────
+// ── Illustration dispatcher ────────────────────────────────────────────────────
 class _Illustration extends StatelessWidget {
   final _SlideData slide;
   const _Illustration({required this.slide});
@@ -446,7 +463,7 @@ class _Illustration extends StatelessWidget {
   }
 }
 
-// ── Slide 1 — Find Your Ride ──────────────────────────────────────────────────
+// ── Slide 1 ────────────────────────────────────────────────────────────────────
 class _FindRideIllustration extends StatelessWidget {
   final Color accent;
   const _FindRideIllustration({required this.accent});
@@ -454,30 +471,24 @@ class _FindRideIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width:  300,
+      width: 300,
       height: 280,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Outer glow ring
           Container(
-            width:  240,
+            width: 240,
             height: 240,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
                   color: Colors.white.withOpacity(0.07), width: 1),
               gradient: RadialGradient(
-                colors: [
-                  accent.withOpacity(0.18),
-                  Colors.transparent,
-                ],
-              ),
+                  colors: [accent.withOpacity(0.18), Colors.transparent]),
             ),
           ),
-          // Inner circle
           Container(
-            width:  160,
+            width: 160,
             height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -486,57 +497,46 @@ class _FindRideIllustration extends StatelessWidget {
                   color: Colors.white.withOpacity(0.12), width: 1),
             ),
           ),
-          // Main icon
           Container(
-            width:  96,
+            width: 96,
             height: 96,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accent.withOpacity(0.2),
-            ),
-            child: Icon(
-              Icons.directions_car_filled_rounded,
-              size:  52,
-              color: Colors.white,
-            ),
+                shape: BoxShape.circle,
+                color: accent.withOpacity(0.2)),
+            child: const Icon(Icons.directions_car_filled_rounded,
+                size: 52, color: Colors.white),
           ),
-
-          // ── Floating UI chips ────────────────────────────────────────────
           Positioned(
-            top:   22,
+            top: 22,
             right: 8,
             child: _FloatingChip(
-              icon:  Icons.location_on_rounded,
-              label: 'Quezon City',
-              color: accent,
-            ),
+                icon: Icons.location_on_rounded,
+                label: 'Quezon City',
+                color: accent),
           ),
           Positioned(
             bottom: 22,
-            left:   4,
+            left: 4,
             child: _FloatingChip(
-              icon:  Icons.search_rounded,
-              label: '200+ Cars',
-              color: accent,
-            ),
+                icon: Icons.search_rounded,
+                label: '200+ Cars',
+                color: accent),
           ),
           Positioned(
-            top:  68,
+            top: 68,
             left: 8,
             child: _FloatingBadge(
-              icon:  Icons.star_rounded,
-              value: '4.9',
-              color: AppColors.warning,
-            ),
+                icon: Icons.star_rounded,
+                value: '4.9',
+                color: AppColors.warning),
           ),
           Positioned(
             bottom: 62,
-            right:  12,
+            right: 12,
             child: _FloatingBadge(
-              icon:  Icons.verified_rounded,
-              value: 'Verified',
-              color: AppColors.success,
-            ),
+                icon: Icons.verified_rounded,
+                value: 'Verified',
+                color: AppColors.success),
           ),
         ],
       ),
@@ -544,7 +544,7 @@ class _FindRideIllustration extends StatelessWidget {
   }
 }
 
-// ── Slide 2 — Book in Minutes ─────────────────────────────────────────────────
+// ── Slide 2 ────────────────────────────────────────────────────────────────────
 class _BookingIllustration extends StatelessWidget {
   final Color accent;
   const _BookingIllustration({required this.accent});
@@ -552,29 +552,24 @@ class _BookingIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width:  300,
+      width: 300,
       height: 280,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Outer ring
           Container(
-            width:  240,
+            width: 240,
             height: 240,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
                   color: Colors.white.withOpacity(0.07), width: 1),
               gradient: RadialGradient(
-                colors: [
-                  accent.withOpacity(0.18),
-                  Colors.transparent,
-                ],
-              ),
+                  colors: [accent.withOpacity(0.18), Colors.transparent]),
             ),
           ),
           Container(
-            width:  160,
+            width: 160,
             height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -583,52 +578,42 @@ class _BookingIllustration extends StatelessWidget {
                   color: Colors.white.withOpacity(0.12), width: 1),
             ),
           ),
-          // Main icon — calendar
           Container(
-            width:  96,
+            width: 96,
             height: 96,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accent.withOpacity(0.2),
-            ),
-            child: const Icon(
-              Icons.calendar_today_rounded,
-              size:  50,
-              color: Colors.white,
-            ),
+                shape: BoxShape.circle,
+                color: accent.withOpacity(0.2)),
+            child: const Icon(Icons.calendar_today_rounded,
+                size: 50, color: Colors.white),
           ),
-
-          // Floating chips
           Positioned(
-            top:   20,
+            top: 20,
             right: 8,
             child: _FloatingChip(
-              icon:  Icons.check_circle_rounded,
-              label: 'Confirmed',
-              color: AppColors.success,
-            ),
+                icon: Icons.check_circle_rounded,
+                label: 'Confirmed',
+                color: AppColors.success),
           ),
           Positioned(
             bottom: 22,
-            left:   4,
+            left: 4,
             child: _FloatingChip(
-              icon:  Icons.access_time_rounded,
-              label: '3-Day Trip',
-              color: accent,
-            ),
+                icon: Icons.access_time_rounded,
+                label: '3-Day Trip',
+                color: accent),
           ),
           Positioned(
-            top:  68,
+            top: 68,
             left: 10,
             child: _FloatingBadge(
-              icon:  Icons.bolt_rounded,
-              value: 'Instant',
-              color: AppColors.warning,
-            ),
+                icon: Icons.bolt_rounded,
+                value: 'Instant',
+                color: AppColors.warning),
           ),
           Positioned(
             bottom: 64,
-            right:  10,
+            right: 10,
             child: _CalendarMini(accent: accent),
           ),
         ],
@@ -637,7 +622,6 @@ class _BookingIllustration extends StatelessWidget {
   }
 }
 
-/// Mini calendar decoration widget
 class _CalendarMini extends StatelessWidget {
   final Color accent;
   const _CalendarMini({required this.accent});
@@ -647,13 +631,12 @@ class _CalendarMini extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color:        AppColors.bgSurface,
+        color: AppColors.bgSurface,
         borderRadius: BorderRadius.circular(10),
-        border:       Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.25),
-              blurRadius: 10),
+              color: Colors.black.withOpacity(0.25), blurRadius: 10)
         ],
       ),
       child: Row(
@@ -661,19 +644,19 @@ class _CalendarMini extends StatelessWidget {
         children: List.generate(3, (i) {
           final selected = i == 1;
           return Container(
-            width:  22,
+            width: 22,
             height: 22,
             margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
-              color:        selected ? accent : Colors.transparent,
+              color: selected ? accent : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Center(
               child: Text(
                 '${12 + i}',
                 style: TextStyle(
-                  color:      selected ? Colors.white : AppColors.textMuted,
-                  fontSize:   10,
+                  color: selected ? Colors.white : AppColors.textMuted,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -685,7 +668,7 @@ class _CalendarMini extends StatelessWidget {
   }
 }
 
-// ── Slide 3 — Earn with Car ───────────────────────────────────────────────────
+// ── Slide 3 ────────────────────────────────────────────────────────────────────
 class _EarnIllustration extends StatelessWidget {
   final Color accent;
   const _EarnIllustration({required this.accent});
@@ -693,29 +676,24 @@ class _EarnIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width:  300,
+      width: 300,
       height: 280,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Outer ring
           Container(
-            width:  240,
+            width: 240,
             height: 240,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
                   color: Colors.white.withOpacity(0.07), width: 1),
               gradient: RadialGradient(
-                colors: [
-                  accent.withOpacity(0.18),
-                  Colors.transparent,
-                ],
-              ),
+                  colors: [accent.withOpacity(0.18), Colors.transparent]),
             ),
           ),
           Container(
-            width:  160,
+            width: 160,
             height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -724,51 +702,42 @@ class _EarnIllustration extends StatelessWidget {
                   color: Colors.white.withOpacity(0.12), width: 1),
             ),
           ),
-          // Main icon — car with money
           Container(
-            width:  96,
+            width: 96,
             height: 96,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accent.withOpacity(0.2),
-            ),
-            child: const Icon(
-              Icons.monetization_on_rounded,
-              size:  52,
-              color: Colors.white,
-            ),
+                shape: BoxShape.circle,
+                color: accent.withOpacity(0.2)),
+            child: const Icon(Icons.monetization_on_rounded,
+                size: 52, color: Colors.white),
           ),
-
           Positioned(
-            top:   20,
+            top: 20,
             right: 8,
             child: _FloatingChip(
-              icon:  Icons.trending_up_rounded,
-              label: '+₱12,500',
-              color: AppColors.success,
-            ),
+                icon: Icons.trending_up_rounded,
+                label: '+₱12,500',
+                color: AppColors.success),
           ),
           Positioned(
             bottom: 22,
-            left:   4,
+            left: 4,
             child: _FloatingChip(
-              icon:  Icons.people_rounded,
-              label: '500+ Partners',
-              color: accent,
-            ),
+                icon: Icons.people_rounded,
+                label: '500+ Partners',
+                color: accent),
           ),
           Positioned(
-            top:  68,
+            top: 68,
             left: 8,
             child: _FloatingBadge(
-              icon:  Icons.workspace_premium_rounded,
-              value: 'Partner',
-              color: AppColors.warning,
-            ),
+                icon: Icons.workspace_premium_rounded,
+                value: 'Partner',
+                color: AppColors.warning),
           ),
           Positioned(
             bottom: 62,
-            right:  8,
+            right: 8,
             child: _MiniChart(accent: accent),
           ),
         ],
@@ -777,11 +746,9 @@ class _EarnIllustration extends StatelessWidget {
   }
 }
 
-/// Mini bar chart decoration widget
 class _MiniChart extends StatelessWidget {
   final Color accent;
   const _MiniChart({required this.accent});
-
   static const _heights = [0.4, 0.6, 0.5, 0.8, 1.0];
 
   @override
@@ -789,27 +756,24 @@ class _MiniChart extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color:        AppColors.bgSurface,
+        color: AppColors.bgSurface,
         borderRadius: BorderRadius.circular(10),
-        border:       Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.25),
-              blurRadius: 10),
+              color: Colors.black.withOpacity(0.25), blurRadius: 10)
         ],
       ),
       child: Row(
-        mainAxisSize:     MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: _heights.map((h) {
           return Container(
-            width:  6,
+            width: 6,
             height: 28 * h,
             margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
-              color:        h == 1.0
-                  ? accent
-                  : accent.withOpacity(0.35),
+              color: h == 1.0 ? accent : accent.withOpacity(0.35),
               borderRadius: BorderRadius.circular(3),
             ),
           );
@@ -820,32 +784,26 @@ class _MiniChart extends StatelessWidget {
 }
 
 // ── Shared floating UI elements ───────────────────────────────────────────────
-
 class _FloatingChip extends StatelessWidget {
   final IconData icon;
-  final String   label;
-  final Color    color;
-
-  const _FloatingChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  final String label;
+  final Color color;
+  const _FloatingChip(
+      {required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color:        AppColors.bgSurface,
+        color: AppColors.bgSurface,
         borderRadius: BorderRadius.circular(12),
-        border:       Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color:      Colors.black.withOpacity(0.3),
-            blurRadius: 14,
-            offset:     const Offset(0, 4),
-          ),
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 14,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Row(
@@ -853,14 +811,11 @@ class _FloatingChip extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: color),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color:      AppColors.textPrimary,
-              fontSize:   11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -869,28 +824,21 @@ class _FloatingChip extends StatelessWidget {
 
 class _FloatingBadge extends StatelessWidget {
   final IconData icon;
-  final String   value;
-  final Color    color;
-
-  const _FloatingBadge({
-    required this.icon,
-    required this.value,
-    required this.color,
-  });
+  final String value;
+  final Color color;
+  const _FloatingBadge(
+      {required this.icon, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color:        color.withOpacity(0.15),
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(10),
-        border:       Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withOpacity(0.35)),
         boxShadow: [
-          BoxShadow(
-            color:      Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)
         ],
       ),
       child: Row(
@@ -898,14 +846,11 @@ class _FloatingBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 12, color: color),
           const SizedBox(width: 3),
-          Text(
-            value,
-            style: TextStyle(
-              color:      color,
-              fontSize:   10,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(value,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -913,33 +858,28 @@ class _FloatingBadge extends StatelessWidget {
 }
 
 // ── Custom painters ───────────────────────────────────────────────────────────
-
-/// Gradient background + decorative circles for the illustration area.
 class _GradientBgPainter extends CustomPainter {
   final Color fromColor;
   final Color toColor;
-
   const _GradientBgPainter({required this.fromColor, required this.toColor});
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Main gradient
     final bgPaint = Paint()
       ..shader = LinearGradient(
-        begin:  Alignment.topLeft,
-        end:    Alignment.bottomRight,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
         colors: [fromColor, toColor],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, bgPaint);
 
-    // Decorative translucent circles
     final dotPaint = Paint()..color = Colors.white.withOpacity(0.04);
     canvas.drawCircle(
         Offset(size.width * 0.85, size.height * 0.12), 90, dotPaint);
     canvas.drawCircle(
         Offset(size.width * 0.08, size.height * 0.75), 70, dotPaint);
     canvas.drawCircle(
-        Offset(size.width * 0.5,  size.height * 0.05), 40, dotPaint);
+        Offset(size.width * 0.5, size.height * 0.05), 40, dotPaint);
   }
 
   @override
@@ -947,8 +887,6 @@ class _GradientBgPainter extends CustomPainter {
       old.fromColor != fromColor || old.toColor != toColor;
 }
 
-/// Draws a smooth curve that transitions the illustration area into the
-/// content area below — color adapts to current theme.
 class _BottomCurvePainter extends CustomPainter {
   final Color color;
   const _BottomCurvePainter({required this.color});
@@ -958,19 +896,13 @@ class _BottomCurvePainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-
     final path = Path()
       ..moveTo(0, size.height)
       ..lineTo(0, size.height * 0.55)
-      ..quadraticBezierTo(
-        size.width * 0.5,
-        -size.height * 0.15,
-        size.width,
-        size.height * 0.55,
-      )
+      ..quadraticBezierTo(size.width * 0.5, -size.height * 0.15,
+          size.width, size.height * 0.55)
       ..lineTo(size.width, size.height)
       ..close();
-
     canvas.drawPath(path, paint);
   }
 
