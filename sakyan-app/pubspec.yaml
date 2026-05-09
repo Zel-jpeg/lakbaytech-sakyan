@@ -56,6 +56,8 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  flutter_native_splash: ^2.4.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -75,3 +77,6 @@ flutter:
     - assets/icon.png
     - assets/images/
     - assets/icons/
+
+flutter_native_splash:
+  color: "#F8FAFC"
