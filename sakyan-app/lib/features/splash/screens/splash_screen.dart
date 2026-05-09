@@ -289,9 +289,10 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                               ],
                             ),
-                            child: ClipOval(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
                               child: Padding(
-                                padding: const EdgeInsets.all(18),
+                                padding: const EdgeInsets.all(14),
                                 child: Image.asset(
                                   'assets/icon.png',
                                   fit: BoxFit.contain,

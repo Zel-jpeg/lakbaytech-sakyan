@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
@@ -9,13 +10,22 @@ import '../../booking/models/booking_model.dart';
 import '../models/partner_model.dart';
 import '../providers/partner_provider.dart';
 
+// ── Money formatter helper ────────────────────────────────────────────────────
+String _fmtMoney(double v) {
+  // e.g. 12500.0 → "12,500"  |  1234567 → "1,234,567"
+  return v.toStringAsFixed(0).replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (m) => '${m[1]},',
+  );
+}
+
 class PartnerHomeScreen extends ConsumerWidget {
   const PartnerHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user         = ref.watch(currentUserProvider);
-    final statsAsync   = ref.watch(partnerStatsProvider);
+    final user          = ref.watch(currentUserProvider);
+    final statsAsync    = ref.watch(partnerStatsProvider);
     final bookingsAsync = ref.watch(partnerBookingsProvider);
     final theme  = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -41,7 +51,7 @@ class PartnerHomeScreen extends ConsumerWidget {
         },
         child: CustomScrollView(
           slivers: [
-            // ── App bar ────────────────────────────────────────────────
+            // ── App bar ────────────────────────────────────────────────────
             SliverAppBar(
               floating: true,
               backgroundColor: scaffoldBg,
@@ -77,7 +87,7 @@ class PartnerHomeScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Greeting ─────────────────────────────────────────
+                    // ── Greeting ───────────────────────────────────────────
                     Text(
                       'Welcome back, $firstName 👋',
                       style: TextStyle(
@@ -90,78 +100,78 @@ class PartnerHomeScreen extends ConsumerWidget {
                         style: TextStyle(color: textSec, fontSize: 14)),
                     const SizedBox(height: 24),
 
-                    // ── Stats grid ────────────────────────────────────────
+                    // ── Stats grid ─────────────────────────────────────────
                     statsAsync.when(
-                      loading: () => GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.6,
-                        children: List.generate(
-                          4,
-                          (_) => Shimmer.fromColors(
-                            baseColor:      shimBase,
-                            highlightColor: shimHigh,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: shimBase,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
+                      loading: () => Column(
+                        children: [
+                          Row(children: [
+                            Expanded(child: Shimmer.fromColors(
+                              baseColor: shimBase, highlightColor: shimHigh,
+                              child: Container(height: 96, decoration: BoxDecoration(color: shimBase, borderRadius: BorderRadius.circular(16))),
+                            )),
+                            const SizedBox(width: 12),
+                            Expanded(child: Shimmer.fromColors(
+                              baseColor: shimBase, highlightColor: shimHigh,
+                              child: Container(height: 96, decoration: BoxDecoration(color: shimBase, borderRadius: BorderRadius.circular(16))),
+                            )),
+                          ]),
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            Expanded(child: Shimmer.fromColors(
+                              baseColor: shimBase, highlightColor: shimHigh,
+                              child: Container(height: 96, decoration: BoxDecoration(color: shimBase, borderRadius: BorderRadius.circular(16))),
+                            )),
+                            const SizedBox(width: 12),
+                            Expanded(child: Shimmer.fromColors(
+                              baseColor: shimBase, highlightColor: shimHigh,
+                              child: Container(height: 96, decoration: BoxDecoration(color: shimBase, borderRadius: BorderRadius.circular(16))),
+                            )),
+                          ]),
+                        ],
                       ),
                       error: (_, __) => const SizedBox.shrink(),
-                      data: (stats) => GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.6,
+                      data: (stats) => Column(
                         children: [
-                          _StatCard(
-                            icon: Icons.payments_rounded,
-                            iconColor: AppColors.success,
-                            label: 'Total Earnings',
-                            value: '₱${stats.totalEarnings.toStringAsFixed(0)}',
-                            cardColor: cardColor,
-                            borderColor: borderColor,
-                            textPrim: textPrim,
-                            textMuted: textMuted,
-                          ),
-                          _StatCard(
-                            icon: Icons.directions_car_rounded,
-                            iconColor: AppColors.info,
-                            label: 'Active Bookings',
-                            value: '${stats.activeBookings}',
-                            cardColor: cardColor,
-                            borderColor: borderColor,
-                            textPrim: textPrim,
-                            textMuted: textMuted,
-                          ),
-                          _StatCard(
-                            icon: Icons.car_rental_rounded,
-                            iconColor: AppColors.primary,
-                            label: 'My Cars',
-                            value: '${stats.totalCars}',
-                            cardColor: cardColor,
-                            borderColor: borderColor,
-                            textPrim: textPrim,
-                            textMuted: textMuted,
-                          ),
-                          _StatCard(
-                            icon: Icons.pending_actions_rounded,
-                            iconColor: AppColors.warning,
-                            label: 'Pending',
-                            value: '${stats.pendingRequests}',
-                            cardColor: cardColor,
-                            borderColor: borderColor,
-                            textPrim: textPrim,
-                            textMuted: textMuted,
-                          ),
+                          Row(children: [
+                            Expanded(child: _StatCard(
+                              icon: Icons.payments_rounded,
+                              iconColor: AppColors.success,
+                              label: 'Total Earnings',
+                              // ── FIX: comma-formatted peso ─────────────────
+                              value: '₱${_fmtMoney(stats.totalEarnings)}',
+                              cardColor: cardColor, borderColor: borderColor,
+                              textPrim: textPrim, textMuted: textMuted,
+                            )),
+                            const SizedBox(width: 12),
+                            Expanded(child: _StatCard(
+                              icon: Icons.directions_car_rounded,
+                              iconColor: AppColors.info,
+                              label: 'Active Bookings',
+                              value: '${stats.activeBookings}',
+                              cardColor: cardColor, borderColor: borderColor,
+                              textPrim: textPrim, textMuted: textMuted,
+                            )),
+                          ]),
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            Expanded(child: _StatCard(
+                              icon: Icons.car_rental_rounded,
+                              iconColor: AppColors.primary,
+                              label: 'My Cars',
+                              value: '${stats.totalCars}',
+                              cardColor: cardColor, borderColor: borderColor,
+                              textPrim: textPrim, textMuted: textMuted,
+                            )),
+                            const SizedBox(width: 12),
+                            Expanded(child: _StatCard(
+                              icon: Icons.pending_actions_rounded,
+                              iconColor: AppColors.warning,
+                              label: 'Pending',
+                              value: '${stats.pendingRequests}',
+                              cardColor: cardColor, borderColor: borderColor,
+                              textPrim: textPrim, textMuted: textMuted,
+                            )),
+                          ]),
                         ],
                       ),
                     ),
@@ -175,45 +185,36 @@ class PartnerHomeScreen extends ConsumerWidget {
                             color: textPrim)),
                     const SizedBox(height: 12),
                     Row(children: [
-                      Expanded(
-                        child: _QuickAction(
-                          icon: Icons.add_circle_rounded,
-                          label: 'Add Car',
-                          color: AppColors.primary,
-                          cardColor: cardColor,
-                          borderColor: borderColor,
-                          textPrim: textPrim,
-                          onTap: () => context.push(AppRoutes.addCar),
-                        ),
-                      ),
+                      Expanded(child: _QuickAction(
+                        icon: Icons.add_circle_rounded,
+                        label: 'Add Car',
+                        color: AppColors.primary,
+                        cardColor: cardColor, borderColor: borderColor,
+                        textPrim: textPrim,
+                        onTap: () => context.push(AppRoutes.addCar),
+                      )),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _QuickAction(
-                          icon: Icons.receipt_long_rounded,
-                          label: 'View Bookings',
-                          color: AppColors.info,
-                          cardColor: cardColor,
-                          borderColor: borderColor,
-                          textPrim: textPrim,
-                          onTap: () => context.go(AppRoutes.partnerBookings),
-                        ),
-                      ),
+                      Expanded(child: _QuickAction(
+                        icon: Icons.receipt_long_rounded,
+                        label: 'View Bookings',
+                        color: AppColors.info,
+                        cardColor: cardColor, borderColor: borderColor,
+                        textPrim: textPrim,
+                        onTap: () => context.go(AppRoutes.partnerBookings),
+                      )),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _QuickAction(
-                          icon: Icons.bar_chart_rounded,
-                          label: 'Earnings',
-                          color: AppColors.success,
-                          cardColor: cardColor,
-                          borderColor: borderColor,
-                          textPrim: textPrim,
-                          onTap: () => context.push(AppRoutes.earnings),
-                        ),
-                      ),
+                      Expanded(child: _QuickAction(
+                        icon: Icons.bar_chart_rounded,
+                        label: 'Earnings',
+                        color: AppColors.success,
+                        cardColor: cardColor, borderColor: borderColor,
+                        textPrim: textPrim,
+                        onTap: () => context.push(AppRoutes.earnings),
+                      )),
                     ]),
                     const SizedBox(height: 28),
 
-                    // ── Recent bookings ────────────────────────────────────
+                    // ── Recent bookings header ─────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -242,12 +243,12 @@ class PartnerHomeScreen extends ConsumerWidget {
               loading: () => SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (_, __) => Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
                     child: Shimmer.fromColors(
                       baseColor:      shimBase,
                       highlightColor: shimHigh,
                       child: Container(
-                        height: 80,
+                        height: 90,
                         decoration: BoxDecoration(
                           color: shimBase,
                           borderRadius: BorderRadius.circular(14),
@@ -258,15 +259,14 @@ class PartnerHomeScreen extends ConsumerWidget {
                   childCount: 3,
                 ),
               ),
-              error: (_, __) => const SliverToBoxAdapter(
-                  child: SizedBox.shrink()),
+              error: (_, __) =>
+                  const SliverToBoxAdapter(child: SizedBox.shrink()),
               data: (bookings) {
                 final recent = bookings.take(5).toList();
                 if (recent.isEmpty) {
                   return SliverToBoxAdapter(
                     child: Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -275,8 +275,8 @@ class PartnerHomeScreen extends ConsumerWidget {
                                 size: 56, color: textMuted),
                             const SizedBox(height: 12),
                             Text('No bookings yet',
-                                style:
-                                    TextStyle(color: textMuted, fontSize: 15)),
+                                style: TextStyle(
+                                    color: textMuted, fontSize: 15)),
                           ],
                         ),
                       ),
@@ -284,19 +284,19 @@ class PartnerHomeScreen extends ConsumerWidget {
                   );
                 }
                 return SliverPadding(
-                  padding:
-                      const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (_, i) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _RecentBookingTile(
-                          booking: recent[i],
-                          cardColor: cardColor,
+                          booking:     recent[i],
+                          cardColor:   cardColor,
                           borderColor: borderColor,
-                          textPrim: textPrim,
-                          textSec: textSec,
-                          textMuted: textMuted,
+                          textPrim:    textPrim,
+                          textSec:     textSec,
+                          textMuted:   textMuted,
+                          shimBase:    shimBase,
                         ),
                       ),
                       childCount: recent.length,
@@ -312,7 +312,7 @@ class PartnerHomeScreen extends ConsumerWidget {
   }
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// ── Stat card ──────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor, cardColor, borderColor, textPrim, textMuted;
@@ -331,7 +331,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -339,36 +339,37 @@ class _StatCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: iconColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
+            child: Icon(icon, color: iconColor, size: 17),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: textPrim)),
-              Text(label,
-                  style: TextStyle(fontSize: 11, color: textMuted)),
-            ],
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w800, color: textPrim),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(fontSize: 11, color: textMuted),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
         ],
       ),
     );
   }
 }
 
-// ── Quick action ──────────────────────────────────────────────────────────────
+// ── Quick action ───────────────────────────────────────────────────────────────
 class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -413,10 +414,10 @@ class _QuickAction extends StatelessWidget {
   }
 }
 
-// ── Recent booking tile ───────────────────────────────────────────────────────
+// ── Recent booking tile ────────────────────────────────────────────────────────
 class _RecentBookingTile extends StatelessWidget {
   final BookingModel booking;
-  final Color cardColor, borderColor, textPrim, textSec, textMuted;
+  final Color cardColor, borderColor, textPrim, textSec, textMuted, shimBase;
   const _RecentBookingTile({
     required this.booking,
     required this.cardColor,
@@ -424,6 +425,7 @@ class _RecentBookingTile extends StatelessWidget {
     required this.textPrim,
     required this.textSec,
     required this.textMuted,
+    required this.shimBase,
   });
 
   Color _statusColor(String s) {
@@ -442,65 +444,137 @@ class _RecentBookingTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final b     = booking;
     final color = _statusColor(b.bookingStatus);
+
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cardColor,
+        color:        cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
+        border:       Border.all(color: borderColor),
       ),
-      child: Row(children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(Icons.directions_car_rounded, color: color, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(b.carName,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: textPrim,
-                      fontSize: 13)),
-              Text(b.customerName,
-                  style: TextStyle(color: textSec, fontSize: 12)),
-              Text('${b.startDate} → ${b.endDate}',
-                  style: TextStyle(color: textMuted, fontSize: 11)),
-            ],
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(b.statusLabel,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600)),
+      child: Row(
+        children: [
+          // ── Car thumbnail ───────────────────────────────────────────────
+          ClipRRect(
+            borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(14)),
+            child: SizedBox(
+              width: 76,
+              height: 88,
+              child: b.carImageUrl != null && b.carImageUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: b.carImageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) =>
+                          Container(color: shimBase),
+                      errorWidget: (_, __, ___) =>
+                          _CarPlaceholder(bg: shimBase, iconColor: textMuted),
+                    )
+                  : _CarPlaceholder(bg: shimBase, iconColor: textMuted),
             ),
-            const SizedBox(height: 4),
-            Text('₱${b.totalAmount.toStringAsFixed(0)}',
-                style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13)),
-          ],
-        ),
-      ]),
+          ),
+
+          // ── Info ─────────────────────────────────────────────────────────
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Car name + status badge
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          b.carName.isNotEmpty ? b.carName : 'Car',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: textPrim,
+                              fontSize: 13),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(b.statusLabel,
+                            style: TextStyle(
+                                color: color,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+
+                  // ── Customer name with icon ──────────────────────────────
+                  Row(children: [
+                    Icon(Icons.person_outline_rounded,
+                        size: 11, color: textMuted),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        b.customerName.isNotEmpty
+                            ? b.customerName
+                            : 'Customer',
+                        style: TextStyle(
+                            color: textSec,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 2),
+
+                  // Dates
+                  Row(children: [
+                    Icon(Icons.date_range_rounded,
+                        size: 11, color: textMuted),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${b.startDate} → ${b.endDate}',
+                      style: TextStyle(color: textMuted, fontSize: 11),
+                    ),
+                  ]),
+                  const SizedBox(height: 6),
+
+                  // Amount — comma-formatted
+                  Text(
+                    '₱${_fmtMoney(b.totalAmount)}',
+                    style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
+
+// ── Car image placeholder ──────────────────────────────────────────────────────
+class _CarPlaceholder extends StatelessWidget {
+  final Color bg, iconColor;
+  const _CarPlaceholder({required this.bg, required this.iconColor});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: bg,
+        child: Center(
+          child: Icon(Icons.directions_car_rounded,
+              color: iconColor, size: 28),
+        ),
+      );
 }

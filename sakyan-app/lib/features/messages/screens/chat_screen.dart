@@ -32,15 +32,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Timer? _pollTimer;
   bool _sending     = false;
 
-  String? get _receiverId   => widget.receiverId;
-  String? get _receiverName => widget.receiverName;
+  String? _resolvedReceiverId;
+  String? _resolvedReceiverName;
+
+  String? get _receiverId   => widget.receiverId   ?? _resolvedReceiverId;
+  String? get _receiverName => widget.receiverName ?? _resolvedReceiverName;
 
   @override
   void initState() {
     super.initState();
-    // Poll every 5 seconds for new messages
+    // ── Silent poll every 5 s — no loading spinner ──────────────────────────
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      ref.read(chatProvider(widget.bookingId).notifier).refresh();
+      if (mounted) {
+        ref.read(chatProvider(widget.bookingId).notifier).silentRefresh();
+      }
     });
   }
 
@@ -52,17 +57,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  void _tryResolveReceiver(List<MessageModel> messages, String? currentUserId) {
+    if (_receiverId != null) return;
+    if (currentUserId == null) return;
+    for (final m in messages) {
+      if (m.senderId.isNotEmpty && m.senderId != currentUserId) {
+        if (mounted) setState(() {
+          _resolvedReceiverId   = m.senderId;
+          _resolvedReceiverName = m.senderName;
+        });
+        return;
+      }
+      if (m.receiverId.isNotEmpty && m.receiverId != currentUserId) {
+        if (mounted) setState(() {
+          _resolvedReceiverId   = m.receiverId;
+          _resolvedReceiverName = m.receiverName;
+        });
+        return;
+      }
+    }
+  }
+
   void _scrollToBottom({bool animated = false}) {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!_scrollCtrl.hasClients) return;
+      final max = _scrollCtrl.position.maxScrollExtent;
       if (animated) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+        _scrollCtrl.animateTo(max,
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
       } else {
-        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+        _scrollCtrl.jumpTo(max);
       }
     });
   }
@@ -97,7 +121,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        _msgCtrl.text = text; // restore
+        _msgCtrl.text = text;
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -111,7 +135,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final theme  = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final scaffoldBg  = theme.scaffoldBackgroundColor;
     final cardColor   = isDark ? AppColors.bgSurface    : AppColors.bgSurfaceLight;
     final borderColor = isDark ? AppColors.border        : AppColors.borderLight;
     final textPrim    = isDark ? AppColors.textPrimary   : AppColors.textPrimaryLight;
@@ -119,30 +142,64 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
     final inputBg     = isDark ? AppColors.bgSurface     : AppColors.bgSurfaceLight;
 
+    messagesAsync.whenData(
+      (messages) => _tryResolveReceiver(messages, currentUser?.id),
+    );
+
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        titleSpacing: 0,
+        title: Row(
           children: [
-            Text(
-              _receiverName ?? 'Partner',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: textPrim),
-            ),
-            if (widget.carName?.isNotEmpty == true)
-              Text(
-                widget.carName!,
-                style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w500),
+            // Avatar circle
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
+              child: Center(
+                child: Text(
+                  (_receiverName ?? 'C').isNotEmpty
+                      ? (_receiverName ?? 'C')[0].toUpperCase()
+                      : 'C',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _receiverName ?? 'Chat',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: textPrim),
+                ),
+                if (widget.carName?.isNotEmpty == true)
+                  Text(
+                    widget.carName!,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500),
+                  ),
+              ],
+            ),
           ],
         ),
         actions: [
-          // Manual refresh
+          // Manual full refresh only
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: textSec),
             tooltip: 'Refresh',
@@ -153,33 +210,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
-          // ── Messages list ──────────────────────────────────────────────
+          // ── Messages list ────────────────────────────────────────────────
           Expanded(
             child: messagesAsync.when(
+              // Only show full loading spinner on first load (no data yet)
               loading: () => const Center(
-                  child: CircularProgressIndicator(
-                      color: AppColors.primary)),
-              error: (e, _) => Center(
+                  child: CircularProgressIndicator(color: AppColors.primary)),
+              error: (e, st) => Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline_rounded,
-                        size: 48, color: textMuted),
+                    Icon(Icons.wifi_off_rounded, size: 48, color: textMuted),
                     const SizedBox(height: 12),
                     Text('Failed to load messages',
-                        style: TextStyle(color: textMuted)),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
+                        style: TextStyle(
+                            color: textMuted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15)),
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        e.toString().replaceFirst('Exception: ', ''),
+                        style: TextStyle(color: textMuted, fontSize: 12),
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Retry'),
                       onPressed: () => ref
                           .read(chatProvider(widget.bookingId).notifier)
                           .refresh(),
-                      child: const Text('Retry'),
                     ),
                   ],
                 ),
               ),
               data: (messages) {
-                // Auto-scroll when new messages arrive
                 _scrollToBottom();
 
                 if (messages.isEmpty) {
@@ -187,16 +257,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.chat_bubble_outline_rounded,
-                            size: 64, color: textMuted),
-                        const SizedBox(height: 12),
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGlow,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.chat_bubble_outline_rounded,
+                              color: AppColors.primary, size: 38),
+                        ),
+                        const SizedBox(height: 16),
                         Text('No messages yet',
                             style: TextStyle(
-                                color: textMuted, fontSize: 15)),
+                                color: textMuted,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600)),
                         const SizedBox(height: 4),
                         Text('Say hello to get started!',
-                            style: TextStyle(
-                                color: textMuted, fontSize: 13)),
+                            style: TextStyle(color: textMuted, fontSize: 13)),
                       ],
                     ),
                   );
@@ -204,12 +283,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
                 return ListView.builder(
                   controller: _scrollCtrl,
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   itemCount: messages.length,
                   itemBuilder: (_, i) {
-                    final msg     = messages[i];
-                    final isMe    = msg.senderId == currentUser?.id;
+                    final msg  = messages[i];
+                    final isMe = msg.senderId == currentUser?.id;
                     final showTime = i == 0 ||
                         messages[i].createdAt
                                 .difference(messages[i - 1].createdAt)
@@ -219,16 +297,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     return Column(
                       children: [
                         if (showTime)
-                          _TimeDivider(
-                              time: msg.createdAt,
-                              textMuted: textMuted),
+                          _TimeDivider(time: msg.createdAt, textMuted: textMuted),
                         _MessageBubble(
-                          message:      msg,
-                          isMe:         isMe,
-                          cardColor:    cardColor,
-                          textPrim:     textPrim,
-                          textMuted:    textMuted,
-                          isDark:       isDark,
+                          message:   msg,
+                          isMe:      isMe,
+                          cardColor: cardColor,
+                          textPrim:  textPrim,
+                          textMuted: textMuted,
+                          isDark:    isDark,
                         ),
                       ],
                     );
@@ -238,13 +314,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
 
-          // ── Input bar ──────────────────────────────────────────────────
+          // ── Input bar ────────────────────────────────────────────────────
           Container(
             padding: EdgeInsets.fromLTRB(
-                16,
-                10,
-                16,
-                MediaQuery.of(context).padding.bottom + 10),
+                16, 10, 16, MediaQuery.of(context).padding.bottom + 10),
             decoration: BoxDecoration(
               color:  cardColor,
               border: Border(top: BorderSide(color: borderColor)),
@@ -266,8 +339,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       style: TextStyle(color: textPrim, fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Type a message...',
-                        hintStyle:
-                            TextStyle(color: textMuted, fontSize: 14),
+                        hintStyle: TextStyle(color: textMuted, fontSize: 14),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
@@ -302,8 +374,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white),
+                                  strokeWidth: 2, color: Colors.white),
                             ),
                           )
                         : const Icon(Icons.send_rounded,
@@ -319,7 +390,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
-// ── Message bubble ────────────────────────────────────────────────────────────
+// ── Message bubble ─────────────────────────────────────────────────────────────
 class _MessageBubble extends StatelessWidget {
   final MessageModel message;
   final bool isMe, isDark;
@@ -336,31 +407,26 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleBg = isMe
-        ? AppColors.primary
-        : cardColor;
+    final bubbleBg  = isMe ? AppColors.primary : cardColor;
     final textColor = isMe ? Colors.white : textPrim;
-    final timeColor = isMe
-        ? Colors.white.withOpacity(0.65)
-        : textMuted;
+    final timeColor = isMe ? Colors.white.withOpacity(0.65) : textMuted;
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: EdgeInsets.only(
-          top: 4,
-          bottom: 4,
-          left:  isMe ? 48 : 0,
-          right: isMe ? 0  : 48,
+          top: 4, bottom: 4,
+          left:  isMe ? 56 : 0,
+          right: isMe ? 0  : 56,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: bubbleBg,
           borderRadius: BorderRadius.only(
-            topLeft:     Radius.circular(isMe ? 16 : 4),
-            topRight:    Radius.circular(isMe ? 4 : 16),
-            bottomLeft:  const Radius.circular(16),
-            bottomRight: const Radius.circular(16),
+            topLeft:     Radius.circular(isMe ? 18 : 4),
+            topRight:    Radius.circular(isMe ? 4 : 18),
+            bottomLeft:  const Radius.circular(18),
+            bottomRight: const Radius.circular(18),
           ),
           boxShadow: [
             BoxShadow(
@@ -381,17 +447,13 @@ class _MessageBubble extends StatelessWidget {
                 child: Text(
                   message.senderName,
                   style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                      fontSize: 11,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
-            Text(
-              message.content,
-              style: TextStyle(
-                  color: textColor, fontSize: 14, height: 1.4),
-            ),
+            Text(message.content,
+                style: TextStyle(color: textColor, fontSize: 14, height: 1.4)),
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -419,7 +481,7 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-// ── Time divider ──────────────────────────────────────────────────────────────
+// ── Time divider ───────────────────────────────────────────────────────────────
 class _TimeDivider extends StatelessWidget {
   final DateTime time;
   final Color textMuted;
@@ -433,25 +495,23 @@ class _TimeDivider extends StatelessWidget {
 
     String label;
     if (d == today) {
-      label = 'Today ${DateFormat('h:mm a').format(time)}';
+      label = 'Today  ${DateFormat('h:mm a').format(time)}';
     } else if (today.difference(d).inDays == 1) {
-      label = 'Yesterday ${DateFormat('h:mm a').format(time)}';
+      label = 'Yesterday  ${DateFormat('h:mm a').format(time)}';
     } else {
-      label = DateFormat('MMM d, h:mm a').format(time);
+      label = DateFormat('MMM d,  h:mm a').format(time);
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(children: [
-        Expanded(
-            child: Divider(color: textMuted.withOpacity(0.3))),
+        Expanded(child: Divider(color: textMuted.withOpacity(0.3))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text(label,
               style: TextStyle(fontSize: 11, color: textMuted)),
         ),
-        Expanded(
-            child: Divider(color: textMuted.withOpacity(0.3))),
+        Expanded(child: Divider(color: textMuted.withOpacity(0.3))),
       ]),
     );
   }

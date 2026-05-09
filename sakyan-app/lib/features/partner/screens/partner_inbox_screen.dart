@@ -22,24 +22,56 @@ class PartnerInboxScreen extends ConsumerWidget {
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Customer Messages')),
+      appBar: AppBar(
+        title: const Text('Customer Messages'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: textPrim),
+            onPressed: () => ref.invalidate(conversationsProvider),
+          ),
+        ],
+      ),
       body: convAsync.when(
         loading: () => const Center(
             child: CircularProgressIndicator(color: AppColors.primary)),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline_rounded, size: 48, color: textMuted),
-              const SizedBox(height: 12),
-              Text('Failed to load messages',
-                  style: TextStyle(color: textMuted)),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(conversationsProvider),
-                child: const Text('Retry'),
-              ),
-            ],
+        error: (e, st) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cloud_off_rounded,
+                      color: AppColors.error, size: 32),
+                ),
+                const SizedBox(height: 16),
+                Text('Failed to load messages',
+                    style: TextStyle(
+                        color: textPrim,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16)),
+                const SizedBox(height: 8),
+                Text(
+                  e.toString().replaceFirst('Exception: ', ''),
+                  style: TextStyle(color: textMuted, fontSize: 12),
+                  textAlign: TextAlign.center,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Retry'),
+                  onPressed: () => ref.invalidate(conversationsProvider),
+                ),
+              ],
+            ),
           ),
         ),
         data: (convs) {
@@ -48,14 +80,22 @@ class PartnerInboxScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.chat_bubble_outline_rounded,
-                      size: 72, color: textMuted),
-                  const SizedBox(height: 16),
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGlow,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.chat_bubble_outline_rounded,
+                        color: AppColors.primary, size: 42),
+                  ),
+                  const SizedBox(height: 18),
                   Text('No messages yet',
                       style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: textMuted)),
+                          fontWeight: FontWeight.w700,
+                          color: textPrim)),
                   const SizedBox(height: 6),
                   Text('Customer conversations will appear here.',
                       style: TextStyle(color: textMuted, fontSize: 13),
@@ -167,11 +207,10 @@ class _ConvTile extends StatelessWidget {
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  width: 16,
-                  height: 16,
+                  width: 18,
+                  height: 18,
                   decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle),
+                      color: AppColors.primary, shape: BoxShape.circle),
                   child: Center(
                     child: Text(
                       c.unreadCount > 9 ? '9+' : '${c.unreadCount}',
@@ -186,7 +225,6 @@ class _ConvTile extends StatelessWidget {
           ]),
           const SizedBox(width: 12),
 
-          // Text content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,14 +259,19 @@ class _ConvTile extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (c.carName.isNotEmpty)
-                  Text(
-                    c.carName,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500),
-                  ),
+                if (c.carName.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Row(children: [
+                    const Icon(Icons.directions_car_rounded,
+                        size: 10, color: AppColors.primary),
+                    const SizedBox(width: 3),
+                    Text(c.carName,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500)),
+                  ]),
+                ],
                 const SizedBox(height: 2),
                 Text(
                   c.lastMessage.isNotEmpty

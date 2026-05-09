@@ -325,8 +325,16 @@ class _BookingCardState extends State<_BookingCard> {
                             icon: const Icon(Icons.chat_bubble_rounded,
                                 size: 16),
                             label: const Text('Message Partner'),
-                            onPressed: () =>
-                                context.push('/chat/${b.id}'),
+                            onPressed: () => context.push(
+                              '/chat/${b.id}',
+                              extra: {
+                                'receiverId': b.partnerId,
+                                'name':       b.partnerName.isNotEmpty
+                                    ? b.partnerName
+                                    : 'Partner',
+                                'carName':    b.carName,
+                              },
+                            ),
                           ),
                         ),
                         if (b.canCancel) ...[

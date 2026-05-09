@@ -7,6 +7,7 @@ class BookingModel {
   final String customerId;
   final String customerName;
   final String partnerId;
+  final String partnerName;
   final String startDate;
   final String endDate;
   final String pickupLocation;
@@ -36,6 +37,7 @@ class BookingModel {
     this.customerId      = '',
     this.customerName    = '',
     this.partnerId       = '',
+    this.partnerName     = '',
     required this.startDate,
     required this.endDate,
     this.pickupLocation  = '',
@@ -126,10 +128,11 @@ class BookingModel {
     }
 
     // partner can be nested or string
-    String partnerId = '';
+    String partnerId = '', partnerName = '';
     final p = json['partner'];
     if (p is Map) {
-      partnerId = p['id'] as String? ?? '';
+      partnerId   = p['id']        as String? ?? '';
+      partnerName = p['full_name'] as String? ?? (p['business_name'] as String? ?? '');
     } else if (p is String) {
       partnerId = p;
     }
@@ -143,6 +146,7 @@ class BookingModel {
       customerId:       customerId,
       customerName:     customerName,
       partnerId:        partnerId,
+      partnerName:      partnerName,
       startDate:        json['start_date']         as String? ?? '',
       endDate:          json['end_date']           as String? ?? '',
       pickupLocation:   json['pickup_location']    as String? ?? '',

@@ -23,7 +23,6 @@ class ChatNotifier extends FamilyAsyncNotifier<List<MessageModel>, String> {
     required String content,
   }) async {
     final bookingId = arg;
-    // Optimistically insert a placeholder
     final current = state.value ?? [];
     final msg = await ref
         .read(messageRepositoryProvider)
@@ -33,10 +32,31 @@ class ChatNotifier extends FamilyAsyncNotifier<List<MessageModel>, String> {
           content:    content,
         );
     state = AsyncValue.data([...current, msg]);
-    // Refresh conversations badge
     ref.invalidate(conversationsProvider);
   }
 
+  /// Silent background refresh — does NOT set loading state so the UI
+  /// never flashes back to a spinner during the auto-poll timer.
+  Future<void> silentRefresh() async {
+    try {
+      final messages = await ref
+          .read(messageRepositoryProvider)
+          .getMessages(arg);
+      // Only update state if the message count or latest id changed
+      final current = state.value;
+      if (current == null ||
+          current.length != messages.length ||
+          (messages.isNotEmpty &&
+              current.isNotEmpty &&
+              messages.last.id != current.last.id)) {
+        state = AsyncValue.data(messages);
+      }
+    } catch (_) {
+      // Silently ignore poll errors — the user still sees the last messages
+    }
+  }
+
+  /// Full refresh with loading indicator — use for manual "retry" only.
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() =>

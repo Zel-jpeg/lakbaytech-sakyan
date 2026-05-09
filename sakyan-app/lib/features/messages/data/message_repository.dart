@@ -10,7 +10,9 @@ class MessageRepository {
     final raw = res.data;
     List list = raw is List
         ? raw
-        : (raw is Map && raw['results'] is List ? raw['results'] as List : []);
+        : (raw is Map && raw['results'] is List
+            ? raw['results'] as List
+            : []);
     return list
         .map((e) => ConversationModel.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -22,7 +24,9 @@ class MessageRepository {
     final raw = res.data;
     List list = raw is List
         ? raw
-        : (raw is Map && raw['results'] is List ? raw['results'] as List : []);
+        : (raw is Map && raw['results'] is List
+            ? raw['results'] as List
+            : []);
     return list
         .map((e) => MessageModel.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -35,9 +39,9 @@ class MessageRepository {
     required String content,
   }) async {
     final res = await ApiService.post('/messages/', data: {
-      'booking':    bookingId,
-      'receiver':   receiverId,
-      'content':    content,
+      'booking':  bookingId,
+      'receiver': receiverId,
+      'content':  content,
     });
     return MessageModel.fromJson(res.data as Map<String, dynamic>);
   }
@@ -48,15 +52,17 @@ class MessageRepository {
     final raw = res.data;
     List list = raw is List
         ? raw
-        : (raw is Map && raw['results'] is List ? raw['results'] as List : []);
+        : (raw is Map && raw['results'] is List
+            ? raw['results'] as List
+            : []);
     return list
         .map((e) => MessageModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   Future<MessageModel> sendSupportMessage(String content) async {
-    final res = await ApiService.post('/messages/support/',
-        data: {'content': content});
+    final res =
+        await ApiService.post('/messages/support/', data: {'content': content});
     return MessageModel.fromJson(res.data as Map<String, dynamic>);
   }
 }
