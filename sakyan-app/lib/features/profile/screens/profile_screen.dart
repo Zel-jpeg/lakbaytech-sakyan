@@ -92,6 +92,53 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
 
+          // ── PARTNER DASHBOARD (approved partners only) ─────────────────
+          // This is the primary CTA for a user whose role == 'partner'.
+          if (user?.isPartner == true) ...[
+            _SectionLabel(label: 'Partner', textSec: textSec),
+            const SizedBox(height: 8),
+            _SettingsCard(
+              isDark: isDark,
+              bgSurface: bgSurface,
+              border: border,
+              children: [
+                _SettingsNavTile(
+                  icon: Icons.dashboard_rounded,
+                  label: 'Go to Partner Dashboard',
+                  subtitle: 'Manage cars, bookings and earnings',
+                  isDark: isDark,
+                  textPrim: textPrim,
+                  textSec: textSec,
+                  // Use go() so the entire navigation stack is replaced with
+                  // the partner shell — prevents the customer bottom-nav
+                  // from showing behind the partner screens.
+                  onTap: () => context.go(AppRoutes.partnerHome),
+                ),
+                _Divider(color: border),
+                _SettingsNavTile(
+                  icon: Icons.directions_car_rounded,
+                  label: 'My Cars',
+                  subtitle: 'View and manage your listings',
+                  isDark: isDark,
+                  textPrim: textPrim,
+                  textSec: textSec,
+                  onTap: () => context.go(AppRoutes.partnerCars),
+                ),
+                _Divider(color: border),
+                _SettingsNavTile(
+                  icon: Icons.bar_chart_rounded,
+                  label: 'Earnings',
+                  subtitle: 'Revenue and commission breakdown',
+                  isDark: isDark,
+                  textPrim: textPrim,
+                  textSec: textSec,
+                  onTap: () => context.push(AppRoutes.earnings),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+
           // ── KYC section (customer only) ────────────────────────────────
           if (user?.isCustomer == true) ...[
             _SectionLabel(label: 'Verification', textSec: textSec),
@@ -115,7 +162,7 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 20),
           ],
 
-          // ── Become a Partner ───────────────────────────────────────────
+          // ── Become a Partner (customer only) ───────────────────────────
           if (user?.isCustomer == true) ...[
             _SectionLabel(label: 'Earn with Sakyan', textSec: textSec),
             const SizedBox(height: 8),
@@ -283,10 +330,6 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
-    // ── FIX: useRootNavigator: true ensures the dialog sits on the root
-    //   navigator, not GoRouter's nested ShellRoute navigator. Without this
-    //   the Navigator.pop() inside the dialog button tries to pop a GoRouter
-    //   page (not the dialog), triggering the "no pages left" assertion.
     final confirmed = await showDialog<bool>(
       context: context,
       useRootNavigator: true,
@@ -296,8 +339,6 @@ class ProfileScreen extends ConsumerWidget {
             'Are you sure you want to sign out?\nYou can sign back in anytime with Google.'),
         actions: [
           TextButton(
-            // Use ctx (dialog context) + rootNavigator so we pop only the
-            // dialog, not the underlying GoRouter page.
             onPressed: () =>
                 Navigator.of(ctx, rootNavigator: true).pop(false),
             child: const Text('Cancel'),
@@ -315,19 +356,11 @@ class ProfileScreen extends ConsumerWidget {
 
     if (confirmed != true || !context.mounted) return;
 
-    // ── No loading dialog here — it was causing a second GoRouter assertion
-    //   because context.go() clears the entire navigator stack while the
-    //   dialog was still mounted.  signOut() is fast enough that a spinner
-    //   is unnecessary.
     try {
       await ref.read(authNotifierProvider.notifier).signOut();
-    } catch (_) {
-      // Even if Supabase sign-out fails the local token is already cleared,
-      // so we still navigate to /login.
-    }
+    } catch (_) {}
 
     if (context.mounted) {
-      // go() replaces the entire stack — user can't press back to Profile.
       context.go(AppRoutes.login);
     }
   }

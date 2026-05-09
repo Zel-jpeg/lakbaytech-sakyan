@@ -81,6 +81,7 @@ class AppRoutes {
 
   // Partner extra
   static const String partnerEarnings = '/partner/earnings';
+  static const String earnings        = '/partner/earnings'; // alias
   static const String addCar = '/partner/cars/add';
   static const String editCar = '/partner/cars/:id/edit';
 
@@ -326,9 +327,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       GoRoute(
         path: '/chat/:bookingId',
-        builder: (_, s) => ChatScreen(
-          bookingId: s.pathParameters['bookingId']!,
-        ),
+        builder: (_, s) {
+          final extra = s.extra as Map<String, dynamic>? ?? {};
+          return ChatScreen(
+            bookingId:    s.pathParameters['bookingId']!,
+            receiverId:   extra['receiverId']   as String?,
+            receiverName: extra['name']         as String?,
+            carName:      extra['carName']       as String?,
+          );
+        },
       ),
 
       GoRoute(
@@ -358,17 +365,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       GoRoute(
         path: AppRoutes.onboardingStep2,
-        builder: (_, __) => const Step2InfoScreen(),
+        builder: (_, s) {
+          final extra = s.extra as Map<String, dynamic>? ?? {};
+          return Step2InfoScreen(
+            partnerType: extra['partnerType'] as String? ?? 'individual',
+          );
+        },
       ),
 
       GoRoute(
         path: AppRoutes.onboardingStep3,
-        builder: (_, __) => const Step3DocsScreen(),
+        builder: (_, s) {
+          final extra = s.extra as Map<String, dynamic>? ?? {};
+          return Step3DocsScreen(data: extra);
+        },
       ),
 
       GoRoute(
         path: AppRoutes.onboardingStep4,
-        builder: (_, __) => const Step4PendingScreen(),
+        builder: (_, s) {
+          final extra = s.extra as Map<String, dynamic>? ?? {};
+          return Step4PendingScreen(applicationData: extra);
+        },
       ),
     ],
   );
