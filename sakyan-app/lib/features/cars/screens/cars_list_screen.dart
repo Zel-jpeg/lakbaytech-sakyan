@@ -12,29 +12,45 @@ class CarsListScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<CarsListScreen> createState() => _CarsListScreenState();
 }
+
 class _CarsListScreenState extends ConsumerState<CarsListScreen> {
   final _searchCtrl = TextEditingController();
   static const _transmissions = ['Any', 'Manual', 'Automatic'];
   static const _fuelTypes     = ['Any', 'Gasoline', 'Diesel', 'Electric', 'Hybrid'];
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
+
   void _updateFilter(CarFilters Function(CarFilters) updater) {
     final current = ref.read(carFiltersProvider);
     ref.read(carFiltersProvider.notifier).state = updater(current);
   }
+
   void _clearFilters() {
     _searchCtrl.clear();
     ref.read(carFiltersProvider.notifier).state = const CarFilters();
   }
+
   @override
   Widget build(BuildContext context) {
     final filters   = ref.watch(carFiltersProvider);
     final carsAsync = ref.watch(carsListProvider);
+    final theme     = Theme.of(context);
+    final isDark    = theme.brightness == Brightness.dark;
+
+    final cardColor   = isDark ? AppColors.bgSurface   : AppColors.bgSurfaceLight;
+    final borderColor = isDark ? AppColors.border       : AppColors.borderLight;
+    final textPrim    = isDark ? AppColors.textPrimary  : AppColors.textPrimaryLight;
+    final textSec     = isDark ? AppColors.textSecondary: AppColors.textSecondaryLight;
+    final textMuted   = isDark ? AppColors.textMuted    : AppColors.textMutedLight;
+    final shimBase    = isDark ? AppColors.bgSurface    : AppColors.bgElevatedLight;
+    final shimHigh    = isDark ? AppColors.bgElevated   : AppColors.bgSubtleLight;
+    final elevBg      = isDark ? AppColors.bgElevated   : AppColors.bgElevatedLight;
+
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
       appBar: AppBar(
         title: const Text('Browse Cars'),
         actions: [
@@ -47,7 +63,7 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
       ),
       body: Column(
         children: [
-          // ── Search & Filters ──────────────────────────────────────
+          // ── Search & Filters ────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Column(
@@ -56,13 +72,13 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
                 TextField(
                   controller: _searchCtrl,
                   onChanged: (v) => _updateFilter((f) => f.copyWith(search: v)),
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: textPrim),
                   decoration: InputDecoration(
-                    hintText:    'Search cars...',
-                    prefixIcon:  const Icon(Icons.search_rounded, color: AppColors.textMuted),
-                    suffixIcon:  _searchCtrl.text.isNotEmpty
+                    hintText:   'Search cars...',
+                    prefixIcon: Icon(Icons.search_rounded, color: textMuted),
+                    suffixIcon: _searchCtrl.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
+                            icon: Icon(Icons.close_rounded, color: textMuted),
                             onPressed: () {
                               _searchCtrl.clear();
                               _updateFilter((f) => f.copyWith(search: ''));
@@ -78,14 +94,17 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
-                      _FilterLabel(label: 'Transmission:'),
+                      _FilterLabel(label: 'Transmission:', color: textMuted),
                       ..._transmissions.map((t) {
                         final val = t == 'Any' ? null : t.toLowerCase();
                         final sel = filters.transmission == val;
                         return _Chip(
                           label:    t,
                           selected: sel,
-                          onTap:    () => _updateFilter((f) => f.copyWith(transmission: val)),
+                          cardColor: cardColor,
+                          borderColor: borderColor,
+                          textSec: textSec,
+                          onTap: () => _updateFilter((f) => f.copyWith(transmission: val)),
                         );
                       }),
                     ],
@@ -98,14 +117,17 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
-                      _FilterLabel(label: 'Fuel:'),
+                      _FilterLabel(label: 'Fuel:', color: textMuted),
                       ..._fuelTypes.map((t) {
                         final val = t == 'Any' ? null : t.toLowerCase();
                         final sel = filters.fuelType == val;
                         return _Chip(
                           label:    t,
                           selected: sel,
-                          onTap:    () => _updateFilter((f) => f.copyWith(fuelType: val)),
+                          cardColor: cardColor,
+                          borderColor: borderColor,
+                          textSec: textSec,
+                          onTap: () => _updateFilter((f) => f.copyWith(fuelType: val)),
                         );
                       }),
                     ],
@@ -115,17 +137,35 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
               ],
             ),
           ),
-          // ── Cars Grid ─────────────────────────────────────────────
+
+          // ── Cars Grid ───────────────────────────────────────────────
           Expanded(
             child: carsAsync.when(
-              loading: () => _buildShimmerGrid(),
-              error:   (e, _) => Center(
+              loading: () => GridView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, crossAxisSpacing: 12,
+                  mainAxisSpacing: 12, childAspectRatio: 0.72,
+                ),
+                itemCount: 6,
+                itemBuilder: (_, __) => Shimmer.fromColors(
+                  baseColor:      shimBase,
+                  highlightColor: shimHigh,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: shimBase,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+              error: (e, _) => Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.textMuted),
+                    Icon(Icons.wifi_off_rounded, size: 48, color: textMuted),
                     const SizedBox(height: 12),
-                    const Text('Failed to load cars', style: TextStyle(color: AppColors.textMuted)),
+                    Text('Failed to load cars', style: TextStyle(color: textMuted)),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: () => ref.invalidate(carsListProvider),
@@ -136,15 +176,17 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
               ),
               data: (cars) {
                 if (cars.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.directions_car_rounded, size: 64, color: AppColors.textMuted),
-                        SizedBox(height: 12),
-                        Text('No cars found', style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
-                        SizedBox(height: 4),
-                        Text('Try adjusting your filters', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                        Icon(Icons.directions_car_rounded, size: 64, color: textMuted),
+                        const SizedBox(height: 12),
+                        Text('No cars found',
+                            style: TextStyle(color: textMuted, fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text('Try adjusting your filters',
+                            style: TextStyle(color: textMuted, fontSize: 13)),
                       ],
                     ),
                   );
@@ -152,13 +194,22 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
                 return GridView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount:    2,
-                    crossAxisSpacing:  12,
-                    mainAxisSpacing:   12,
-                    childAspectRatio:  0.72,
+                    crossAxisCount:   2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing:  12,
+                    childAspectRatio: 0.72,
                   ),
                   itemCount: cars.length,
-                  itemBuilder: (_, i) => _CarListCard(car: cars[i]),
+                  itemBuilder: (_, i) => _CarListCard(
+                    car: cars[i],
+                    cardColor:   cardColor,
+                    borderColor: borderColor,
+                    textPrim:    textPrim,
+                    textMuted:   textMuted,
+                    textSec:     textSec,
+                    shimBase:    shimBase,
+                    elevBg:      elevBg,
+                  ),
                 );
               },
             ),
@@ -167,37 +218,36 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
       ),
     );
   }
-  Widget _buildShimmerGrid() => GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.72,
-        ),
-        itemCount: 6,
-        itemBuilder: (_, __) => Shimmer.fromColors(
-          baseColor:      AppColors.bgSurface,
-          highlightColor: AppColors.bgElevated,
-          child: Container(decoration: BoxDecoration(color: AppColors.bgSurface, borderRadius: BorderRadius.circular(16))),
-        ),
-      );
 }
+
 // ── Car list card ─────────────────────────────────────────────────────────────
 class _CarListCard extends StatelessWidget {
   final CarModel car;
-  const _CarListCard({required this.car});
+  final Color cardColor, borderColor, textPrim, textMuted, textSec, shimBase, elevBg;
+  const _CarListCard({
+    required this.car,
+    required this.cardColor,
+    required this.borderColor,
+    required this.textPrim,
+    required this.textMuted,
+    required this.textSec,
+    required this.shimBase,
+    required this.elevBg,
+  });
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => context.push('/cars/${car.id}'),
       child: Container(
         decoration: BoxDecoration(
-          color:        AppColors.bgSurface,
+          color:        cardColor,
           borderRadius: BorderRadius.circular(16),
-          border:       Border.all(color: AppColors.border),
+          border:       Border.all(color: borderColor),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
             Expanded(
               child: Stack(
                 children: [
@@ -208,57 +258,77 @@ class _CarListCard extends StatelessWidget {
                             imageUrl: car.primaryImageUrl!,
                             fit:      BoxFit.cover,
                             width:    double.infinity,
-                            placeholder: (_, __) => Container(color: AppColors.bgElevated),
+                            placeholder: (_, __) => Container(color: shimBase),
                             errorWidget: (_, __, ___) => Container(
-                              color: AppColors.bgElevated,
-                              child: const Icon(Icons.directions_car_rounded, color: AppColors.textMuted, size: 40),
+                              color: shimBase,
+                              child: Icon(Icons.directions_car_rounded,
+                                  color: textMuted, size: 40),
                             ),
                           )
                         : Container(
-                            color: AppColors.bgElevated,
-                            child: const Icon(Icons.directions_car_rounded, color: AppColors.textMuted, size: 40),
+                            color: shimBase,
+                            child: Icon(Icons.directions_car_rounded,
+                                color: textMuted, size: 40),
                           ),
                   ),
-                  // Availability badge
                   if (!car.isAvailable)
                     Positioned(
                       top: 8, right: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color:        Colors.black54,
+                          color: Colors.black54,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text('Unavailable', style: TextStyle(color: Colors.white, fontSize: 10)),
+                        child: const Text('Unavailable',
+                            style: TextStyle(color: Colors.white, fontSize: 10)),
                       ),
                     ),
                 ],
               ),
             ),
-            // Info
             Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(car.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  Text(car.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600, color: textPrim)),
                   const SizedBox(height: 2),
                   Row(children: [
-                    const Icon(Icons.location_on_rounded, size: 11, color: AppColors.textMuted),
+                    Icon(Icons.location_on_rounded, size: 11, color: textMuted),
                     const SizedBox(width: 2),
-                    Expanded(child: Text(car.location, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted))),
+                    Expanded(
+                        child: Text(car.location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11, color: textMuted))),
                   ]),
                   const SizedBox(height: 4),
                   Row(children: [
-                    _SpecChip(icon: Icons.settings_rounded, label: car.transmissionLabel),
+                    _SpecChip(
+                        icon: Icons.settings_rounded,
+                        label: car.transmissionLabel,
+                        bg: elevBg,
+                        border: borderColor,
+                        text: textSec),
                     const SizedBox(width: 4),
-                    _SpecChip(icon: Icons.people_rounded, label: '${car.seats}'),
+                    _SpecChip(
+                        icon: Icons.people_rounded,
+                        label: '${car.seats}',
+                        bg: elevBg,
+                        border: borderColor,
+                        text: textSec),
                   ]),
                   const SizedBox(height: 6),
                   Text('₱${car.pricePerDay.toStringAsFixed(0)}/day',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary)),
                 ],
               ),
             ),
@@ -268,44 +338,66 @@ class _CarListCard extends StatelessWidget {
     );
   }
 }
+
 class _SpecChip extends StatelessWidget {
   final IconData icon;
   final String label;
-  const _SpecChip({required this.icon, required this.label});
+  final Color bg, border, text;
+  const _SpecChip({
+    required this.icon,
+    required this.label,
+    required this.bg,
+    required this.border,
+    required this.text,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.bgElevated,
+        color: bg,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: border),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 10, color: AppColors.textMuted),
+        Icon(icon, size: 10, color: text),
         const SizedBox(width: 3),
-        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+        Text(label, style: TextStyle(fontSize: 10, color: text)),
       ]),
     );
   }
 }
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
 class _FilterLabel extends StatelessWidget {
   final String label;
-  const _FilterLabel({required this.label});
+  final Color color;
+  const _FilterLabel({required this.label, required this.color});
+
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(right: 8),
         child: Center(
-          child: Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          child: Text(label, style: TextStyle(color: color, fontSize: 12)),
         ),
       );
 }
+
 class _Chip extends StatelessWidget {
   final String label;
   final bool selected;
+  final Color cardColor, borderColor, textSec;
   final VoidCallback onTap;
-  const _Chip({required this.label, required this.selected, required this.onTap});
+  const _Chip({
+    required this.label,
+    required this.selected,
+    required this.cardColor,
+    required this.borderColor,
+    required this.textSec,
+    required this.onTap,
+  });
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -315,14 +407,14 @@ class _Chip extends StatelessWidget {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color:        selected ? AppColors.primary : AppColors.bgSurface,
+          color:        selected ? AppColors.primary : cardColor,
           borderRadius: BorderRadius.circular(20),
-          border:       Border.all(color: selected ? AppColors.primary : AppColors.border),
+          border:       Border.all(color: selected ? AppColors.primary : borderColor),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color:      selected ? Colors.white : AppColors.textSecondary,
+            color:      selected ? Colors.white : textSec,
             fontSize:   12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
           ),

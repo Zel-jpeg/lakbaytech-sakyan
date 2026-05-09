@@ -7,8 +7,66 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/router/app_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cars/models/car_model.dart';
-import '../../home/models/public_stats_model.dart';
 import '../../home/providers/home_provider.dart';
+
+// ── Greeting helpers ──────────────────────────────────────────────────────────
+
+String _getGreeting() {
+  final hour = DateTime.now().hour;
+  if (hour >= 5 && hour < 12) {
+    const options = [
+      'Good morning',
+      'Rise and shine',
+      'Morning! Ready to roll?',
+      'Top of the morning',
+    ];
+    return options[DateTime.now().minute % options.length];
+  } else if (hour >= 12 && hour < 17) {
+    const options = [
+      'Good afternoon',
+      'Hope your day\'s going great',
+      'Afternoon! Need a ride?',
+      'Good afternoon! Let\'s go',
+    ];
+    return options[DateTime.now().minute % options.length];
+  } else if (hour >= 17 && hour < 21) {
+    const options = [
+      'Good evening',
+      'Evening! Where to next?',
+      'Great evening for a drive',
+      'Good evening! Let\'s ride',
+    ];
+    return options[DateTime.now().minute % options.length];
+  } else {
+    const options = [
+      'Burning the midnight oil?',
+      'Up late? We\'ve got cars',
+      'Night owl! Need a ride?',
+      'Hey there, night rider',
+    ];
+    return options[DateTime.now().minute % options.length];
+  }
+}
+
+String _getSubtitle() {
+  final hour = DateTime.now().hour;
+  if (hour >= 5 && hour < 12) {
+    return 'Start your day with the perfect ride 🌤️';
+  } else if (hour >= 12 && hour < 17) {
+    return 'Find your perfect car for the afternoon 🚘';
+  } else if (hour >= 17 && hour < 21) {
+    return 'Evening plans? We have you covered 🌆';
+  } else {
+    return 'Browse cars anytime, anywhere 🌙';
+  }
+}
+
+String _capitalize(String s) {
+  if (s.isEmpty) return s;
+  return s[0].toUpperCase() + s.substring(1);
+}
+
+// ── HomeScreen ────────────────────────────────────────────────────────────────
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -16,74 +74,127 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user          = ref.watch(currentUserProvider);
-    final statsAsync    = ref.watch(publicStatsProvider);
     final featuredAsync = ref.watch(featuredCarsProvider);
+    final theme         = Theme.of(context);
+    final isDark        = theme.brightness == Brightness.dark;
+
+    // Adaptive surface colors — respect current theme mode
+    final scaffoldBg  = theme.scaffoldBackgroundColor;
+    final cardColor   = isDark ? AppColors.bgSurface  : AppColors.bgSurfaceLight;
+    final borderColor = isDark ? AppColors.border      : AppColors.borderLight;
+    final textPrim    = isDark ? AppColors.textPrimary : AppColors.textPrimaryLight;
+    final textSec     = isDark ? AppColors.textSecondary : AppColors.textSecondaryLight;
+    final textMuted   = isDark ? AppColors.textMuted   : AppColors.textMutedLight;
+    final searchBg    = isDark ? AppColors.bgSurface   : AppColors.bgSurfaceLight;
+    final shimBase    = isDark ? AppColors.bgSurface   : AppColors.bgElevatedLight;
+    final shimHigh    = isDark ? AppColors.bgElevated  : AppColors.bgSubtleLight;
+
+    final firstName = _capitalize(
+      user?.fullName.trim().split(' ').first ?? 'there',
+    );
+    final greeting = _getGreeting();
+    final subtitle = _getSubtitle();
 
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: scaffoldBg,
       body: CustomScrollView(
         slivers: [
-          // ── App bar ────────────────────────────────────────────────
+          // ── App bar ────────────────────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 0,
             floating: true,
             pinned: false,
-            backgroundColor: AppColors.bgBase,
+            backgroundColor: scaffoldBg,
             title: Row(
               children: [
-                Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Center(
-                    child: Text('S', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                // ── Sakyan logo from assets ────────────────────────────────
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/icon.png',
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'S',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Text('Sakyan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                Text(
+                  'Sakyan',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: textPrim,
+                  ),
+                ),
               ],
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined),
+                icon: Icon(Icons.notifications_outlined, color: textPrim),
                 onPressed: () => context.push(AppRoutes.notifications),
               ),
             ],
           ),
 
+          // ── Body content ───────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Greeting ───────────────────────────────────────
+                  // ── Dynamic greeting ───────────────────────────────────────
                   Text(
-                    'Hello, ${user?.fullName.split(' ').first ?? 'there'} 👋',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    '$greeting, $firstName! 👋',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: textPrim,
+                    ),
                   ),
                   const SizedBox(height: 4),
-                  const Text('Find your perfect ride today', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: textSec, fontSize: 14),
+                  ),
                   const SizedBox(height: 20),
 
-                  // ── Search bar (tappable → Cars page) ─────────────
+                  // ── Search bar (tappable → Cars page) ─────────────────────
                   GestureDetector(
                     onTap: () => context.go(AppRoutes.cars),
                     child: Container(
                       height: 50,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color:        AppColors.bgSurface,
+                        color:        searchBg,
                         borderRadius: BorderRadius.circular(14),
-                        border:       Border.all(color: AppColors.border),
+                        border:       Border.all(color: borderColor),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                          Icon(Icons.search_rounded, color: textMuted, size: 20),
                           const SizedBox(width: 10),
-                          const Text('Search cars, locations...', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+                          Text(
+                            'Search cars, locations...',
+                            style: TextStyle(color: textMuted, fontSize: 14),
+                          ),
                           const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -91,51 +202,39 @@ class HomeScreen extends ConsumerWidget {
                               color: AppColors.primaryGlow,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text('Filter', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-
-                  // ── Stats banner ───────────────────────────────────
-                  statsAsync.when(
-                    loading: () => const _StatsShimmer(),
-                    error:   (e, _) => Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Stats error: $e',
-                              style: const TextStyle(color: Colors.red, fontSize: 11),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                            child: const Text(
+                              'Filter',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    data: (stats) => _StatsBanner(stats: stats),
                   ),
                   const SizedBox(height: 28),
 
-                  // ── Featured cars header ───────────────────────────
+                  // ── Featured cars header ───────────────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Featured Cars', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      Text(
+                        'Featured Cars',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: textPrim,
+                        ),
+                      ),
                       TextButton(
                         onPressed: () => context.go(AppRoutes.cars),
-                        child: const Text('See all', style: TextStyle(color: AppColors.primary, fontSize: 13)),
+                        child: const Text(
+                          'See all',
+                          style: TextStyle(color: AppColors.primary, fontSize: 13),
+                        ),
                       ),
                     ],
                   ),
@@ -145,13 +244,13 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
 
-          // ── Featured cars grid ─────────────────────────────────────
+          // ── Featured cars grid ─────────────────────────────────────────────
           featuredAsync.when(
             loading: () => SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
-                  (_, __) => const _CarCardShimmer(),
+                  (_, __) => _CarCardShimmer(base: shimBase, highlight: shimHigh),
                   childCount: 4,
                 ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -168,11 +267,18 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.textMuted),
+                    Icon(Icons.wifi_off_rounded, size: 48, color: textMuted),
                     const SizedBox(height: 12),
-                    const Text('Failed to load cars', style: TextStyle(color: AppColors.textMuted, fontSize: 15)),
+                    Text(
+                      'Failed to load cars',
+                      style: TextStyle(color: textMuted, fontSize: 15),
+                    ),
                     const SizedBox(height: 6),
-                    Text('$e', style: const TextStyle(color: Colors.red, fontSize: 11), textAlign: TextAlign.center),
+                    Text(
+                      '$e',
+                      style: const TextStyle(color: Colors.red, fontSize: 11),
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: () => ref.invalidate(featuredCarsProvider),
@@ -186,7 +292,15 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => _CarCard(car: cars[i]),
+                  (ctx, i) => _CarCard(
+                    car: cars[i],
+                    cardColor: cardColor,
+                    borderColor: borderColor,
+                    textPrim: textPrim,
+                    textMuted: textMuted,
+                    shimBase: shimBase,
+                    shimHigh: shimHigh,
+                  ),
                   childCount: cars.length,
                 ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -204,76 +318,36 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ── Stats Banner ──────────────────────────────────────────────────────────────
-// FIX: _StatItem used to return Expanded() from build() which caused a
-// RenderFlex overflow of ~99752px when the parent Row wasn't properly
-// constrained. Now the Row is built inline so Expanded is always inside
-// a proper flex parent.
-class _StatsBanner extends StatelessWidget {
-  final PublicStatsModel stats;
-  const _StatsBanner({required this.stats});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1a0f0a), AppColors.bgSurface],
-          begin:  Alignment.topLeft,
-          end:    Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          // Each stat is Expanded directly inside this Row — no wrapper widget
-          Expanded(child: _StatCell(value: '${stats.totalCars}+',     label: 'Cars')),
-          Container(width: 1, height: 36, color: AppColors.border),
-          Expanded(child: _StatCell(value: '${stats.totalPartners}+', label: 'Partners')),
-          Container(width: 1, height: 36, color: AppColors.border),
-          Expanded(child: _StatCell(value: '${stats.totalBookings}+', label: 'Bookings')),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatCell extends StatelessWidget {
-  final String value;
-  final String label;
-  const _StatCell({super.key, required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.primary)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-      ],
-    );
-  }
-}
-
 // ── Car Card ──────────────────────────────────────────────────────────────────
 class _CarCard extends StatelessWidget {
   final CarModel car;
-  const _CarCard({super.key, required this.car});
+  final Color cardColor;
+  final Color borderColor;
+  final Color textPrim;
+  final Color textMuted;
+  final Color shimBase;
+  final Color shimHigh;
+
+  const _CarCard({
+    super.key,
+    required this.car,
+    required this.cardColor,
+    required this.borderColor,
+    required this.textPrim,
+    required this.textMuted,
+    required this.shimBase,
+    required this.shimHigh,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // DEBUG: uncomment the next line if images still don't appear after hot restart.
-    // print('CAR primaryImageUrl → ${car.primaryImageUrl}  |  images count: ${car.images.length}');
     return GestureDetector(
       onTap: () => context.push('/cars/${car.id}'),
       child: Container(
         decoration: BoxDecoration(
-          color:        AppColors.bgSurface,
+          color:        cardColor,
           borderRadius: BorderRadius.circular(16),
-          border:       Border.all(color: AppColors.border),
+          border:       Border.all(color: borderColor),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,10 +361,10 @@ class _CarCard extends StatelessWidget {
                         imageUrl: car.primaryImageUrl!,
                         fit:      BoxFit.cover,
                         width:    double.infinity,
-                        placeholder: (_, __) => Container(color: AppColors.bgElevated),
-                        errorWidget: (_, __, ___) => const _CarPlaceholder(),
+                        placeholder: (_, __) => Container(color: shimBase),
+                        errorWidget: (_, __, ___) => _CarPlaceholder(bg: shimBase, iconColor: textMuted),
                       )
-                    : const _CarPlaceholder(),
+                    : _CarPlaceholder(bg: shimBase, iconColor: textMuted),
               ),
             ),
             // Info
@@ -303,19 +377,23 @@ class _CarCard extends StatelessWidget {
                     car.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: textPrim,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_rounded, size: 11, color: AppColors.textMuted),
+                      Icon(Icons.location_on_rounded, size: 11, color: textMuted),
                       const SizedBox(width: 2),
                       Expanded(
                         child: Text(
                           car.location,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                          style: TextStyle(fontSize: 11, color: textMuted),
                         ),
                       ),
                     ],
@@ -326,9 +404,16 @@ class _CarCard extends StatelessWidget {
                     children: [
                       Text(
                         '₱${car.pricePerDay.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
                       ),
-                      const Text('/day', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                      Text(
+                        '/day',
+                        style: TextStyle(fontSize: 10, color: textMuted),
+                      ),
                     ],
                   ),
                 ],
@@ -342,43 +427,33 @@ class _CarCard extends StatelessWidget {
 }
 
 class _CarPlaceholder extends StatelessWidget {
-  const _CarPlaceholder();
+  final Color bg;
+  final Color iconColor;
+  const _CarPlaceholder({required this.bg, required this.iconColor});
+
   @override
   Widget build(BuildContext context) => Container(
-        color: AppColors.bgElevated,
-        child: const Center(child: Icon(Icons.directions_car_rounded, color: AppColors.textMuted, size: 40)),
+        color: bg,
+        child: Center(
+          child: Icon(Icons.directions_car_rounded, color: iconColor, size: 40),
+        ),
       );
 }
 
 // ── Shimmer placeholders ──────────────────────────────────────────────────────
-class _StatsShimmer extends StatelessWidget {
-  const _StatsShimmer();
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer.fromColors(
-      baseColor:      AppColors.bgSurface,
-      highlightColor: AppColors.bgElevated,
-      child: Container(
-        height: 80,
-        decoration: BoxDecoration(
-          color: AppColors.bgSurface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-    );
-  }
-}
-
 class _CarCardShimmer extends StatelessWidget {
-  const _CarCardShimmer();
+  final Color base;
+  final Color highlight;
+  const _CarCardShimmer({required this.base, required this.highlight});
+
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor:      AppColors.bgSurface,
-      highlightColor: AppColors.bgElevated,
+      baseColor:      base,
+      highlightColor: highlight,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.bgSurface,
+          color: base,
           borderRadius: BorderRadius.circular(16),
         ),
       ),

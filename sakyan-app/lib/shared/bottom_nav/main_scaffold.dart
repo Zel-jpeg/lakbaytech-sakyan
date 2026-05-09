@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 
 /// Bottom-nav scaffold shown to all authenticated Customer-role users.
@@ -7,19 +6,19 @@ class CustomerScaffold extends StatelessWidget {
   final Widget child;
   final int currentIndex;
   final ValueChanged<int> onTabTapped;
-  
+
   const CustomerScaffold({
-    super.key, 
+    super.key,
     required this.child,
     required this.currentIndex,
     required this.onTabTapped,
   });
 
   static const _tabs = [
-    _TabItem(icon: Icons.home_rounded,    label: 'Home'),
-    _TabItem(icon: Icons.directions_car_rounded, label: 'Cars'),
-    _TabItem(icon: Icons.receipt_long_rounded,   label: 'Bookings'),
-    _TabItem(icon: Icons.person_rounded,  label: 'Profile'),
+    _TabItem(icon: Icons.home_rounded,             label: 'Home'),
+    _TabItem(icon: Icons.directions_car_rounded,   label: 'Cars'),
+    _TabItem(icon: Icons.receipt_long_rounded,     label: 'Bookings'),
+    _TabItem(icon: Icons.person_rounded,           label: 'Profile'),
   ];
 
   @override
@@ -42,17 +41,17 @@ class PartnerScaffold extends StatelessWidget {
   final ValueChanged<int> onTabTapped;
 
   const PartnerScaffold({
-    super.key, 
+    super.key,
     required this.child,
     required this.currentIndex,
     required this.onTabTapped,
   });
 
   static const _tabs = [
-    _TabItem(icon: Icons.dashboard_rounded,      label: 'Dashboard'),
-    _TabItem(icon: Icons.directions_car_rounded, label: 'My Cars'),
-    _TabItem(icon: Icons.receipt_long_rounded,   label: 'Bookings'),
-    _TabItem(icon: Icons.chat_bubble_rounded,    label: 'Inbox'),
+    _TabItem(icon: Icons.dashboard_rounded,        label: 'Dashboard'),
+    _TabItem(icon: Icons.directions_car_rounded,   label: 'My Cars'),
+    _TabItem(icon: Icons.receipt_long_rounded,     label: 'Bookings'),
+    _TabItem(icon: Icons.chat_bubble_rounded,      label: 'Inbox'),
   ];
 
   @override
@@ -68,7 +67,7 @@ class PartnerScaffold extends StatelessWidget {
   }
 }
 
-// ── Shared bottom nav component ──────────────────────────────────────────────
+// ── Shared bottom nav component ───────────────────────────────────────────────
 
 class _TabItem {
   final IconData icon;
@@ -89,10 +88,18 @@ class _SakyanBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme   = Theme.of(context);
+    final isDark  = theme.brightness == Brightness.dark;
+
+    // Adaptive nav bar colors
+    final navBg     = isDark ? AppColors.bgSurface  : AppColors.bgSurfaceLight;
+    final navBorder = isDark ? AppColors.border      : AppColors.borderLight;
+    final mutedCol  = isDark ? AppColors.textMuted   : AppColors.textMutedLight;
+
     return Container(
-      decoration: const BoxDecoration(
-        color:  AppColors.bgSurface,
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+      decoration: BoxDecoration(
+        color:  navBg,
+        border: Border(top: BorderSide(color: navBorder, width: 1)),
       ),
       child: SafeArea(
         child: Padding(
@@ -107,7 +114,8 @@ class _SakyanBottomNav extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 8, horizontal: 4),
                     decoration: BoxDecoration(
                       color: selected ? AppColors.primaryGlow : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
@@ -118,15 +126,17 @@ class _SakyanBottomNav extends StatelessWidget {
                         Icon(
                           tab.icon,
                           size: 22,
-                          color: selected ? AppColors.primary : AppColors.textMuted,
+                          color: selected ? AppColors.primary : mutedCol,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           tab.label,
                           style: TextStyle(
                             fontSize:   10,
-                            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                            color: selected ? AppColors.primary : AppColors.textMuted,
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: selected ? AppColors.primary : mutedCol,
                           ),
                         ),
                       ],

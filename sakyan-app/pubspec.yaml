@@ -1,11 +1,11 @@
 name: sakyan_app
 description: Sakyan — Car Rental Mobile App for Customers and Partners.
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.10.0 <4.0.0'
-  flutter: '>=3.38.0'
+  sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.38.0"
 
 dependencies:
   flutter:
@@ -70,3 +70,8 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icon.png
+    - assets/images/
+    - assets/icons/
