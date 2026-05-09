@@ -100,10 +100,8 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 28),
 
                   // ── Stats banner ───────────────────────────────────
-                  // NOTE: error is now visible so you can see what's failing.
-                  // Once data loads correctly, change back to SizedBox.shrink().
                   statsAsync.when(
-                    loading: () => _StatsShimmer(),
+                    loading: () => const _StatsShimmer(),
                     error:   (e, _) => Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -130,7 +128,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 28),
 
-                  // ── Featured cars ──────────────────────────────────
+                  // ── Featured cars header ───────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -153,7 +151,7 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
-                  (_, __) => _CarCardShimmer(),
+                  (_, __) => const _CarCardShimmer(),
                   childCount: 4,
                 ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -174,7 +172,6 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     const Text('Failed to load cars', style: TextStyle(color: AppColors.textMuted, fontSize: 15)),
                     const SizedBox(height: 6),
-                    // Shows the actual error so you can debug it
                     Text('$e', style: const TextStyle(color: Colors.red, fontSize: 11), textAlign: TextAlign.center),
                     const SizedBox(height: 12),
                     ElevatedButton(
@@ -207,7 +204,11 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ── Stats Banner ─────────────────────────────────────────────────────────────
+// ── Stats Banner ──────────────────────────────────────────────────────────────
+// FIX: _StatItem used to return Expanded() from build() which caused a
+// RenderFlex overflow of ~99752px when the parent Row wasn't properly
+// constrained. Now the Row is built inline so Expanded is always inside
+// a proper flex parent.
 class _StatsBanner extends StatelessWidget {
   final PublicStatsModel stats;
   const _StatsBanner({required this.stats});
@@ -227,49 +228,45 @@ class _StatsBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _StatItem(value: '${stats.totalCars}+',     label: 'Cars'),
-          _Divider(),
-          _StatItem(value: '${stats.totalPartners}+', label: 'Partners'),
-          _Divider(),
-          _StatItem(value: '${stats.totalBookings}+', label: 'Bookings'),
+          // Each stat is Expanded directly inside this Row — no wrapper widget
+          Expanded(child: _StatCell(value: '${stats.totalCars}+',     label: 'Cars')),
+          Container(width: 1, height: 36, color: AppColors.border),
+          Expanded(child: _StatCell(value: '${stats.totalPartners}+', label: 'Partners')),
+          Container(width: 1, height: 36, color: AppColors.border),
+          Expanded(child: _StatCell(value: '${stats.totalBookings}+', label: 'Bookings')),
         ],
       ),
     );
   }
 }
 
-class _StatItem extends StatelessWidget {
+class _StatCell extends StatelessWidget {
   final String value;
   final String label;
-  const _StatItem({required this.value, required this.label});
+  const _StatCell({super.key, required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.primary)),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        ],
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.primary)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      ],
     );
   }
 }
 
-class _Divider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Container(width: 1, height: 36, color: AppColors.border);
-}
-
-// ── Car Card ─────────────────────────────────────────────────────────────────
+// ── Car Card ──────────────────────────────────────────────────────────────────
 class _CarCard extends StatelessWidget {
   final CarModel car;
-  const _CarCard({required this.car});
+  const _CarCard({super.key, required this.car});
 
   @override
   Widget build(BuildContext context) {
+    // DEBUG: uncomment the next line if images still don't appear after hot restart.
+    // print('CAR primaryImageUrl → ${car.primaryImageUrl}  |  images count: ${car.images.length}');
     return GestureDetector(
       onTap: () => context.push('/cars/${car.id}'),
       child: Container(
@@ -291,9 +288,9 @@ class _CarCard extends StatelessWidget {
                         fit:      BoxFit.cover,
                         width:    double.infinity,
                         placeholder: (_, __) => Container(color: AppColors.bgElevated),
-                        errorWidget: (_, __, ___) => _CarPlaceholder(),
+                        errorWidget: (_, __, ___) => const _CarPlaceholder(),
                       )
-                    : _CarPlaceholder(),
+                    : const _CarPlaceholder(),
               ),
             ),
             // Info
@@ -345,6 +342,7 @@ class _CarCard extends StatelessWidget {
 }
 
 class _CarPlaceholder extends StatelessWidget {
+  const _CarPlaceholder();
   @override
   Widget build(BuildContext context) => Container(
         color: AppColors.bgElevated,
@@ -354,6 +352,7 @@ class _CarPlaceholder extends StatelessWidget {
 
 // ── Shimmer placeholders ──────────────────────────────────────────────────────
 class _StatsShimmer extends StatelessWidget {
+  const _StatsShimmer();
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
@@ -371,6 +370,7 @@ class _StatsShimmer extends StatelessWidget {
 }
 
 class _CarCardShimmer extends StatelessWidget {
+  const _CarCardShimmer();
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
