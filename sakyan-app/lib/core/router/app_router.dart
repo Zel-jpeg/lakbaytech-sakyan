@@ -49,7 +49,7 @@ class AppRoutes {
   static const String confirmation = '/confirmation/:code';
   static const String kycVerify    = '/kyc/verify';
   static const String kycPending   = '/kyc/pending';
-  static const String notifications= '/notifications';
+  static const String notifications = '/notifications';
   static const String inbox        = '/inbox';
   static const String chat         = '/chat/:bookingId';
 
@@ -71,53 +71,70 @@ class AppRoutes {
   static const String onboardingStep4    = '/partner/onboarding/pending';
 }
 
-// ── Router ─────────────────────────────────────────────────────────────────────
+// ── Stable navigator key (module-level singleton) ─────────────────────────────
 final _rootKey = GlobalKey<NavigatorState>();
 
-GoRouter createRouter(WidgetRef ref) {
-  final authState = ref.watch(authNotifierProvider);
-
-  return GoRouter(
+// ── Router provider — created ONCE, never recreated on theme change ───────────
+//
+// KEY FIX: Previously createRouter(WidgetRef ref) was called inside
+// SakyanApp.build(), so every time themeModeProvider changed the widget
+// rebuilt → a brand-new GoRouter was created → initialLocation: '/' fired
+// → the user got bounced back to home.
+//
+// Now the GoRouter lives in a Provider that has NO dependency on themeModeProvider.
+// Theme changes only rebuild MaterialApp.router (swapping ThemeData), but the
+// router instance stays the same → navigation state is preserved.
+//
+// Auth changes are handled by ref.listen → router.refresh(), which triggers the
+// redirect callback without recreating the router.
+// ─────────────────────────────────────────────────────────────────────────────
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final router = GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/',
-    redirect: (context, state) {
-      final isLoggedIn   = StorageService.hasToken();
-      final seenOnboard  = StorageService.hasSeenOnboarding();
-      final path         = state.uri.path;
 
-      // First-time launch → onboarding
+    redirect: (context, state) {
+      final isLoggedIn  = StorageService.hasToken();
+      final seenOnboard = StorageService.hasSeenOnboarding();
+      final path        = state.uri.path;
+
+      // First launch → onboarding
       if (!seenOnboard && path != AppRoutes.onboarding) {
         return AppRoutes.onboarding;
       }
 
       // Not logged in → login
-      if (!isLoggedIn && path != AppRoutes.login && path != AppRoutes.onboarding) {
+      if (!isLoggedIn &&
+          path != AppRoutes.login &&
+          path != AppRoutes.onboarding) {
         return AppRoutes.login;
       }
 
-      // Logged in but on login → home
+      // Logged-in user on login page → push to role-appropriate home
       if (isLoggedIn && path == AppRoutes.login) {
-        final user = authState.value;
+        // Use ref.read (not watch) inside the redirect closure
+        final user = ref.read(authNotifierProvider).value;
         if (user?.role == 'partner') return AppRoutes.partnerHome;
         return AppRoutes.home;
       }
 
-      return null;
+      return null; // no redirect
     },
+
     routes: [
-      // ── Onboarding ──────────────────────────────────────────────────────────
+      // ── Onboarding ──────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (_, __) => const OnboardingScreen(),
       ),
 
-      // ── Auth ─────────────────────────────────────────────────────────────────
+      // ── Auth ─────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.login,
         builder: (_, __) => const LoginScreen(),
       ),
 
-      // ── Customer Shell (Bottom Nav) ──────────────────────────────────────────
+      // ── Customer Shell (Bottom Nav) ──────────────────────────────────────
       ShellRoute(
         builder: (context, state, child) {
           final path = state.uri.path;
@@ -125,14 +142,14 @@ GoRouter createRouter(WidgetRef ref) {
           if (path.startsWith(AppRoutes.cars)) idx = 1;
           else if (path.startsWith(AppRoutes.bookings)) idx = 2;
           else if (path.startsWith(AppRoutes.profile)) idx = 3;
-          
+
           return CustomerScaffold(
             currentIndex: idx,
             onTabTapped: (i) {
-               if (i == 0) context.go(AppRoutes.home);
-               else if (i == 1) context.go(AppRoutes.cars);
-               else if (i == 2) context.go(AppRoutes.bookings);
-               else if (i == 3) context.go(AppRoutes.profile);
+              if (i == 0) context.go(AppRoutes.home);
+              else if (i == 1) context.go(AppRoutes.cars);
+              else if (i == 2) context.go(AppRoutes.bookings);
+              else if (i == 3) context.go(AppRoutes.profile);
             },
             child: child,
           );
@@ -145,16 +162,21 @@ GoRouter createRouter(WidgetRef ref) {
             routes: [
               GoRoute(
                 path: ':id',
-                builder: (_, s) => CarDetailScreen(carId: s.pathParameters['id']!),
+                builder: (_, s) =>
+                    CarDetailScreen(carId: s.pathParameters['id']!),
               ),
             ],
           ),
-          GoRoute(path: AppRoutes.bookings, builder: (_, __) => const MyBookingsScreen()),
-          GoRoute(path: AppRoutes.profile,  builder: (_, __) => const ProfileScreen()),
+          GoRoute(
+              path: AppRoutes.bookings,
+              builder: (_, __) => const MyBookingsScreen()),
+          GoRoute(
+              path: AppRoutes.profile,
+              builder: (_, __) => const ProfileScreen()),
         ],
       ),
 
-      // ── Partner Shell (Bottom Nav) ────────────────────────────────────────────
+      // ── Partner Shell (Bottom Nav) ────────────────────────────────────────
       ShellRoute(
         builder: (context, state, child) {
           final path = state.uri.path;
@@ -166,51 +188,89 @@ GoRouter createRouter(WidgetRef ref) {
           return PartnerScaffold(
             currentIndex: idx,
             onTabTapped: (i) {
-               if (i == 0) context.go(AppRoutes.partnerHome);
-               else if (i == 1) context.go(AppRoutes.partnerCars);
-               else if (i == 2) context.go(AppRoutes.partnerBookings);
-               else if (i == 3) context.go(AppRoutes.partnerInbox);
+              if (i == 0) context.go(AppRoutes.partnerHome);
+              else if (i == 1) context.go(AppRoutes.partnerCars);
+              else if (i == 2) context.go(AppRoutes.partnerBookings);
+              else if (i == 3) context.go(AppRoutes.partnerInbox);
             },
             child: child,
           );
         },
         routes: [
-          GoRoute(path: AppRoutes.partnerHome, builder: (_, __) => const PartnerHomeScreen()),
-          GoRoute(path: AppRoutes.partnerCars, builder: (_, __) => const MyCarsScreen()),
-          GoRoute(path: AppRoutes.partnerBookings, builder: (_, __) => const PartnerBookingsScreen()),
-          GoRoute(path: AppRoutes.partnerInbox, builder: (_, __) => const PartnerInboxScreen()),
+          GoRoute(
+              path: AppRoutes.partnerHome,
+              builder: (_, __) => const PartnerHomeScreen()),
+          GoRoute(
+              path: AppRoutes.partnerCars,
+              builder: (_, __) => const MyCarsScreen()),
+          GoRoute(
+              path: AppRoutes.partnerBookings,
+              builder: (_, __) => const PartnerBookingsScreen()),
+          GoRoute(
+              path: AppRoutes.partnerInbox,
+              builder: (_, __) => const PartnerInboxScreen()),
         ],
       ),
 
-      // ── Standalone screens (no shell) ─────────────────────────────────────────
+      // ── Standalone screens (no shell) ─────────────────────────────────────
       GoRoute(
         path: '/checkout/:carId',
-        builder: (_, s) => CheckoutScreen(carId: s.pathParameters['carId']!),
+        builder: (_, s) =>
+            CheckoutScreen(carId: s.pathParameters['carId']!),
       ),
       GoRoute(
         path: '/confirmation/:code',
-        builder: (_, s) => ConfirmationScreen(bookingCode: s.pathParameters['code']!),
+        builder: (_, s) =>
+            ConfirmationScreen(bookingCode: s.pathParameters['code']!),
       ),
-      GoRoute(path: AppRoutes.kycVerify,    builder: (_, __) => const KycVerificationScreen()),
-      GoRoute(path: AppRoutes.kycPending,   builder: (_, __) => const KycPendingScreen()),
-      GoRoute(path: AppRoutes.notifications,builder: (_, __) => const NotificationsScreen()),
-      GoRoute(path: AppRoutes.inbox,        builder: (_, __) => const InboxScreen()),
+      GoRoute(
+          path: AppRoutes.kycVerify,
+          builder: (_, __) => const KycVerificationScreen()),
+      GoRoute(
+          path: AppRoutes.kycPending,
+          builder: (_, __) => const KycPendingScreen()),
+      GoRoute(
+          path: AppRoutes.notifications,
+          builder: (_, __) => const NotificationsScreen()),
+      GoRoute(path: AppRoutes.inbox, builder: (_, __) => const InboxScreen()),
       GoRoute(
         path: '/chat/:bookingId',
-        builder: (_, s) => ChatScreen(bookingId: s.pathParameters['bookingId']!),
+        builder: (_, s) =>
+            ChatScreen(bookingId: s.pathParameters['bookingId']!),
       ),
-      GoRoute(path: AppRoutes.partnerEarnings,  builder: (_, __) => const EarningsScreen()),
-      GoRoute(path: AppRoutes.addCar,           builder: (_, __) => const AddCarScreen()),
+      GoRoute(
+          path: AppRoutes.partnerEarnings,
+          builder: (_, __) => const EarningsScreen()),
+      GoRoute(
+          path: AppRoutes.addCar, builder: (_, __) => const AddCarScreen()),
       GoRoute(
         path: '/partner/cars/:id/edit',
-        builder: (_, s) => EditCarScreen(carId: s.pathParameters['id']!),
+        builder: (_, s) =>
+            EditCarScreen(carId: s.pathParameters['id']!),
       ),
 
-      // Partner onboarding
-      GoRoute(path: AppRoutes.onboardingStep1, builder: (_, __) => const Step1TypeScreen()),
-      GoRoute(path: AppRoutes.onboardingStep2, builder: (_, __) => const Step2InfoScreen()),
-      GoRoute(path: AppRoutes.onboardingStep3, builder: (_, __) => const Step3DocsScreen()),
-      GoRoute(path: AppRoutes.onboardingStep4, builder: (_, __) => const Step4PendingScreen()),
+      // Partner onboarding wizard
+      GoRoute(
+          path: AppRoutes.onboardingStep1,
+          builder: (_, __) => const Step1TypeScreen()),
+      GoRoute(
+          path: AppRoutes.onboardingStep2,
+          builder: (_, __) => const Step2InfoScreen()),
+      GoRoute(
+          path: AppRoutes.onboardingStep3,
+          builder: (_, __) => const Step3DocsScreen()),
+      GoRoute(
+          path: AppRoutes.onboardingStep4,
+          builder: (_, __) => const Step4PendingScreen()),
     ],
   );
-}
+
+  // ── Refresh router when auth state changes ─────────────────────────────────
+  // This triggers the redirect callback so role-based routing stays in sync,
+  // WITHOUT recreating the router (navigation state is preserved).
+  ref.listen<AsyncValue<dynamic>>(authNotifierProvider, (_, __) {
+    router.refresh();
+  });
+
+  return router;
+});

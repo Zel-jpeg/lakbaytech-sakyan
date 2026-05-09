@@ -9,15 +9,27 @@ class SakyanApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final router    = createRouter(ref);
-    final themeMode = ref.watch(themeModeProvider); // ← reads saved preference
+    // ── CRITICAL: use ref.watch(appRouterProvider) NOT createRouter(ref) ────
+    //
+    // appRouterProvider is a stable Provider<GoRouter> — it is created ONCE
+    // for the lifetime of the ProviderScope and never recreated.
+    //
+    // Previously createRouter(ref) was called here directly, which meant any
+    // rebuild of SakyanApp (e.g. theme toggle) created a brand-new GoRouter
+    // with initialLocation: '/', bouncing the user back to home.
+    //
+    // Now only themeModeProvider triggers a rebuild (to swap ThemeData), but
+    // the router instance is unchanged → navigation state is preserved.
+    // ────────────────────────────────────────────────────────────────────────
+    final router    = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title:                      'Sakyan',
       debugShowCheckedModeBanner: false,
       theme:                      AppTheme.light,
       darkTheme:                  AppTheme.dark,
-      themeMode:                  themeMode, // ← no longer hardcoded
+      themeMode:                  themeMode,
       routerConfig:               router,
     );
   }
