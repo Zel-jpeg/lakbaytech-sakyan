@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, ToggleLeft, ToggleRight, Pencil, MapPin, Car, X, Settings2, Fuel, Users } from 'lucide-react'
-import { useMyPartnerCars, useToggleCarAvailability } from '@/hooks/useCars'
+import { useMyPartnerCars, useToggleCarAvailability, useCar } from '@/hooks/useCars'
 import { formatCurrency } from '@/utils/formatters'
 
 function CarStatusBadge({ isAvailable }) {
@@ -20,6 +20,7 @@ export default function MyCarsPage() {
   const { data, isLoading } = useMyPartnerCars()
   const toggleMutation = useToggleCarAvailability()
   const [selectedCar, setSelectedCar] = useState(null)
+  const { data: fullCar } = useCar(selectedCar?.id)
 
   const cars = data?.results || data || []
 
@@ -135,137 +136,140 @@ export default function MyCarsPage() {
       </div>
 
       {/* Car Details Modal */}
-      {selectedCar && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-             onClick={() => setSelectedCar(null)}>
-          <div className="bg-white dark:bg-[#1a1d2e] w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
-               onClick={e => e.stopPropagation()}>
-            <div className="relative h-64 bg-gray-100 dark:bg-gray-800 shrink-0">
-              {selectedCar.primary_image ? (
-                <img src={selectedCar.primary_image} alt={selectedCar.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Car size={48} className="text-gray-300 dark:text-gray-600" />
+      {selectedCar && (() => {
+        const displayCar = fullCar ? { ...selectedCar, ...fullCar } : selectedCar;
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+               onClick={() => setSelectedCar(null)}>
+            <div className="bg-white dark:bg-[#1a1d2e] w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+                 onClick={e => e.stopPropagation()}>
+              <div className="relative h-64 bg-gray-100 dark:bg-gray-800 shrink-0">
+                {displayCar.primary_image ? (
+                  <img src={displayCar.primary_image} alt={displayCar.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Car size={48} className="text-gray-300 dark:text-gray-600" />
+                  </div>
+                )}
+                <button 
+                  onClick={() => setSelectedCar(null)} 
+                  className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition backdrop-blur-sm"
+                >
+                  <X size={20} />
+                </button>
+                <div className="absolute bottom-4 right-4">
+                   <CarStatusBadge isAvailable={displayCar.is_available} />
                 </div>
-              )}
-              <button 
-                onClick={() => setSelectedCar(null)} 
-                className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition backdrop-blur-sm"
-              >
-                <X size={20} />
-              </button>
-              <div className="absolute bottom-4 right-4">
-                 <CarStatusBadge isAvailable={selectedCar.is_available} />
               </div>
-            </div>
-            
-            <div className="p-6 overflow-y-auto">
-              <div className="flex justify-between items-start gap-4 mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCar.name}</h2>
-                  <p className="text-gray-500 dark:text-gray-400 mt-1">
-                    {selectedCar.brand} {selectedCar.model && `• ${selectedCar.model}`} • {selectedCar.year}
-                  </p>
-                  {selectedCar.location && (
-                    <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      <MapPin size={14} />
-                      <span>{selectedCar.location}</span>
+              
+              <div className="p-6 overflow-y-auto">
+                <div className="flex justify-between items-start gap-4 mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{displayCar.name}</h2>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                      {displayCar.brand} {displayCar.model && `• ${displayCar.model}`} • {displayCar.year}
+                    </p>
+                    {displayCar.location && (
+                      <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        <MapPin size={14} />
+                        <span>{displayCar.location}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-brand-600 dark:text-brand-400">{formatCurrency(displayCar.price_per_day)}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">/day</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+                  {displayCar.transmission && (
+                    <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                      <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                        <Settings2 size={16} className="text-brand-500 dark:text-brand-400" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Transmission</p>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">{displayCar.transmission}</p>
+                      </div>
+                    </div>
+                  )}
+                  {displayCar.fuel_type && (
+                    <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                      <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                        <Fuel size={16} className="text-brand-500 dark:text-brand-400" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Fuel</p>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">{displayCar.fuel_type}</p>
+                      </div>
+                    </div>
+                  )}
+                  {displayCar.seats && (
+                    <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                      <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                        <Users size={16} className="text-brand-500 dark:text-brand-400" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Seats</p>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{displayCar.seats} seats</p>
+                      </div>
+                    </div>
+                  )}
+                  {displayCar.plate_number && (
+                    <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                      <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                        <span className="text-brand-500 dark:text-brand-400 font-bold text-xs">#</span>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Plate No.</p>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{displayCar.plate_number}</p>
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-brand-600 dark:text-brand-400">{formatCurrency(selectedCar.price_per_day)}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">/day</p>
+                
+                {displayCar.description && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Description</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">{displayCar.description}</p>
+                  </div>
+                )}
+                
+                {displayCar.features?.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Features</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {displayCar.features.map((f, i) => (
+                        <span key={i} className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2.5 py-1 rounded-md">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-3 pt-4 mt-2 border-t border-gray-100 dark:border-gray-800/60">
+                  <button
+                    onClick={() => {
+                      toggleMutation.mutate(displayCar.id);
+                      // update local state so the badge changes instantly
+                      setSelectedCar({ ...displayCar, is_available: !displayCar.is_available });
+                    }}
+                    disabled={toggleMutation.isPending}
+                    className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                  >
+                    {displayCar.is_available ? 'Deactivate Listing' : 'Activate Listing'}
+                  </button>
+                  <Link to={`/dashboard/cars/${displayCar.id}/edit`} className="flex-1 flex justify-center items-center py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-xl transition">
+                    Edit Details
+                  </Link>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-                {selectedCar.transmission && (
-                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
-                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
-                      <Settings2 size={16} className="text-brand-500 dark:text-brand-400" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Transmission</p>
-                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">{selectedCar.transmission}</p>
-                    </div>
-                  </div>
-                )}
-                {selectedCar.fuel_type && (
-                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
-                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
-                      <Fuel size={16} className="text-brand-500 dark:text-brand-400" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Fuel</p>
-                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">{selectedCar.fuel_type}</p>
-                    </div>
-                  </div>
-                )}
-                {selectedCar.seats && (
-                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
-                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
-                      <Users size={16} className="text-brand-500 dark:text-brand-400" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Seats</p>
-                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{selectedCar.seats} seats</p>
-                    </div>
-                  </div>
-                )}
-                {selectedCar.plate_number && (
-                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
-                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
-                      <span className="text-brand-500 dark:text-brand-400 font-bold text-xs">#</span>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Plate No.</p>
-                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{selectedCar.plate_number}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {selectedCar.description && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Description</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">{selectedCar.description}</p>
-                </div>
-              )}
-              
-              {selectedCar.features?.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Features</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedCar.features.map((f, i) => (
-                      <span key={i} className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2.5 py-1 rounded-md">
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex gap-3 pt-4 mt-2 border-t border-gray-100 dark:border-gray-800/60">
-                <button
-                  onClick={() => {
-                    toggleMutation.mutate(selectedCar.id);
-                    // update local state so the badge changes instantly
-                    setSelectedCar({ ...selectedCar, is_available: !selectedCar.is_available });
-                  }}
-                  disabled={toggleMutation.isPending}
-                  className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-                >
-                  {selectedCar.is_available ? 'Deactivate Listing' : 'Activate Listing'}
-                </button>
-                <Link to={`/dashboard/cars/${selectedCar.id}/edit`} className="flex-1 flex justify-center items-center py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-xl transition">
-                  Edit Details
-                </Link>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   )
 }
