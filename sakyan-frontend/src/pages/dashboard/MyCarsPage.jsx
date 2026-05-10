@@ -163,7 +163,9 @@ export default function MyCarsPage() {
               <div className="flex justify-between items-start gap-4 mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCar.name}</h2>
-                  <p className="text-gray-500 dark:text-gray-400 mt-1">{selectedCar.brand} • {selectedCar.year}</p>
+                  <p className="text-gray-500 dark:text-gray-400 mt-1">
+                    {selectedCar.brand} {selectedCar.model && `• ${selectedCar.model}`} • {selectedCar.year}
+                  </p>
                   {selectedCar.location && (
                     <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500 dark:text-gray-400">
                       <MapPin size={14} />
@@ -208,6 +210,17 @@ export default function MyCarsPage() {
                     <div>
                       <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Seats</p>
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{selectedCar.seats} seats</p>
+                    </div>
+                  </div>
+                )}
+                {selectedCar.plate_number && (
+                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                      <span className="text-brand-500 dark:text-brand-400 font-bold text-xs">#</span>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Plate No.</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{selectedCar.plate_number}</p>
                     </div>
                   </div>
                 )}
