@@ -24,12 +24,12 @@ export default function CarCard({ car }) {
   const avail = getAvailabilityInfo(bookedRanges)
 
   return (
-    <div className="group bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800
+    <div className="group bg-white dark:bg-[#1a1d2e] rounded-xl sm:rounded-2xl border border-gray-100 dark:border-gray-800
                     overflow-hidden transition-all duration-300
                     hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.3)]
                     hover:-translate-y-1 active:translate-y-0">
       {/* Image Section */}
-      <div className="relative aspect-[4/3] bg-gray-100 dark:bg-gray-800 overflow-hidden">
+      <div className="relative aspect-[3/2] bg-gray-100 dark:bg-gray-800 overflow-hidden">
         {car.primary_image ? (
           <img
             src={car.primary_image}
@@ -38,7 +38,7 @@ export default function CarCard({ car }) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Settings2 className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+            <Settings2 className="w-7 h-7 sm:w-10 sm:h-10 text-gray-300 dark:text-gray-600" />
           </div>
         )}
 
@@ -58,32 +58,33 @@ export default function CarCard({ car }) {
         </div>
 
         {/* Transmission badge (top-left) */}
-        <span className="absolute top-2.5 left-2.5 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm
-                         text-[11px] font-semibold text-gray-700 dark:text-gray-200
-                         px-2.5 py-1 rounded-lg capitalize shadow-sm">
+        <span className="absolute top-1.5 left-1.5 sm:top-2.5 sm:left-2.5 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm
+                         text-[9px] sm:text-[11px] font-semibold text-gray-700 dark:text-gray-200
+                         px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg capitalize shadow-sm">
           {car.transmission}
         </span>
 
         {/* Availability badge (top-right) */}
-        <span className={`absolute top-2.5 right-2.5 flex items-center gap-1.5 text-[11px] font-bold
-                          px-2.5 py-1 rounded-lg backdrop-blur-sm shadow-sm ${avail.bg} ${avail.color}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${avail.dot} ${avail.label === 'Pending' ? 'animate-pulse' : ''}`} />
+        <span className={`absolute top-1.5 right-1.5 sm:top-2.5 sm:right-2.5 flex items-center gap-1 sm:gap-1.5
+                          text-[9px] sm:text-[11px] font-bold px-1.5 sm:px-2.5 py-0.5 sm:py-1
+                          rounded-md sm:rounded-lg backdrop-blur-sm shadow-sm ${avail.bg} ${avail.color}`}>
+          <span className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${avail.dot} ${avail.label === 'Pending' ? 'animate-pulse' : ''}`} />
           {avail.label}
         </span>
       </div>
 
       {/* Info Section */}
-      <div className="p-4">
+      <div className="p-2.5 sm:p-4">
         {/* Name & model */}
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-[15px] leading-tight">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-xs sm:text-[15px] leading-tight">
           {car.name}
         </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
           {car.brand} {car.model} · {car.year}
         </p>
 
-        {/* Specs row */}
-        <div className="flex items-center gap-3 mt-3 text-xs text-gray-400 dark:text-gray-500">
+        {/* Specs row — hidden on mobile, shown on sm+ */}
+        <div className="hidden sm:flex items-center gap-3 mt-3 text-xs text-gray-400 dark:text-gray-500">
           <span className="flex items-center gap-1 shrink-0 capitalize">
             <Gauge size={13} className="text-brand-400" />
             {car.transmission}
@@ -98,23 +99,35 @@ export default function CarCard({ car }) {
           </span>
         </div>
 
-        {/* Price + mobile CTA */}
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+        {/* Mobile specs — compact icon row */}
+        <div className="flex sm:hidden items-center gap-2 mt-1.5 text-[9px] text-gray-400 dark:text-gray-500">
+          <span className="flex items-center gap-0.5">
+            <Users size={10} className="text-brand-400" />
+            {car.seats}
+          </span>
+          <span className="flex items-center gap-0.5 capitalize">
+            <Fuel size={10} className="text-brand-400" />
+            {car.fuel_type}
+          </span>
+        </div>
+
+        {/* Price + CTA */}
+        <div className="flex items-center justify-between mt-2 sm:mt-4 pt-2 sm:pt-3 border-t border-gray-100 dark:border-gray-800">
           <div>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">
+            <span className="text-[13px] sm:text-lg font-bold text-gray-900 dark:text-white">
               {formatCurrency(car.price_per_day)}
             </span>
-            <span className="text-xs text-gray-400 dark:text-gray-500 ml-0.5">/day</span>
+            <span className="text-[8px] sm:text-xs text-gray-400 dark:text-gray-500">/day</span>
           </div>
 
-          {/* Mobile: always-visible button */}
+          {/* Mobile: always-visible compact button */}
           <Link
             to={`/cars/${car.id}`}
-            className="sm:hidden px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white
-                       text-xs font-semibold rounded-xl transition-all duration-200
+            className="sm:hidden px-2.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white
+                       text-[10px] font-semibold rounded-lg transition-all duration-200
                        shadow-sm active:scale-95"
           >
-            {user ? 'Book Now' : 'View'}
+            {user ? 'Book' : 'View'}
           </Link>
 
           {/* Desktop: location hint (button is on hover overlay) */}

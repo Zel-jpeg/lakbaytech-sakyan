@@ -64,9 +64,9 @@ export default function CarsPage() {
       </div>
 
       {/* Top bar: search + sort + filter toggle */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        {/* Search */}
-        <div className="flex-1 relative">
+      <div className="space-y-3 mb-5">
+        {/* Search — full width */}
+        <div className="relative">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             value={filters.search}
@@ -76,37 +76,38 @@ export default function CarsPage() {
           />
         </div>
 
-        {/* Sort */}
-        <div className="relative">
-          <ArrowUpDown size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value)}
-            className="select-modern pl-9 w-full sm:w-48"
-          >
-            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
+        {/* Sort + Filter — inline */}
+        <div className="flex gap-2 sm:gap-3">
+          <div className="relative flex-1 sm:flex-none">
+            <ArrowUpDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value)}
+              className="select-modern pl-8 w-full sm:w-48 text-xs sm:text-sm"
+            >
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
 
-        {/* Filter toggle */}
-        <button
-          onClick={() => setShowFilters(f => !f)}
-          className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold
-                      border transition-all duration-200 shrink-0 ${
-            showFilters || activeFilterCount > 0
-              ? 'bg-brand-500 text-white border-brand-500 shadow-md shadow-brand-500/20'
-              : 'bg-white dark:bg-[#1a1d2e] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
-          }`}
-        >
-          <SlidersHorizontal size={15} />
-          <span>Filters</span>
-          {activeFilterCount > 0 && (
-            <span className="w-5 h-5 rounded-full bg-white text-brand-600 text-[10px]
-                             font-bold flex items-center justify-center">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
+          <button
+            onClick={() => setShowFilters(f => !f)}
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold
+                        border transition-all duration-200 shrink-0 ${
+              showFilters || activeFilterCount > 0
+                ? 'bg-brand-500 text-white border-brand-500 shadow-md shadow-brand-500/20'
+                : 'bg-white dark:bg-[#1a1d2e] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white text-brand-600 text-[9px] sm:text-[10px]
+                               font-bold flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Results count */}
@@ -184,7 +185,7 @@ export default function CarsPage() {
         {/* Cars grid */}
         <div className="flex-1 min-w-0">
           {isLoading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(9)].map((_, i) => <CarSkeleton key={i} />)}
             </div>
           ) : cars.length === 0 ? (
@@ -207,7 +208,7 @@ export default function CarsPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {cars.map(car => <CarCard key={car.id} car={car} />)}
             </div>
           )}
