@@ -53,6 +53,15 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     // before we fetch the new user's profile.
     _invalidateUserCache();
 
+    // If using the browser-based OAuth flow, the deep link bypasses the Django
+    // register sync. Here we attempt to sync the user just in case they are completely new.
+    // This prevents the infinite refresh loop caused by 404 Not Found.
+    try {
+      await ref.read(authRepositoryProvider).syncGoogleUser();
+    } catch (_) {
+      // Ignore errors here; getMe will either fetch the user or throw properly.
+    }
+
     state = await AsyncValue.guard(
         () => ref.read(authRepositoryProvider).getMe());
   }

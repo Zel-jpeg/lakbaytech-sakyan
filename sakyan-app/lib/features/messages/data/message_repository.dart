@@ -53,41 +53,38 @@ class MessageRepository {
     required String bookingId,
     required String receiverId,
     required String content,
+    String? imageUrl,
   }) async {
     // Guard: never send an empty receiver — the backend will 400 immediately.
     if (receiverId.isEmpty) {
       throw Exception('Cannot send message: recipient ID is missing.');
     }
-    if (content.trim().isEmpty) {
+    if (content.trim().isEmpty && (imageUrl == null || imageUrl.isEmpty)) {
       throw Exception('Cannot send an empty message.');
     }
+
+    // Build payload — include image_url only when present
+    Map<String, dynamic> buildPayload({bool useSuffix = true}) => {
+      if (useSuffix) 'booking_id': bookingId else 'booking': bookingId,
+      if (useSuffix) 'receiver_id': receiverId else 'receiver': receiverId,
+      'content': content.trim(),
+      if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
+    };
 
     try {
       // Primary attempt: use the _id suffix that DRF PrimaryKeyRelatedField
       // exposes for write operations.
-      final res = await ApiService.post('/messages/', data: {
-        'booking_id':  bookingId,
-        'receiver_id': receiverId,
-        'content':     content.trim(),
-      });
+      final res = await ApiService.post('/messages/', data: buildPayload(useSuffix: true));
       return MessageModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       // ── Extract the actual Django validation error message ──────────────
-      // Django returns structured errors like:
-      //   {"receiver_id": ["This field is required."]}
-      //   {"non_field_errors": ["..."]}
-      // Show that instead of the raw Dio exception.
       final body = e.response?.data;
       if (body is Map) {
         // If primary attempt failed, retry with non-suffixed field names
         // in case the serializer uses source= overrides.
         if (e.response?.statusCode == 400) {
           try {
-            final retry = await ApiService.post('/messages/', data: {
-              'booking':  bookingId,
-              'receiver': receiverId,
-              'content':  content.trim(),
-            });
+            final retry = await ApiService.post('/messages/', data: buildPayload(useSuffix: false));
             return MessageModel.fromJson(retry.data as Map<String, dynamic>);
           } on DioException catch (retryErr) {
             // Both attempts failed — surface the cleanest error message.
@@ -117,14 +114,17 @@ class MessageRepository {
         .toList();
   }
 
-  Future<MessageModel> sendSupportMessage(String content) async {
-    if (content.trim().isEmpty) {
+  Future<MessageModel> sendSupportMessage(String content, {String? imageUrl}) async {
+    if (content.trim().isEmpty && (imageUrl == null || imageUrl.isEmpty)) {
       throw Exception('Cannot send an empty message.');
     }
     try {
       final res = await ApiService.post(
         '/messages/support/',
-        data: {'content': content.trim()},
+        data: {
+          'content': content.trim(),
+          if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
+        },
       );
       return MessageModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {

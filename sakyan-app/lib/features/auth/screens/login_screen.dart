@@ -20,7 +20,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
   bool _loading = false;
-  StreamSubscription? _authSub;
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -41,29 +40,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
     _animCtrl.forward();
-
-    _authSub = Supabase.instance.client.auth.onAuthStateChange
-        .listen((data) async {
-      final session = data.session;
-      if (session != null && mounted) {
-        await StorageService.saveToken(session.accessToken);
-        await ref
-            .read(authNotifierProvider.notifier)
-            .handleAuthCallback();
-        if (!mounted) return;
-        final user = ref.read(currentUserProvider);
-        if (user?.isPartner == true) {
-          context.go(AppRoutes.partnerHome);
-        } else {
-          context.go(AppRoutes.home);
-        }
-      }
-    });
   }
 
   @override
   void dispose() {
-    _authSub?.cancel();
     _animCtrl.dispose();
     super.dispose();
   }
@@ -71,10 +51,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Future<void> _signInWithGoogle() async {
     setState(() => _loading = true);
     try {
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'com.sakyan.app://login-callback',
-      );
+      await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+      
+      if (!mounted) return;
+      
+      final user = ref.read(currentUserProvider);
+      if (user != null) {
+        if (user.isPartner == true) {
+          context.go(AppRoutes.partnerHome);
+        } else {
+          context.go(AppRoutes.home);
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

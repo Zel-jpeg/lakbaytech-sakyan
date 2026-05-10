@@ -1,4 +1,4 @@
-﻿import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +9,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cars/models/car_model.dart';
 import '../../cars/providers/cars_provider.dart';
+import '../../kyc/providers/kyc_provider.dart';
 
 class CarDetailScreen extends ConsumerStatefulWidget {
   final String carId;
@@ -22,6 +23,9 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
   final _pageCtrl = PageController();
   int _currentImg = 0;
 
+  // Cached KYC state — assigned in build() so helper methods can access it
+  AsyncValue<dynamic> _kycAsync = const AsyncValue.loading();
+
   @override
   void dispose() {
     _pageCtrl.dispose();
@@ -30,10 +34,11 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final carAsync = ref.watch(carDetailProvider(widget.carId));
-    final user     = ref.watch(currentUserProvider);
-    final theme    = Theme.of(context);
-    final isDark   = theme.brightness == Brightness.dark;
+    final carAsync  = ref.watch(carDetailProvider(widget.carId));
+    final user       = ref.watch(currentUserProvider);
+    _kycAsync        = ref.watch(kycStatusProvider);  // store as field
+    final theme      = Theme.of(context);
+    final isDark     = theme.brightness == Brightness.dark;
 
     final cardColor   = isDark ? AppColors.bgSurface    : AppColors.bgSurfaceLight;
     final borderColor = isDark ? AppColors.border        : AppColors.borderLight;
@@ -406,55 +411,137 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
         // ── Sticky Book Now bar ──────────────────────────────────────────
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: Container(
-            padding: EdgeInsets.fromLTRB(
-                20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
-            decoration: BoxDecoration(
-              color:  cardColor,
-              border: Border(top: BorderSide(color: borderColor)),
-            ),
-            child: Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // KYC banner (only for logged-in users with non-approved status)
+              if (user != null) _buildKycBanner(isDark),
+              Container(
+                padding: EdgeInsets.fromLTRB(
+                    20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
+                decoration: BoxDecoration(
+                  color:  cardColor,
+                  border: Border(top: BorderSide(color: borderColor)),
+                ),
+                child: Row(
                   children: [
-                    Text(
-                      '₱${car.pricePerDay.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '₱${car.pricePerDay.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary),
+                        ),
+                        Text('per day',
+                            style: TextStyle(fontSize: 12, color: textMuted)),
+                      ],
                     ),
-                    Text('per day',
-                        style: TextStyle(fontSize: 12, color: textMuted)),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: car.isAvailable && user != null
+                            ? () => _handleBookNow(context, car)
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 52),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(
+                          user == null
+                              ? 'Sign in to Book'
+                              : (car.isAvailable ? 'Book Now' : 'Unavailable'),
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: car.isAvailable && user != null
-                        ? () => context.push('/checkout/${car.id}')
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: Text(
-                      user == null
-                          ? 'Sign in to Book'
-                          : (car.isAvailable ? 'Book Now' : 'Unavailable'),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  // ── KYC status banner shown above the Book Now bar ────────────────────────
+  Widget _buildKycBanner(bool isDark) {
+    return _kycAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (kyc) {
+        final status = kyc?.status ?? 'not_submitted';
+        if (status == 'approved') return const SizedBox.shrink();
+
+        final isPending = status == 'pending';
+        final color  = isPending ? AppColors.warning : AppColors.primary;
+        final label  = isPending
+            ? '⏳ KYC verification is under review'
+            : '⚠️ Identity verification required to book';
+        final action = isPending ? 'Check Status' : 'Verify Now';
+        final route  = isPending ? '/kyc/pending' : '/kyc/verify';
+
+        return GestureDetector(
+          onTap: () => context.push(route),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: color.withOpacity(isDark ? 0.2 : 0.1),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(label,
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
+                ),
+                Text(action,
+                    style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Handles KYC check before navigating to checkout ──────────────────────
+  void _handleBookNow(BuildContext ctx, CarModel car) {
+    _kycAsync.when(
+      loading: () {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(content: Text('Checking verification status…')),
+        );
+      },
+      error: (_, __) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(
+            content: Text('Could not verify identity status. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      },
+      data: (kyc) {
+        final status = kyc?.status ?? 'not_submitted';
+        if (status == 'approved') {
+          ctx.push('/checkout/${car.id}');
+        } else if (status == 'pending') {
+          ctx.push('/kyc/pending');
+        } else {
+          ctx.push('/kyc/verify');
+        }
+      },
     );
   }
 

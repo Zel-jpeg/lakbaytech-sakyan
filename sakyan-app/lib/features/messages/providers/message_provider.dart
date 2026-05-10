@@ -21,6 +21,7 @@ class ChatNotifier extends FamilyAsyncNotifier<List<MessageModel>, String> {
   Future<void> send({
     required String receiverId,
     required String content,
+    String? imageUrl,
   }) async {
     final bookingId = arg;
     final current = state.value ?? [];
@@ -30,6 +31,7 @@ class ChatNotifier extends FamilyAsyncNotifier<List<MessageModel>, String> {
           bookingId:  bookingId,
           receiverId: receiverId,
           content:    content,
+          imageUrl:   imageUrl,
         );
     state = AsyncValue.data([...current, msg]);
     ref.invalidate(conversationsProvider);

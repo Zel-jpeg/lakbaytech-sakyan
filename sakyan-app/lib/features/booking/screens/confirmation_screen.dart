@@ -9,13 +9,23 @@ class ConfirmationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme   = Theme.of(context);
-    final isDark  = theme.brightness == Brightness.dark;
-    final cardColor   = isDark ? AppColors.bgSurface  : AppColors.bgSurfaceLight;
-    final borderColor = isDark ? AppColors.border      : AppColors.borderLight;
-    final textPrim    = isDark ? AppColors.textPrimary : AppColors.textPrimaryLight;
+    // Read optional extra data passed from checkout
+    final extra         = GoRouterState.of(context).extra as Map<String, dynamic>? ?? {};
+    final bookingId     = extra['bookingId']     as String?;
+    final paymentMethod = extra['paymentMethod'] as String? ?? 'cash';
+    final partnerUserId = extra['partnerUserId'] as String? ?? '';
+    final partnerName   = extra['partnerName']   as String? ?? 'Partner';
+    final carName       = extra['carName']       as String? ?? '';
+
+    final isGcash   = paymentMethod == 'gcash';
+    final theme     = Theme.of(context);
+    final isDark    = theme.brightness == Brightness.dark;
+
+    final cardColor   = isDark ? AppColors.bgSurface    : AppColors.bgSurfaceLight;
+    final borderColor = isDark ? AppColors.border        : AppColors.borderLight;
+    final textPrim    = isDark ? AppColors.textPrimary   : AppColors.textPrimaryLight;
     final textSec     = isDark ? AppColors.textSecondary : AppColors.textSecondaryLight;
-    final textMuted   = isDark ? AppColors.textMuted   : AppColors.textMutedLight;
+    final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
 
     return Scaffold(
       body: SafeArea(
@@ -88,14 +98,78 @@ class ConfirmationScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+
+              // ── Payment info banner ────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: (isGcash ? AppColors.info : AppColors.success)
+                      .withOpacity(isDark ? 0.15 : 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (isGcash ? AppColors.info : AppColors.success)
+                        .withOpacity(0.4),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      isGcash ? Icons.phone_android_rounded : Icons.payments_rounded,
+                      color: isGcash ? AppColors.info : AppColors.success,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isGcash
+                            ? 'GCash Payment: Chat with the partner to send your payment receipt and confirm your booking.'
+                            : 'Cash Payment: Pay the full amount to the partner on the pickup/delivery date.',
+                        style: TextStyle(
+                          color: isDark ? textSec : textPrim,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
               const Spacer(flex: 3),
 
-              // ── Actions ────────────────────────────────────────────────
+              // ── Actions ─────────────────────────────────────────────────
+              // If GCash and we have a bookingId, offer Chat with Partner
+              if (isGcash && bookingId != null && bookingId.isNotEmpty) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.chat_bubble_rounded, size: 18),
+                    label: const Text('Chat with Partner',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                    onPressed: () => context.go('/chat/$bookingId', extra: {
+                      'receiverId': partnerUserId.isNotEmpty ? partnerUserId : null,
+                      'name':       partnerName,
+                      'carName':    carName,
+                    }),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => context.go(AppRoutes.bookings),
+                  style: isGcash
+                      ? ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.bgElevated,
+                          foregroundColor: textPrim,
+                        )
+                      : null,
                   child: const Text('View My Bookings',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),

@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../cars/models/car_model.dart';
 import '../../cars/providers/cars_provider.dart';
 import '../../booking/providers/booking_provider.dart';
+import '../../kyc/providers/kyc_provider.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   final String carId;
@@ -89,7 +90,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final booking =
         await ref.read(createBookingProvider.notifier).create(data);
     if (booking != null && mounted) {
-      context.go('/confirmation/${booking.bookingCode}');
+      if (_paymentMethod == 'gcash') {
+        // GCash → go to chat so customer can send payment receipt to partner
+        context.go('/chat/${booking.id}', extra: {
+          'receiverId': booking.partnerUserId.isNotEmpty
+              ? booking.partnerUserId
+              : null,
+          'name': booking.partnerName.isNotEmpty
+              ? booking.partnerName
+              : 'Partner',
+          'carName': booking.carName,
+        });
+      } else {
+        // Cash → show booking confirmation page
+        context.go('/confirmation/${booking.bookingCode}', extra: {
+          'bookingId':     booking.id,
+          'paymentMethod': _paymentMethod,
+          'partnerUserId': booking.partnerUserId,
+          'partnerName':   booking.partnerName.isNotEmpty
+              ? booking.partnerName
+              : 'Partner',
+          'carName': booking.carName,
+        });
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -105,6 +128,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final carAsync    = ref.watch(carDetailProvider(widget.carId));
     final bookedAsync = ref.watch(bookedDatesProvider(widget.carId));
     final createState = ref.watch(createBookingProvider);
+    final kycAsync    = ref.watch(kycStatusProvider);
     final theme       = Theme.of(context);
     final isDark      = theme.brightness == Brightness.dark;
 
@@ -116,6 +140,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final shimBase    = isDark ? AppColors.bgElevated    : AppColors.bgElevatedLight;
 
     bookedAsync.whenData(_loadBookedDates);
+
+    // KYC guard — redirect if user is not verified (mirrors web CheckoutPage.jsx)
+    kycAsync.whenData((kyc) {
+      final status = kyc?.status ?? 'not_submitted';
+      if (status == 'approved') return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (status == 'pending') {
+          context.go('/kyc/pending');
+        } else {
+          context.go('/kyc/verify');
+        }
+      });
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Book Car')),

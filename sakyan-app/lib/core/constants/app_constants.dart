@@ -21,6 +21,7 @@ class AppConstants {
   static const String bucketKycDocs     = 'kyc-documents';
   static const String bucketPartnerDocs = 'partner-documents';
   static const String bucketAvatars     = 'avatars';
+  static const String bucketChatImages  = 'chat-images';
 
   // Polling interval for messages / notifications (ms)
   static const int pollingIntervalMs = 5000;

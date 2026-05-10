@@ -61,21 +61,39 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.Serializer):
-    user_id   = serializers.UUIDField()
-    full_name = serializers.CharField(max_length=255)
-    email     = serializers.EmailField()
-    phone     = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    user_id     = serializers.UUIDField()
+    full_name   = serializers.CharField(max_length=255)
+    email       = serializers.EmailField()
+    phone       = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    avatar_url  = serializers.URLField(required=False, allow_blank=True)
 
     def create(self, validated_data):
-        user, _ = User.objects.get_or_create(
+        user, created = User.objects.get_or_create(
             id=validated_data['user_id'],
             defaults={
-                'full_name': validated_data['full_name'],
-                'email':     validated_data['email'],
-                'phone':     validated_data.get('phone', ''),
-                'role':      'customer',
+                'full_name':  validated_data['full_name'],
+                'email':      validated_data['email'],
+                'phone':      validated_data.get('phone', ''),
+                'avatar_url': validated_data.get('avatar_url', ''),
+                'role':       'customer',
             }
         )
+        
+        if not created:
+            # Fix for accounts that were created during the native auth issue
+            # where full_name and avatar_url were empty.
+            needs_update = False
+            if not user.full_name and validated_data.get('full_name'):
+                user.full_name = validated_data['full_name']
+                needs_update = True
+                
+            if not user.avatar_url and validated_data.get('avatar_url'):
+                user.avatar_url = validated_data['avatar_url']
+                needs_update = True
+                
+            if needs_update:
+                user.save(update_fields=['full_name', 'avatar_url'])
+                
         return user
 
 

@@ -1,9 +1,13 @@
-﻿import 'dart:async';
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/services/supabase_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/message_model.dart';
 import '../providers/message_provider.dart';
@@ -30,13 +34,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _msgCtrl    = TextEditingController();
   final _scrollCtrl = ScrollController();
   Timer? _pollTimer;
-  bool _sending     = false;
+  bool  _sending   = false;
+  bool  _uploading = false;
+
+  // Image attachment state
+  XFile?     _pickedImage;
+  Uint8List? _pickedImageBytes;
 
   String? _resolvedReceiverId;
   String? _resolvedReceiverName;
 
-  /// Use the widget's receiverId only if it's a non-empty string.
-  /// Fall back to the resolved one from message history.
   String? get _receiverId {
     final wid = widget.receiverId;
     if (wid != null && wid.isNotEmpty) return wid;
@@ -55,7 +62,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // ── Silent poll every 5 s — no loading spinner ──────────────────────────
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted) {
         ref.read(chatProvider(widget.bookingId).notifier).silentRefresh();
@@ -71,8 +77,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  /// Try to figure out who the other party is from message history.
-  /// This is a fallback when receiverId was not passed (e.g. opened from inbox).
   void _tryResolveReceiver(List<MessageModel> messages, String? currentUserId) {
     if (_hasValidReceiver) return;
     if (currentUserId == null) return;
@@ -111,11 +115,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  Future<void> _send() async {
-    final text = _msgCtrl.text.trim();
-    if (text.isEmpty || _sending) return;
+  // ── Pick image from gallery ────────────────────────────────────────────────
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source:       ImageSource.gallery,
+        maxWidth:     1280,
+        maxHeight:    1280,
+        imageQuality: 82,
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (mounted) {
+        setState(() {
+          _pickedImage      = picked;
+          _pickedImageBytes = bytes;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not pick image: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
 
-    // Guard: receiver must be a non-empty UUID
+  void _clearImage() {
+    setState(() {
+      _pickedImage      = null;
+      _pickedImageBytes = null;
+    });
+  }
+
+  // ── Upload picked image to Supabase and return public URL ─────────────────
+  Future<String?> _uploadImage() async {
+    if (_pickedImage == null || _pickedImageBytes == null) return null;
+    setState(() => _uploading = true);
+    try {
+      final ext      = _pickedImage!.name.split('.').last.toLowerCase();
+      final safeExt  = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext) ? ext : 'jpg';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}-${widget.bookingId.substring(0, 8)}.$safeExt';
+      final url = await SupabaseService.uploadFile(
+        bucket:      AppConstants.bucketChatImages,
+        fileName:    fileName,
+        fileBytes:   _pickedImageBytes!,
+        contentType: 'image/$safeExt',
+      );
+      return url;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image upload failed: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  // ── Send message (with optional image) ────────────────────────────────────
+  Future<void> _send() async {
+    final text       = _msgCtrl.text.trim();
+    final hasImage   = _pickedImage != null;
+    final hasContent = text.isNotEmpty || hasImage;
+
+    if (!hasContent || _sending || _uploading) return;
+
     if (!_hasValidReceiver) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -131,27 +207,100 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     setState(() => _sending = true);
+    final savedText = text;
     _msgCtrl.clear();
+
+    // Upload image first if one is attached
+    String? imageUrl;
+    if (hasImage) {
+      imageUrl = await _uploadImage();
+      // If upload failed and there's no text either, abort and restore
+      if (imageUrl == null && savedText.isEmpty) {
+        if (mounted) {
+          _msgCtrl.text = savedText;
+          setState(() => _sending = false);
+        }
+        return;
+      }
+      _clearImage();
+    }
+
     try {
       await ref.read(chatProvider(widget.bookingId).notifier).send(
             receiverId: _receiverId!,
-            content:    text,
+            content:    savedText,
+            imageUrl:   imageUrl,
           );
       _scrollToBottom(animated: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send: ${e.toString().replaceFirst('Exception: ', '')}'),
+            content: Text(
+                'Failed to send: ${e.toString().replaceFirst('Exception: ', '')}'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        _msgCtrl.text = text; // restore unsent text
+        _msgCtrl.text = savedText; // restore unsent text
       }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  // ── Fullscreen image viewer ────────────────────────────────────────────────
+  void _showFullScreenImage(BuildContext ctx, String url) {
+    showDialog(
+      context: ctx,
+      barrierColor: Colors.black87,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(0),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            InteractiveViewer(
+              panEnabled:  true,
+              minScale:    0.5,
+              maxScale:    5.0,
+              child: Center(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (_, child, progress) => progress == null
+                      ? child
+                      : const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.primary)),
+                  errorBuilder: (_, __, ___) => const Icon(
+                      Icons.broken_image_rounded,
+                      color: Colors.white54,
+                      size: 64),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.of(ctx, rootNavigator: true).pop(),
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color:  Colors.black54,
+                    shape:  BoxShape.circle,
+                    border: Border.all(color: Colors.white30),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -168,7 +317,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
     final inputBg     = isDark ? AppColors.bgSurface     : AppColors.bgSurfaceLight;
 
-    // Try to resolve receiver from messages if not passed as param
     messagesAsync.whenData(
       (messages) => _tryResolveReceiver(messages, currentUser?.id),
     );
@@ -178,10 +326,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            // Avatar circle with first letter of receiver name
             Container(
-              width: 36,
-              height: 36,
+              width: 36, height: 36,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -236,7 +382,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
-          // ── Receiver-unknown warning banner ──────────────────────────────
+          // ── Receiver-unknown warning banner ────────────────────────────────
           if (!_hasValidReceiver && messagesAsync.hasValue)
             Container(
               width: double.infinity,
@@ -257,7 +403,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ]),
             ),
 
-          // ── Messages list ────────────────────────────────────────────────
+          // ── Messages list ──────────────────────────────────────────────────
           Expanded(
             child: messagesAsync.when(
               loading: () => const Center(
@@ -304,9 +450,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
+                          width: 80, height: 80,
+                          decoration: const BoxDecoration(
                             color: AppColors.primaryGlow,
                             shape: BoxShape.circle,
                           ),
@@ -353,6 +498,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           textPrim:  textPrim,
                           textMuted: textMuted,
                           isDark:    isDark,
+                          onImageTap: (url) =>
+                              _showFullScreenImage(context, url),
                         ),
                       ],
                     );
@@ -362,16 +509,99 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
 
-          // ── Input bar ────────────────────────────────────────────────────
+          // ── Image preview strip ────────────────────────────────────────────
+          if (_pickedImageBytes != null)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              color: cardColor,
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.memory(
+                          _pickedImageBytes!,
+                          width: 72, height: 72,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 2, right: 2,
+                        child: GestureDetector(
+                          onTap: _clearImage,
+                          child: Container(
+                            width: 20, height: 20,
+                            decoration: const BoxDecoration(
+                              color:  Colors.black87,
+                              shape:  BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close_rounded,
+                                color: Colors.white, size: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Image attached',
+                          style: TextStyle(
+                              color: textPrim,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text('Tap send to share',
+                          style:
+                              TextStyle(color: textMuted, fontSize: 11)),
+                    ],
+                  ),
+                  if (_uploading) ...[
+                    const Spacer(),
+                    const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.primary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+          // ── Input bar ──────────────────────────────────────────────────────
           Container(
             padding: EdgeInsets.fromLTRB(
-                16, 10, 16, MediaQuery.of(context).padding.bottom + 10),
+                12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
             decoration: BoxDecoration(
               color:  cardColor,
               border: Border(top: BorderSide(color: borderColor)),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Attachment button
+                GestureDetector(
+                  onTap: (_sending || _uploading) ? null : _pickImage,
+                  child: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.attach_file_rounded,
+                      color: (_pickedImage != null)
+                          ? AppColors.primary
+                          : AppColors.primary.withOpacity(0.6),
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Text input
                 Expanded(
                   child: Container(
                     constraints: const BoxConstraints(maxHeight: 120),
@@ -382,13 +612,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     child: TextField(
                       controller: _msgCtrl,
-                      maxLines: null,
+                      maxLines:   null,
                       textCapitalization: TextCapitalization.sentences,
                       style: TextStyle(color: textPrim, fontSize: 14),
                       decoration: InputDecoration(
                         hintText: _hasValidReceiver
-                            ? 'Type a message...'
-                            : 'Resolve recipient first...',
+                            ? (_pickedImage != null
+                                ? 'Add a caption (optional)…'
+                                : 'Type a message…')
+                            : 'Resolve recipient first…',
                         hintStyle:
                             TextStyle(color: textMuted, fontSize: 14),
                         border: InputBorder.none,
@@ -399,15 +631,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
+
+                // Send button
                 GestureDetector(
-                  onTap: _sending ? null : _send,
+                  onTap: (_sending || _uploading) ? null : _send,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    width: 44,
-                    height: 44,
+                    width: 44, height: 44,
                     decoration: BoxDecoration(
-                      color: (_sending || !_hasValidReceiver)
+                      color: (_sending || _uploading || !_hasValidReceiver)
                           ? AppColors.primary.withOpacity(0.4)
                           : AppColors.primary,
                       shape: BoxShape.circle,
@@ -421,11 +654,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             ]
                           : [],
                     ),
-                    child: _sending
+                    child: (_sending || _uploading)
                         ? const Center(
                             child: SizedBox(
-                              width: 20,
-                              height: 20,
+                              width: 20, height: 20,
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white),
                             ),
@@ -448,6 +680,7 @@ class _MessageBubble extends StatelessWidget {
   final MessageModel message;
   final bool isMe, isDark;
   final Color cardColor, textPrim, textMuted;
+  final void Function(String url) onImageTap;
 
   const _MessageBubble({
     required this.message,
@@ -456,6 +689,7 @@ class _MessageBubble extends StatelessWidget {
     required this.cardColor,
     required this.textPrim,
     required this.textMuted,
+    required this.onImageTap,
   });
 
   @override
@@ -463,6 +697,8 @@ class _MessageBubble extends StatelessWidget {
     final bubbleBg  = isMe ? AppColors.primary : cardColor;
     final textColor = isMe ? Colors.white : textPrim;
     final timeColor = isMe ? Colors.white.withOpacity(0.65) : textMuted;
+    final hasImage  = message.imageUrl != null && message.imageUrl!.isNotEmpty;
+    final hasText   = message.content.isNotEmpty;
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -472,31 +708,33 @@ class _MessageBubble extends StatelessWidget {
           left:  isMe ? 56 : 0,
           right: isMe ? 0  : 56,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: bubbleBg,
+          color: hasImage && !hasText ? Colors.transparent : bubbleBg,
           borderRadius: BorderRadius.only(
             topLeft:     Radius.circular(isMe ? 18 : 4),
             topRight:    Radius.circular(isMe ? 4 : 18),
             bottomLeft:  const Radius.circular(18),
             bottomRight: const Radius.circular(18),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: hasImage && !hasText
+              ? []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment:
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!isMe && message.senderName.isNotEmpty)
+            // Sender name (for others only)
+            if (!isMe && message.senderName.isNotEmpty && !hasImage)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(top: 8, left: 14, right: 14),
                 child: Text(
                   message.senderName,
                   style: const TextStyle(
@@ -505,28 +743,102 @@ class _MessageBubble extends StatelessWidget {
                       fontWeight: FontWeight.w600),
                 ),
               ),
-            Text(message.content,
-                style:
-                    TextStyle(color: textColor, fontSize: 14, height: 1.4)),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  DateFormat('h:mm a').format(message.createdAt),
-                  style: TextStyle(fontSize: 10, color: timeColor),
-                ),
-                if (isMe) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    message.isRead
-                        ? Icons.done_all_rounded
-                        : Icons.done_rounded,
-                    size: 13,
-                    color: timeColor,
+
+            // Image attachment
+            if (hasImage)
+              GestureDetector(
+                onTap: () => onImageTap(message.imageUrl!),
+                child: Hero(
+                  tag: message.imageUrl!,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.only(
+                      topLeft:
+                          Radius.circular(isMe ? 18 : 4),
+                      topRight:
+                          Radius.circular(isMe ? 4 : 18),
+                      bottomLeft:
+                          Radius.circular(hasText ? 0 : 18),
+                      bottomRight:
+                          Radius.circular(hasText ? 0 : 18),
+                    ),
+                    child: Image.network(
+                      message.imageUrl!,
+                      width: 220,
+                      height: 165,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (ctx, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          width: 220, height: 165,
+                          color: AppColors.bgElevated,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary),
+                          ),
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 220, height: 80,
+                        color: AppColors.bgElevated,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.broken_image_rounded,
+                                color: AppColors.textMuted, size: 28),
+                            const SizedBox(height: 4),
+                            Text('Image unavailable',
+                                style: TextStyle(
+                                    color: textMuted, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
+                ),
+              ),
+
+            // Text content
+            if (hasText)
+              Padding(
+                padding: EdgeInsets.only(
+                  top:    hasImage ? 6 : ((!isMe && message.senderName.isNotEmpty) ? 4 : 10),
+                  bottom: 4,
+                  left:   14,
+                  right:  14,
+                ),
+                child: Text(
+                  message.content,
+                  style: TextStyle(
+                      color: textColor, fontSize: 14, height: 1.4),
+                ),
+              ),
+
+            // Timestamp row
+            Padding(
+              padding: const EdgeInsets.only(
+                  bottom: 8, left: 14, right: 14, top: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('h:mm a').format(message.createdAt),
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: hasImage && !hasText ? textMuted : timeColor),
+                  ),
+                  if (isMe) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      message.isRead
+                          ? Icons.done_all_rounded
+                          : Icons.done_rounded,
+                      size: 13,
+                      color: hasImage && !hasText ? textMuted : timeColor,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ],
         ),
@@ -559,15 +871,13 @@ class _TimeDivider extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(children: [
-        Expanded(
-            child: Divider(color: textMuted.withOpacity(0.3))),
+        Expanded(child: Divider(color: textMuted.withOpacity(0.3))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text(label,
               style: TextStyle(fontSize: 11, color: textMuted)),
         ),
-        Expanded(
-            child: Divider(color: textMuted.withOpacity(0.3))),
+        Expanded(child: Divider(color: textMuted.withOpacity(0.3))),
       ]),
     );
   }

@@ -10,6 +10,7 @@ class MessageModel {
   final String receiverId;
   final String receiverName;
   final String content;
+  final String? imageUrl;
   final bool isRead;
   final DateTime createdAt;
 
@@ -22,6 +23,7 @@ class MessageModel {
     required this.receiverId,
     this.receiverName = '',
     required this.content,
+    this.imageUrl,
     this.isRead     = false,
     required this.createdAt,
   });
@@ -63,7 +65,14 @@ class MessageModel {
       if (bid is String && bid.isNotEmpty) bookingId = bid;
     }
 
-    // ── last_message_at — guard against non-string values ─────────────────
+    // ── image_url ─────────────────────────────────────────────────────────
+    String? imageUrl;
+    final rawImg = json['image_url'];
+    if (rawImg is String && rawImg.isNotEmpty) {
+      imageUrl = rawImg;
+    }
+
+    // ── created_at — guard against non-string values ──────────────────────
     DateTime createdAt = DateTime.now();
     final rawCa = json['created_at'];
     if (rawCa is String && rawCa.isNotEmpty) {
@@ -79,6 +88,7 @@ class MessageModel {
       receiverId:   receiverId,
       receiverName: receiverName,
       content:      _s(json['content']),
+      imageUrl:     imageUrl,
       isRead:       json['is_read'] as bool? ?? false,
       createdAt:    createdAt,
     );
@@ -153,13 +163,25 @@ class ConversationModel {
 
     // ── last_message — might be null or non-string ─────────────────────────
     final rawLm = json['last_message'];
-    final lastMessage = rawLm is String ? rawLm : '';
+    String lastMessage = '';
+    if (rawLm is String) {
+      lastMessage = rawLm;
+    } else if (rawLm is Map) {
+      // backend returns { content, created_at, sender_id }
+      lastMessage = _s(rawLm['content']);
+    }
 
     // ── last_message_at ────────────────────────────────────────────────────
     DateTime lastMessageAt = DateTime.now();
     final rawAt = json['last_message_at'];
     if (rawAt is String && rawAt.isNotEmpty) {
       lastMessageAt = DateTime.tryParse(rawAt) ?? DateTime.now();
+    } else if (rawLm is Map) {
+      // fallback: parse from nested last_message object
+      final rawCreated = rawLm['created_at'];
+      if (rawCreated is String && rawCreated.isNotEmpty) {
+        lastMessageAt = DateTime.tryParse(rawCreated) ?? DateTime.now();
+      }
     }
 
     // ── unread_count — might come as String from some serialisers ─────────
