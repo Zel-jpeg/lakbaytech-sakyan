@@ -230,7 +230,7 @@ export default function InboxPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117]">
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><ArrowLeft size={18}/></button>
+          <button onClick={() => navigate('/booking/my-bookings')} className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"><ArrowLeft size={18}/></button>
           <div>
             <h1 className="text-base font-bold text-gray-900 dark:text-white">Messages</h1>
             <p className="text-xs text-gray-400 dark:text-gray-500">{convList.length} conversation{convList.length !== 1 ? 's' : ''}</p>
