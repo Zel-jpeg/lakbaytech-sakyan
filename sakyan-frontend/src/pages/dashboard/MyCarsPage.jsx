@@ -64,36 +64,40 @@ export default function MyCarsPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {cars.map((car) => (
-          <div key={car.id} className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md dark:hover:shadow-dark-card transition duration-300">
-            {/* Car image */}
-            <div className="h-40 bg-gray-100 dark:bg-gray-800 relative">
-              {car.primary_image ? (
-                <img src={car.primary_image} alt={car.name}
-                     className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Car size={36} className="text-gray-300 dark:text-gray-600" />
+          <div key={car.id} className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md dark:hover:shadow-dark-card transition duration-300 flex flex-col">
+            <Link to={`/cars/${car.id}`} className="block group flex-1">
+              {/* Car image */}
+              <div className="h-40 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
+                {car.primary_image ? (
+                  <img src={car.primary_image} alt={car.name}
+                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Car size={36} className="text-gray-300 dark:text-gray-600" />
+                  </div>
+                )}
+                <div className="absolute top-2 right-2">
+                  <CarStatusBadge isAvailable={car.is_available} />
                 </div>
-              )}
-              <div className="absolute top-2 right-2">
-                <CarStatusBadge isAvailable={car.is_available} />
               </div>
-            </div>
 
-            {/* Info */}
-            <div className="p-4">
-              <p className="font-semibold text-gray-900 dark:text-gray-100">{car.name}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{car.brand} · {car.year}</p>
-              {car.location && (
-                <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  <MapPin size={11} />
-                  {car.location}
-                </div>
-              )}
-              <p className="text-brand-600 dark:text-brand-400 font-bold mt-2">{formatCurrency(car.price_per_day)}<span className="text-xs text-gray-400 dark:text-gray-500 font-normal">/day</span></p>
+              {/* Info */}
+              <div className="p-4 pb-0 flex-1">
+                <p className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">{car.name}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{car.brand} · {car.year}</p>
+                {car.location && (
+                  <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <MapPin size={11} />
+                    {car.location}
+                  </div>
+                )}
+                <p className="text-brand-600 dark:text-brand-400 font-bold mt-2">{formatCurrency(car.price_per_day)}<span className="text-xs text-gray-400 dark:text-gray-500 font-normal">/day</span></p>
+              </div>
+            </Link>
 
-              {/* Actions */}
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800/60">
+            {/* Actions */}
+            <div className="p-4 pt-3 mt-auto">
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-800/60">
                 <button
                   onClick={() => toggleMutation.mutate(car.id)}
                   disabled={toggleMutation.isPending}
