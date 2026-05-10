@@ -325,16 +325,24 @@ class _BookingCardState extends State<_BookingCard> {
                             icon: const Icon(Icons.chat_bubble_rounded,
                                 size: 16),
                             label: const Text('Message Partner'),
-                            onPressed: () => context.push(
-                              '/chat/${b.id}',
-                              extra: {
-                                'receiverId': b.partnerId,
-                                'name':       b.partnerName.isNotEmpty
-                                    ? b.partnerName
-                                    : 'Partner',
-                                'carName':    b.carName,
-                              },
-                            ),
+                            onPressed: () {
+                              // partnerUserId is the partner's USER uuid,
+                              // not the partner-profile uuid.
+                              // If empty after model fix, open chat anyway
+                              // and let ChatScreen resolve from history.
+                              context.push(
+                                '/chat/${b.id}',
+                                extra: {
+                                  'receiverId': b.partnerUserId.isNotEmpty
+                                      ? b.partnerUserId
+                                      : null,
+                                  'name': b.partnerName.isNotEmpty
+                                      ? b.partnerName
+                                      : 'Partner',
+                                  'carName': b.carName,
+                                },
+                              );
+                            },
                           ),
                         ),
                         if (b.canCancel) ...[

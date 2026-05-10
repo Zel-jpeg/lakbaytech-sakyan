@@ -35,8 +35,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _resolvedReceiverId;
   String? _resolvedReceiverName;
 
-  String? get _receiverId   => widget.receiverId   ?? _resolvedReceiverId;
-  String? get _receiverName => widget.receiverName ?? _resolvedReceiverName;
+  /// Use the widget's receiverId only if it's a non-empty string.
+  /// Fall back to the resolved one from message history.
+  String? get _receiverId {
+    final wid = widget.receiverId;
+    if (wid != null && wid.isNotEmpty) return wid;
+    return _resolvedReceiverId;
+  }
+
+  String? get _receiverName {
+    final wn = widget.receiverName;
+    if (wn != null && wn.isNotEmpty) return wn;
+    return _resolvedReceiverName;
+  }
+
+  bool get _hasValidReceiver =>
+      _receiverId != null && _receiverId!.isNotEmpty;
 
   @override
   void initState() {
@@ -57,22 +71,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  /// Try to figure out who the other party is from message history.
+  /// This is a fallback when receiverId was not passed (e.g. opened from inbox).
   void _tryResolveReceiver(List<MessageModel> messages, String? currentUserId) {
-    if (_receiverId != null) return;
+    if (_hasValidReceiver) return;
     if (currentUserId == null) return;
     for (final m in messages) {
       if (m.senderId.isNotEmpty && m.senderId != currentUserId) {
-        if (mounted) setState(() {
-          _resolvedReceiverId   = m.senderId;
-          _resolvedReceiverName = m.senderName;
-        });
+        if (mounted) {
+          setState(() {
+            _resolvedReceiverId   = m.senderId;
+            _resolvedReceiverName = m.senderName;
+          });
+        }
         return;
       }
       if (m.receiverId.isNotEmpty && m.receiverId != currentUserId) {
-        if (mounted) setState(() {
-          _resolvedReceiverId   = m.receiverId;
-          _resolvedReceiverName = m.receiverName;
-        });
+        if (mounted) {
+          setState(() {
+            _resolvedReceiverId   = m.receiverId;
+            _resolvedReceiverName = m.receiverName;
+          });
+        }
         return;
       }
     }
@@ -94,16 +114,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _send() async {
     final text = _msgCtrl.text.trim();
     if (text.isEmpty || _sending) return;
-    if (_receiverId == null) {
+
+    // Guard: receiver must be a non-empty UUID
+    if (!_hasValidReceiver) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cannot determine recipient.'),
+          content: Text(
+            'Cannot determine recipient. Please go back and open the chat '
+            'from your booking details.',
+          ),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
+
     setState(() => _sending = true);
     _msgCtrl.clear();
     try {
@@ -112,16 +138,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             content:    text,
           );
       _scrollToBottom(animated: true);
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send message.'),
+          SnackBar(
+            content: Text('Failed to send: ${e.toString().replaceFirst('Exception: ', '')}'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        _msgCtrl.text = text;
+        _msgCtrl.text = text; // restore unsent text
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -142,6 +168,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
     final inputBg     = isDark ? AppColors.bgSurface     : AppColors.bgSurfaceLight;
 
+    // Try to resolve receiver from messages if not passed as param
     messagesAsync.whenData(
       (messages) => _tryResolveReceiver(messages, currentUser?.id),
     );
@@ -151,13 +178,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            // Avatar circle
+            // Avatar circle with first letter of receiver name
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   colors: [AppColors.primary, AppColors.primaryDark],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -165,9 +192,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
               child: Center(
                 child: Text(
-                  (_receiverName ?? 'C').isNotEmpty
-                      ? (_receiverName ?? 'C')[0].toUpperCase()
-                      : 'C',
+                  (_receiverName ?? 'U').isNotEmpty
+                      ? (_receiverName ?? 'U')[0].toUpperCase()
+                      : 'U',
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
@@ -199,7 +226,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
-          // Manual full refresh only
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: textSec),
             tooltip: 'Refresh',
@@ -210,10 +236,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
+          // ── Receiver-unknown warning banner ──────────────────────────────
+          if (!_hasValidReceiver && messagesAsync.hasValue)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: AppColors.warning.withOpacity(0.12),
+              child: Row(children: [
+                const Icon(Icons.warning_rounded,
+                    color: AppColors.warning, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Recipient info unavailable — send a message first '
+                    'or open this chat from your booking.',
+                    style: const TextStyle(
+                        color: AppColors.warning, fontSize: 12),
+                  ),
+                ),
+              ]),
+            ),
+
           // ── Messages list ────────────────────────────────────────────────
           Expanded(
             child: messagesAsync.when(
-              // Only show full loading spinner on first load (no data yet)
               loading: () => const Center(
                   child: CircularProgressIndicator(color: AppColors.primary)),
               error: (e, st) => Center(
@@ -274,7 +320,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600)),
                         const SizedBox(height: 4),
-                        Text('Say hello to get started!',
+                        Text('Send a message to get started!',
                             style: TextStyle(color: textMuted, fontSize: 13)),
                       ],
                     ),
@@ -289,7 +335,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     final msg  = messages[i];
                     final isMe = msg.senderId == currentUser?.id;
                     final showTime = i == 0 ||
-                        messages[i].createdAt
+                        messages[i]
+                                .createdAt
                                 .difference(messages[i - 1].createdAt)
                                 .inMinutes
                                 .abs() >
@@ -297,7 +344,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     return Column(
                       children: [
                         if (showTime)
-                          _TimeDivider(time: msg.createdAt, textMuted: textMuted),
+                          _TimeDivider(
+                              time: msg.createdAt, textMuted: textMuted),
                         _MessageBubble(
                           message:   msg,
                           isMe:      isMe,
@@ -338,8 +386,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       textCapitalization: TextCapitalization.sentences,
                       style: TextStyle(color: textPrim, fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        hintStyle: TextStyle(color: textMuted, fontSize: 14),
+                        hintText: _hasValidReceiver
+                            ? 'Type a message...'
+                            : 'Resolve recipient first...',
+                        hintStyle:
+                            TextStyle(color: textMuted, fontSize: 14),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
@@ -356,17 +407,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: _sending
-                          ? AppColors.primary.withOpacity(0.5)
+                      color: (_sending || !_hasValidReceiver)
+                          ? AppColors.primary.withOpacity(0.4)
                           : AppColors.primary,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      boxShadow: _hasValidReceiver
+                          ? [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : [],
                     ),
                     child: _sending
                         ? const Center(
@@ -453,7 +506,8 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             Text(message.content,
-                style: TextStyle(color: textColor, fontSize: 14, height: 1.4)),
+                style:
+                    TextStyle(color: textColor, fontSize: 14, height: 1.4)),
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -505,13 +559,15 @@ class _TimeDivider extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(children: [
-        Expanded(child: Divider(color: textMuted.withOpacity(0.3))),
+        Expanded(
+            child: Divider(color: textMuted.withOpacity(0.3))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text(label,
               style: TextStyle(fontSize: 11, color: textMuted)),
         ),
-        Expanded(child: Divider(color: textMuted.withOpacity(0.3))),
+        Expanded(
+            child: Divider(color: textMuted.withOpacity(0.3))),
       ]),
     );
   }

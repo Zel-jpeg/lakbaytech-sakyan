@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -113,7 +114,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ? Colors.white.withOpacity(0.06)
         : Colors.black.withOpacity(0.04);
 
-    // Theme toggle icon adapts to current mode
     final toggleIcon =
         isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded;
     final toggleBg = isDark
@@ -126,7 +126,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       backgroundColor: bgColor,
       body: Stack(
         children: [
-          // ── Radial glows (decorative) ──────────────────────────────────
+          // ── Radial glows ───────────────────────────────────────────────
           Positioned(
             top: -100,
             left: size.width / 2 - 180,
@@ -159,7 +159,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
 
-          // ── Dot grids (decorative) ─────────────────────────────────────
+          // ── Dot grids ──────────────────────────────────────────────────
           Positioned(
             top: 56,
             right: 18,
@@ -171,7 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             child: _DotsGrid(dotColor: dotColor, columns: 4, rows: 4),
           ),
 
-          // ── Theme toggle — top-right ───────────────────────────────────
+          // ── Theme toggle ───────────────────────────────────────────────
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             right: 16,
@@ -209,7 +209,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     children: [
                       const Spacer(flex: 2),
 
-                      // ── Logo + app name ──────────────────────────
+                      // ── Logo + app name ──────────────────────────────
                       Center(
                         child: Column(
                           children: [
@@ -240,7 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                       const Spacer(flex: 2),
 
-                      // ── Headline ─────────────────────────────────
+                      // ── Headline ─────────────────────────────────────
                       Text(
                         'Welcome back 👋',
                         style: TextStyle(
@@ -263,7 +263,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ),
                       const SizedBox(height: 28),
 
-                      // ── Google Sign-In button ─────────────────────
+                      // ── Google Sign-In button ─────────────────────────
                       _GoogleSignInButton(
                         loading: _loading,
                         isDark: isDark,
@@ -271,7 +271,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ),
                       const SizedBox(height: 20),
 
-                      // ── Divider ───────────────────────────────────
+                      // ── Divider ───────────────────────────────────────
                       Row(children: [
                         Expanded(
                             child: Divider(
@@ -294,7 +294,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ]),
                       const SizedBox(height: 20),
 
-                      // ── Trust badges ──────────────────────────────
+                      // ── Trust badges ──────────────────────────────────
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -326,7 +326,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                       const Spacer(flex: 1),
 
-                      // ── Footer ────────────────────────────────────
+                      // ── Footer ────────────────────────────────────────
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.only(bottom: 14),
@@ -496,10 +496,16 @@ class _GoogleSignInButton extends StatelessWidget {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
+                  // ── Official Google G logo (SVG) ─────────────────────
+                  SvgPicture.string(
+                    '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>''',
                     width: 22,
                     height: 22,
-                    child: CustomPaint(painter: _GoogleLogoPainter()),
                   ),
                   const SizedBox(width: 14),
                   const Text(
@@ -517,61 +523,6 @@ class _GoogleSignInButton extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Google 4-colour G painter ─────────────────────────────────────────────────
-class _GoogleLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final r = size.width / 2;
-    final paint = Paint()..style = PaintingStyle.fill;
-    const toRad = 3.14159265358979 / 180;
-
-    void arc(double startDeg, double sweepDeg, Color color) {
-      paint.color = color;
-      canvas.drawPath(
-        Path()
-          ..moveTo(cx, cy)
-          ..arcTo(Rect.fromCircle(center: Offset(cx, cy), radius: r),
-              startDeg * toRad, sweepDeg * toRad, false)
-          ..close(),
-        paint,
-      );
-    }
-
-    arc(-23, 113, const Color(0xFF4285F4));
-    arc(90, 120, const Color(0xFF34A853));
-    arc(210, 93, const Color(0xFFFBBC05));
-    arc(303, 34, const Color(0xFFEA4335));
-
-    paint.color = Colors.white;
-    canvas.drawCircle(Offset(cx, cy), r * 0.58, paint);
-
-    final barH = r * 0.36;
-    canvas.drawRect(
-        Rect.fromLTRB(cx, cy - barH / 2, cx + r + 2, cy + barH / 2),
-        paint);
-
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawRect(
-        Rect.fromLTRB(
-            cx * 0.98, cy - barH / 2, cx + r * 0.94, cy + barH / 2),
-        paint);
-
-    paint.color = Colors.white;
-    canvas.drawCircle(Offset(cx, cy), r * 0.58, paint);
-
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawRect(
-        Rect.fromLTRB(
-            cx * 0.98, cy - barH / 2, cx + r * 0.94, cy + barH / 2),
-        paint);
-  }
-
-  @override
-  bool shouldRepaint(_GoogleLogoPainter _) => false;
 }
 
 // ── Trust badge ───────────────────────────────────────────────────────────────
