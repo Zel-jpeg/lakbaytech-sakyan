@@ -310,6 +310,76 @@ export default function LandingPage() {
                           bg-gradient-to-b from-brand-500/10 to-transparent rounded-full blur-3xl" />
           <div className="absolute top-40 -left-40 w-[400px] sm:w-[500px] h-[400px] sm:h-[500px]
                           bg-gradient-to-br from-blue-500/8 to-transparent rounded-full blur-3xl" />
+
+          {/* ── Decorative side elements (hidden on mobile) ── */}
+
+          {/* Left side decorations */}
+          <div className="hidden lg:block pointer-events-none">
+            {/* Gradient orb — top-left */}
+            <div className="absolute top-24 left-8 xl:left-16 w-20 h-20 rounded-full
+                            bg-gradient-to-br from-brand-400/20 to-blue-400/10
+                            dark:from-brand-500/15 dark:to-blue-500/10
+                            blur-sm animate-float" />
+
+            {/* Ring shape */}
+            <div className="absolute top-52 left-14 xl:left-24 w-12 h-12 rounded-full
+                            border-2 border-brand-300/25 dark:border-brand-500/15
+                            animate-float" style={{ animationDelay: '1s' }} />
+
+            {/* Small dot cluster */}
+            <div className="absolute top-36 left-6 xl:left-12 grid grid-cols-3 gap-2 opacity-30 dark:opacity-20">
+              {[...Array(9)].map((_, i) => (
+                <div key={i} className="w-1.5 h-1.5 rounded-full bg-brand-400 dark:bg-brand-500" />
+              ))}
+            </div>
+
+            {/* Slanted line accent */}
+            <div className="absolute top-72 left-20 xl:left-32 w-16 h-[2px]
+                            bg-gradient-to-r from-brand-400/30 to-transparent dark:from-brand-500/20
+                            rotate-[30deg]" />
+
+            {/* Diamond shape */}
+            <div className="absolute top-[340px] left-10 xl:left-20 w-6 h-6 rotate-45
+                            border-2 border-indigo-300/20 dark:border-indigo-500/15 rounded-sm
+                            animate-float" style={{ animationDelay: '2s' }} />
+          </div>
+
+          {/* Right side decorations */}
+          <div className="hidden lg:block pointer-events-none">
+            {/* Gradient orb — top-right */}
+            <div className="absolute top-32 right-10 xl:right-20 w-16 h-16 rounded-full
+                            bg-gradient-to-bl from-indigo-400/20 to-purple-400/10
+                            dark:from-indigo-500/15 dark:to-purple-500/10
+                            blur-sm animate-float" style={{ animationDelay: '0.5s' }} />
+
+            {/* Cross pattern */}
+            <div className="absolute top-20 right-16 xl:right-28 opacity-20 dark:opacity-15">
+              <div className="w-8 h-[2px] bg-brand-400 dark:bg-brand-500 absolute top-1/2 left-0 -translate-y-1/2" />
+              <div className="w-[2px] h-8 bg-brand-400 dark:bg-brand-500 absolute top-0 left-1/2 -translate-x-1/2" />
+            </div>
+
+            {/* Ring */}
+            <div className="absolute top-60 right-8 xl:right-16 w-14 h-14 rounded-full
+                            border-2 border-dashed border-blue-300/20 dark:border-blue-500/15
+                            animate-spin-slow" />
+
+            {/* Small dot cluster */}
+            <div className="absolute top-44 right-20 xl:right-32 grid grid-cols-2 gap-2 opacity-25 dark:opacity-15">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="w-1.5 h-1.5 rounded-full bg-indigo-400 dark:bg-indigo-500" />
+              ))}
+            </div>
+
+            {/* Diagonal line */}
+            <div className="absolute top-80 right-14 xl:right-24 w-14 h-[2px]
+                            bg-gradient-to-l from-indigo-400/30 to-transparent dark:from-indigo-500/20
+                            -rotate-[25deg]" />
+
+            {/* Circle accent */}
+            <div className="absolute top-[360px] right-24 xl:right-36 w-4 h-4 rounded-full
+                            bg-brand-400/15 dark:bg-brand-500/10
+                            animate-float" style={{ animationDelay: '1.5s' }} />
+          </div>
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 lg:pt-24">
