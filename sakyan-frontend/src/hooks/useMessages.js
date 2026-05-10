@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/config/axios'
 import { supabase } from '@/config/supabase'
@@ -55,11 +55,12 @@ export function useMessages(bookingId) {
 export function useSendMessage() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ bookingId, receiverId, content }) =>
+    mutationFn: ({ bookingId, receiverId, content, imageUrl }) =>
       api.post('/messages/', {
-        booking: bookingId,
-        receiver: receiverId,
-        content,
+        booking:    bookingId,
+        receiver:   receiverId,
+        content:    content || '',
+        image_url:  imageUrl || null,
       }).then(r => r.data),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['messages', variables.bookingId] })
@@ -86,8 +87,6 @@ export function useSupportMessages(partnerId = null) {
   })
 
   // Supabase realtime: listen for new support messages.
-  // Supabase postgres_changes does not support IS NULL filters,
-  // so we listen broadly and let the query (which filters server-side) dedupe.
   useEffect(() => {
     const channel = supabase
       .channel(`support-messages:${partnerId ?? 'self'}:${Date.now()}`)
@@ -97,10 +96,8 @@ export function useSupportMessages(partnerId = null) {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          // No filter here — server side already scopes to null-booking messages
         },
         (payload) => {
-          // Only invalidate if it looks like a support message (booking_id is null)
           if (!payload.new?.booking_id) {
             qc.invalidateQueries({ queryKey })
             qc.invalidateQueries({ queryKey: ['conversations'] })
@@ -112,16 +109,16 @@ export function useSupportMessages(partnerId = null) {
     return () => supabase.removeChannel(channel)
   }, [partnerId])
 
-
   return query
 }
 
 export function useSendSupportMessage() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ content, receiverId }) =>
+    mutationFn: ({ content, receiverId, imageUrl }) =>
       api.post('/messages/support/', {
-        content,
+        content:     content || '',
+        image_url:   imageUrl || null,
         ...(receiverId ? { receiver_id: receiverId } : {}),
       }).then(r => r.data),
     onSuccess: () => {

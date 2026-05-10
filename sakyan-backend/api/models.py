@@ -211,7 +211,8 @@ class Message(models.Model):
                                     null=True, blank=True)   # null = support message
     sender      = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
     receiver    = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
-    content     = models.TextField()
+    content     = models.TextField(blank=True)   # optional when image_url is provided
+    image_url   = models.TextField(blank=True, null=True)   # optional image attachment (GCash receipts, etc.)
     is_read     = models.BooleanField(default=False)
     created_at  = models.DateTimeField(auto_now_add=True)
 

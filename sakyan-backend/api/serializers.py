@@ -261,7 +261,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['id', 'booking', 'sender', 'receiver', 'sender_name', 'content', 'is_read', 'created_at']
+        fields = ['id', 'booking', 'sender', 'receiver', 'sender_name', 'content', 'image_url', 'is_read', 'created_at']
         read_only_fields = ['id', 'sender', 'created_at']
 
     def __init__(self, *args, **kwargs):
@@ -269,6 +269,9 @@ class MessageSerializer(serializers.ModelSerializer):
         # booking is optional — null means it's a support message
         self.fields['booking'].required = False
         self.fields['booking'].allow_null = True
+        # content is optional when an image_url is provided
+        self.fields['content'].required = False
+        self.fields['content'].allow_blank = True
 
 
 class NotificationSerializer(serializers.ModelSerializer):

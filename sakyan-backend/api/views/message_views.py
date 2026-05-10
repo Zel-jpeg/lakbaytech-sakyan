@@ -28,7 +28,10 @@ class SendMessageView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
+        serializer.save(
+            sender=self.request.user,
+            image_url=self.request.data.get('image_url') or None,
+        )
 
 
 # ─── Support Thread (partner ↔ admin, no booking) ────────────────────────────
@@ -86,9 +89,11 @@ class SupportThreadView(APIView):
 
     def post(self, request):
         user = request.user
-        content = request.data.get('content', '').strip()
-        if not content:
-            return Response({'error': 'Content is required.'}, status=400)
+        content   = request.data.get('content', '').strip()
+        image_url = request.data.get('image_url', '').strip() or None
+
+        if not content and not image_url:
+            return Response({'error': 'Either content or image_url is required.'}, status=400)
 
         if user.role == 'admin':
             # Admin replies to a specific partner
@@ -116,6 +121,7 @@ class SupportThreadView(APIView):
             sender=user,
             receiver=receiver,
             content=content,
+            image_url=image_url,
         )
         return Response(MessageSerializer(msg).data, status=201)
 
