@@ -121,11 +121,6 @@ function StatCard({ icon: Icon, label, value, accent, sparkColor, sparkData }) {
           className="text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
         />
       </div>
-      {sparkData !== null && (
-        <div className="mt-3 -mx-1 opacity-60">
-          <Sparkline data={sparkData} color={sparkColor} />
-        </div>
-      )}
     </div>
   )
 }
