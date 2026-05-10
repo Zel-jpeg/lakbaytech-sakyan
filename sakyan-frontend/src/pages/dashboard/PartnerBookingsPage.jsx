@@ -6,7 +6,7 @@ import {
   Calendar, Car, CreditCard, Banknote, Clock, ShieldCheck,
   ShieldAlert, X, LayoutGrid, List, BadgeCheck, AlertCircle,
   ZoomIn, ChevronLeft, ChevronRight, ClipboardList, DollarSign,
-  ChevronDown, Truck, Building2, Timer, Flag, TriangleAlert,
+  ChevronDown, Truck, Building2, Timer, Flag, TriangleAlert, ArrowDown, ArrowUp
 } from 'lucide-react'
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -939,11 +939,23 @@ export default function PartnerBookingsPage() {
   const [statusFilter, setStatusFilter]       = useState('')
   const [viewMode, setViewMode]               = useState('list')
   const [selectedBooking, setSelectedBooking] = useState(null)
+  const [sortOrder, setSortOrder]             = useState('desc')
 
   const { data, isLoading } = usePartnerBookings(
     statusFilter ? { booking_status: statusFilter } : {}
   )
-  const bookings = data?.results || data || []
+  
+  let bookings = data?.results || data || []
+  
+  // Sort bookings (desc = latest first, asc = oldest first)
+  bookings = [...bookings].sort((a, b) => {
+    // Use created_at if available, otherwise start_date, otherwise id
+    const valA = new Date(a.created_at || a.start_date || 0).getTime() || a.id
+    const valB = new Date(b.created_at || b.start_date || 0).getTime() || b.id
+    if (valA < valB) return sortOrder === 'desc' ? 1 : -1
+    if (valA > valB) return sortOrder === 'desc' ? -1 : 1
+    return 0
+  })
 
   // ── Keep the open modal in sync whenever the list refetches ───────────────
   // Fixes: payment status / rental times / booking status showing stale data
@@ -966,16 +978,31 @@ export default function PartnerBookingsPage() {
           </p>
         </div>
 
-        {/* View toggle */}
-        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1">
-          <button onClick={() => setViewMode('card')} title="Card view"
-            className={`p-2 rounded-lg transition ${viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-brand-600 dark:text-brand-400' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}`}>
-            <LayoutGrid size={17}/>
+        {/* Toggles */}
+        <div className="flex items-center gap-3">
+          {/* Sort toggle */}
+          <button 
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1a1d2e] text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition shadow-sm"
+          >
+            {sortOrder === 'desc' ? (
+              <><ArrowDown size={14} className="text-brand-500" /> Latest</>
+            ) : (
+              <><ArrowUp size={14} className="text-brand-500" /> Oldest</>
+            )}
           </button>
-          <button onClick={() => setViewMode('list')} title="List view"
-            className={`p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-brand-600 dark:text-brand-400' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}`}>
-            <List size={17}/>
-          </button>
+          
+          {/* View toggle */}
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1">
+            <button onClick={() => setViewMode('card')} title="Card view"
+              className={`p-2 rounded-lg transition ${viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-brand-600 dark:text-brand-400' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}`}>
+              <LayoutGrid size={17}/>
+            </button>
+            <button onClick={() => setViewMode('list')} title="List view"
+              className={`p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-brand-600 dark:text-brand-400' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}`}>
+              <List size={17}/>
+            </button>
+          </div>
         </div>
       </div>
 

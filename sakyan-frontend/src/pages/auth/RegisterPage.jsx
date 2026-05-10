@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Mail, Lock, User, Phone, UserPlus } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function RegisterPage() {
   const { registerMutation, loginWithGoogle } = useAuth()
@@ -13,10 +14,16 @@ export default function RegisterPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (form.password !== form.confirmPassword) { alert('Passwords do not match'); return }
-    registerMutation.mutate({
-      full_name: form.full_name, email: form.email, phone: form.phone, password: form.password,
+    toast('We are currently optimizing the sign-up process. Kindly use "Continue with Google" to create your account.', {
+      icon: '🛠️',
+      duration: 5000,
+      style: {
+        borderRadius: '10px',
+        background: '#333',
+        color: '#fff',
+      },
     })
+    return
   }
 
   const inputIcon = (Icon) => (
