@@ -181,14 +181,14 @@ export default function PartnerHomePage() {
   const completed = bookings.filter(b => b.booking_status === 'completed')
 
   const totalEarnings = completed.reduce(
-    (s, b) => s + (Number(b.total_amount) - Number(b.commission_amount || 0)), 0
+    (s, b) => s + (Number(b.total_amount) - Number(b.commission_amount || 0) - Number(b.booking_fee || 0)), 0
   )
 
   // ── Dynamic chart data (period-aware) ───────────────────────────────────
   const earningsData = useMemo(() => {
     const map = completed.reduce((acc, b) => {
       const key = getPeriodKey(b.end_date, period)
-      acc[key]  = (acc[key] || 0) + (Number(b.total_amount) - Number(b.commission_amount || 0))
+      acc[key]  = (acc[key] || 0) + (Number(b.total_amount) - Number(b.commission_amount || 0) - Number(b.booking_fee || 0))
       return acc
     }, {})
     return sortPeriodKeys(Object.keys(map), period).map(k => ({ name: k, Earnings: map[k] }))
@@ -207,7 +207,7 @@ export default function PartnerHomePage() {
   const earningsSpark = useMemo(() => {
     const map = completed.reduce((acc, b) => {
       const k  = format(new Date(b.end_date), 'MMM yy')
-      acc[k]   = (acc[k] || 0) + (Number(b.total_amount) - Number(b.commission_amount || 0))
+      acc[k]   = (acc[k] || 0) + (Number(b.total_amount) - Number(b.commission_amount || 0) - Number(b.booking_fee || 0))
       return acc
     }, {})
     return Object.keys(map).sort((a, b) => new Date(a) - new Date(b)).map(k => ({ value: map[k] }))
@@ -256,7 +256,7 @@ export default function PartnerHomePage() {
       const inRange = earningsData.some(d => d.name === key)
       if (!inRange) return acc
       const n  = b.car_name || 'Unknown'
-      acc[n]   = (acc[n] || 0) + (Number(b.total_amount) - Number(b.commission_amount || 0))
+      acc[n]   = (acc[n] || 0) + (Number(b.total_amount) - Number(b.commission_amount || 0) - Number(b.booking_fee || 0))
       return acc
     }, {})
     return Object.entries(map)
