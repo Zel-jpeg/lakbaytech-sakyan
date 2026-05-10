@@ -131,9 +131,10 @@ export default function CarLocationPicker({ onChange, onCoordsChange, error, ini
 
   const initPartsRef = useRef(null)
 
-  // Pre-fetch reverse-geocode label for an existing pin (edit mode)
+  // Pre-fetch reverse-geocode label and set state for an existing or async pin
   useEffect(() => {
     if (!initialPin?.lat || !initialPin?.lng) return
+    if (!pin) setPin(initialPin)
     fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${initialPin.lat}&lon=${initialPin.lng}&format=json`,
       { headers: { 'Accept-Language': 'en' } }
@@ -141,7 +142,7 @@ export default function CarLocationPicker({ onChange, onCoordsChange, error, ini
       .then(r => r.json())
       .then(d => setPinLabel(d.display_name || `${initialPin.lat.toFixed(5)}, ${initialPin.lng.toFixed(5)}`))
       .catch(() => setPinLabel(`${initialPin.lat.toFixed(5)}, ${initialPin.lng.toFixed(5)}`))
-  }, [])
+  }, [initialPin])
 
   const provName = provinces.find(p  => p.code === province)?.name  || ''
   const cityName = cities.find(c    => c.code === city)?.name       || ''
