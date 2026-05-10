@@ -57,7 +57,7 @@ export default function AdminHomePage() {
     .reduce((acc, b) => {
       if (!b.end_date) return acc
       const month = format(new Date(b.end_date), 'MMM yyyy')
-      const rev = Number(b.commission_amount) || 0
+      const rev = (Number(b.commission_amount) || 0) + (Number(b.booking_fee) || 0)
       acc[month] = (acc[month] || 0) + rev
       return acc
     }, {})
@@ -77,7 +77,7 @@ export default function AdminHomePage() {
     .filter(b => b.booking_status === 'completed')
     .reduce((acc, b) => {
       const name = b.partner_name || 'Unknown Partner'
-      const rev = Number(b.commission_amount) || 0
+      const rev = (Number(b.commission_amount) || 0) + (Number(b.booking_fee) || 0)
       acc[name] = (acc[name] || 0) + rev
       return acc
     }, {})

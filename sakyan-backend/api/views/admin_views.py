@@ -87,19 +87,42 @@ class AdminStatsView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
+        completed_bookings = Booking.objects.filter(booking_status='completed')
+        totals = completed_bookings.aggregate(
+            comm=Sum('commission_amount'),
+            fees=Sum('booking_fee')
+        )
+        total_commission = totals['comm'] or 0
+        total_booking_fees = totals['fees'] or 0
+        total_revenue = total_commission + total_booking_fees
+
         stats = {
             'total_users':       User.objects.count(),
             'total_cars':        Car.objects.count(),
             'total_bookings':    Booking.objects.count(),
-            'total_revenue':     Booking.objects.filter(
-                booking_status='completed'
-            ).aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0,
+            'total_revenue':     total_revenue,
+            'total_commission':  total_commission,
+            'total_booking_fees': total_booking_fees,
+
+            'completed_bookings': completed_bookings.count(),
+            'cancelled_bookings': Booking.objects.filter(booking_status='cancelled').count(),
+            'rejected_bookings':  Booking.objects.filter(booking_status='rejected').count(),
+            'pending_bookings':  Booking.objects.filter(booking_status='pending_review').count(),
+            'active_bookings':   Booking.objects.filter(booking_status='active').count(),
 
             'pending_partners':  Partner.objects.filter(status='pending').count(),
             'active_partners':   Partner.objects.filter(status='approved').count(),
-            'pending_bookings':  Booking.objects.filter(booking_status='pending_review').count(),
-            'active_bookings':   Booking.objects.filter(booking_status='active').count(),
+            'rejected_partners': Partner.objects.filter(status='rejected').count(),
+            'suspended_partners': Partner.objects.filter(status='suspended').count(),
+
+            'total_customers':   User.objects.filter(role='customer').count(),
+            'total_partners':    User.objects.filter(role='partner').count(),
+            'total_admins':      User.objects.filter(role='admin').count(),
+
+            'kyc_approved':      CustomerProfile.objects.filter(kyc_status='approved').count(),
+            'kyc_rejected':      CustomerProfile.objects.filter(kyc_status='rejected').count(),
             'pending_kyc':       CustomerProfile.objects.filter(kyc_status='pending').count(),
+            'kyc_pending':       CustomerProfile.objects.filter(kyc_status='pending').count(),
         }
         return Response(stats)
 
