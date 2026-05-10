@@ -22,7 +22,8 @@ class StorageService {
 
   static String? getToken() => _p.getString(AppConstants.keyToken);
 
-  static bool hasToken() => _p.containsKey(AppConstants.keyToken) && getToken() != null;
+  static bool hasToken() =>
+      _p.containsKey(AppConstants.keyToken) && getToken() != null;
 
   static Future<void> removeToken() => _p.remove(AppConstants.keyToken);
 
@@ -34,7 +35,6 @@ class StorageService {
       _p.setBool(AppConstants.keyOnboardingSeen, true);
 
   // ── Theme ─────────────────────────────────────────────────────────────────
-
   /// Returns true only if the user has explicitly set a theme preference.
   /// On a fresh install this is false → ThemeModeNotifier falls back to the
   /// system brightness instead of hardcoding dark mode.
@@ -52,11 +52,23 @@ class StorageService {
   static Future<void> saveFcmToken(String token) =>
       _p.setString(AppConstants.keyFcmToken, token);
 
-  // ── Clear All ─────────────────────────────────────────────────────────────
-  /// Clears auth data (token, user) but preserves onboarding flag and theme.
+  // ── Clear auth (sign-out) ─────────────────────────────────────────────────
+  /// Clears all data tied to a specific user account:
+  ///   • Bearer token (the most important — used by the router guard)
+  ///   • Cached user JSON
+  ///   • FCM device token — the next user should register a fresh token
+  ///     so push notifications go to the right account.
+  ///
+  /// Intentionally PRESERVES:
+  ///   • Onboarding flag — the new user shouldn't see the intro again
+  ///     just because someone else signed out on the same device.
+  ///   • Theme preference — UX continuity on shared devices.
   static Future<void> clearAuth() async {
-    await _p.remove(AppConstants.keyToken);
-    await _p.remove(AppConstants.keyUser);
+    await Future.wait([
+      _p.remove(AppConstants.keyToken),
+      _p.remove(AppConstants.keyUser),
+      _p.remove(AppConstants.keyFcmToken), // prevent push notifications leaking to next user
+    ]);
   }
 
   /// Full wipe — used only in development / testing.
