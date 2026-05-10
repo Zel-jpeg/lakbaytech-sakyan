@@ -55,9 +55,7 @@ export default function DashboardLayout({ role }) {
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
         <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-1.5 flex items-center justify-center bg-white dark:bg-gray-800 shrink-0">
-            <img src="/sakyan-logo.png" alt="Sakyan" className="w-full h-full object-contain" />
-          </div>
+          <img src="/sakyan-logo.png" alt="Sakyan" className="w-10 h-10 object-contain rounded-xl" />
           <div>
             <p className="text-base font-bold text-gray-900 dark:text-white tracking-tight leading-none">Sakyan</p>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 capitalize">{role} Dashboard</p>
