@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, ToggleLeft, ToggleRight, Pencil, MapPin, Car } from 'lucide-react'
+import { Plus, ToggleLeft, ToggleRight, Pencil, MapPin, Car, X, Settings2, Fuel, Users } from 'lucide-react'
 import { useMyPartnerCars, useToggleCarAvailability } from '@/hooks/useCars'
 import { formatCurrency } from '@/utils/formatters'
 
@@ -18,8 +19,18 @@ function CarStatusBadge({ isAvailable }) {
 export default function MyCarsPage() {
   const { data, isLoading } = useMyPartnerCars()
   const toggleMutation = useToggleCarAvailability()
+  const [selectedCar, setSelectedCar] = useState(null)
 
   const cars = data?.results || data || []
+
+  // Close modal on escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setSelectedCar(null)
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [])
 
   return (
     <div>
@@ -65,7 +76,7 @@ export default function MyCarsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {cars.map((car) => (
           <div key={car.id} className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md dark:hover:shadow-dark-card transition duration-300 flex flex-col">
-            <Link to={`/cars/${car.id}`} className="block group flex-1">
+            <div onClick={() => setSelectedCar(car)} className="block group flex-1 cursor-pointer">
               {/* Car image */}
               <div className="h-40 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
                 {car.primary_image ? (
@@ -93,7 +104,7 @@ export default function MyCarsPage() {
                 )}
                 <p className="text-brand-600 dark:text-brand-400 font-bold mt-2">{formatCurrency(car.price_per_day)}<span className="text-xs text-gray-400 dark:text-gray-500 font-normal">/day</span></p>
               </div>
-            </Link>
+            </div>
 
             {/* Actions */}
             <div className="p-4 pt-3 mt-auto">
@@ -122,6 +133,126 @@ export default function MyCarsPage() {
           </div>
         ))}
       </div>
+
+      {/* Car Details Modal */}
+      {selectedCar && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+             onClick={() => setSelectedCar(null)}>
+          <div className="bg-white dark:bg-[#1a1d2e] w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+               onClick={e => e.stopPropagation()}>
+            <div className="relative h-64 bg-gray-100 dark:bg-gray-800 shrink-0">
+              {selectedCar.primary_image ? (
+                <img src={selectedCar.primary_image} alt={selectedCar.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Car size={48} className="text-gray-300 dark:text-gray-600" />
+                </div>
+              )}
+              <button 
+                onClick={() => setSelectedCar(null)} 
+                className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition backdrop-blur-sm"
+              >
+                <X size={20} />
+              </button>
+              <div className="absolute bottom-4 right-4">
+                 <CarStatusBadge isAvailable={selectedCar.is_available} />
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <div className="flex justify-between items-start gap-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCar.name}</h2>
+                  <p className="text-gray-500 dark:text-gray-400 mt-1">{selectedCar.brand} • {selectedCar.year}</p>
+                  {selectedCar.location && (
+                    <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      <MapPin size={14} />
+                      <span>{selectedCar.location}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-brand-600 dark:text-brand-400">{formatCurrency(selectedCar.price_per_day)}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">/day</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+                {selectedCar.transmission && (
+                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                      <Settings2 size={16} className="text-brand-500 dark:text-brand-400" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Transmission</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">{selectedCar.transmission}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedCar.fuel_type && (
+                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                      <Fuel size={16} className="text-brand-500 dark:text-brand-400" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Fuel</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">{selectedCar.fuel_type}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedCar.seats && (
+                  <div className="flex items-center gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                    <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+                      <Users size={16} className="text-brand-500 dark:text-brand-400" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Seats</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{selectedCar.seats} seats</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {selectedCar.description && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Description</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">{selectedCar.description}</p>
+                </div>
+              )}
+              
+              {selectedCar.features?.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Features</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCar.features.map((f, i) => (
+                      <span key={i} className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2.5 py-1 rounded-md">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-3 pt-4 mt-2 border-t border-gray-100 dark:border-gray-800/60">
+                <button
+                  onClick={() => {
+                    toggleMutation.mutate(selectedCar.id);
+                    // update local state so the badge changes instantly
+                    setSelectedCar({ ...selectedCar, is_available: !selectedCar.is_available });
+                  }}
+                  disabled={toggleMutation.isPending}
+                  className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                >
+                  {selectedCar.is_available ? 'Deactivate Listing' : 'Activate Listing'}
+                </button>
+                <Link to={`/dashboard/cars/${selectedCar.id}/edit`} className="flex-1 flex justify-center items-center py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-xl transition">
+                  Edit Details
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
