@@ -6,6 +6,8 @@ import { ArrowLeft, Upload, X } from 'lucide-react'
 import { useState } from 'react'
 import { useCreateCar } from '@/hooks/useCars'
 import { useFileUpload } from '@/hooks/useFileUpload'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/config/axios'
 import CarLocationPicker from '@/components/cars/CarLocationPicker'
 
 const schema = z.object({
@@ -45,10 +47,24 @@ export default function AddCarPage() {
   const [imageUrls, setImageUrls] = useState([])
   const [locationCoords, setLocationCoords] = useState({ lat: null, lng: null })
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, formState: { errors }, setValue } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { seats: 5, transmission: 'automatic', fuel_type: 'gasoline' }
   })
+
+  const { data: profile } = useQuery({
+    queryKey: ['partnerProfile'],
+    queryFn: async () => {
+      const res = await api.get('/partner/profile/')
+      return res.data
+    }
+  })
+
+  useEffect(() => {
+    if (profile?.business_lat && profile?.business_lng && locationCoords.lat === null) {
+      setLocationCoords({ lat: profile.business_lat, lng: profile.business_lng })
+    }
+  }, [profile, locationCoords.lat])
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || [])
@@ -154,8 +170,11 @@ export default function AddCarPage() {
               <Controller
                 name="location"
                 control={control}
+                defaultValue={profile?.business_address || ''}
                 render={({ field }) => (
                   <CarLocationPicker
+                    initialAddress={profile?.business_address}
+                    initialPin={profile?.business_lat && profile?.business_lng ? { lat: profile.business_lat, lng: profile.business_lng } : null}
                     onChange={field.onChange}
                     onCoordsChange={(lat, lng) => setLocationCoords({ lat, lng })}
                     error={errors.location?.message}

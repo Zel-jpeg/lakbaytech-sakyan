@@ -35,6 +35,8 @@ class Partner(models.Model):
     business_name       = models.CharField(max_length=255)
     partner_type        = models.CharField(max_length=20, choices=TYPE_CHOICES)
     business_address    = models.TextField(blank=True)
+    business_lat        = models.FloatField(null=True, blank=True)
+    business_lng        = models.FloatField(null=True, blank=True)
     business_permit_url = models.TextField(blank=True)
     government_id_url   = models.TextField()
     contact_person      = models.CharField(max_length=255, blank=True)

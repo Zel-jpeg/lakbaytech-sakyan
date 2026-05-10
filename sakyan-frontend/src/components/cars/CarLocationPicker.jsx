@@ -113,7 +113,7 @@ function Select({ value, onChange, options, placeholder, loading, disabled }) {
  *   error                               — validation error message string
  *   initialPin                          — optional { lat, lng } to pre-place the pin (Edit mode)
  */
-export default function CarLocationPicker({ onChange, onCoordsChange, error, initialPin }) {
+export default function CarLocationPicker({ onChange, onCoordsChange, error, initialPin, initialAddress }) {
   const [provinces, setProvinces] = useState([])
   const [cities,    setCities]    = useState([])
   const [barangays, setBarangays] = useState([])
@@ -128,6 +128,8 @@ export default function CarLocationPicker({ onChange, onCoordsChange, error, ini
 
   const [pin,      setPin]      = useState(initialPin || null)
   const [pinLabel, setPinLabel] = useState('')
+
+  const initPartsRef = useRef(null)
 
   // Pre-fetch reverse-geocode label for an existing pin (edit mode)
   useEffect(() => {
@@ -149,10 +151,30 @@ export default function CarLocationPicker({ onChange, onCoordsChange, error, ini
   const flyQuery = barangay ? `${brgyName}, ${cityName}` : city ? cityName : ''
   const flyZoom  = barangay ? 15 : 13
 
+  // Trigger initialization when initialAddress arrives
+  useEffect(() => {
+    if (initialAddress && !initPartsRef.current && !province) {
+      initPartsRef.current = initialAddress.split(',').map(s => s.trim())
+      // If provinces are already loaded, select it immediately
+      if (provinces.length > 0) {
+        const pName = initPartsRef.current[initPartsRef.current.length - 1]
+        const found = provinces.find(p => p.name === pName)
+        if (found) setProvince(found.code)
+      }
+    }
+  }, [initialAddress, provinces])
+
   // Load provinces
   useEffect(() => {
     psgcFetch('psgc_provinces', `${PSGC}/provinces/`)
-      .then(setProvinces)
+      .then(data => {
+        setProvinces(data)
+        if (initPartsRef.current?.length > 0) {
+          const pName = initPartsRef.current[initPartsRef.current.length - 1]
+          const found = data.find(p => p.name === pName)
+          if (found) setProvince(found.code)
+        }
+      })
       .finally(() => setLoadingP(false))
   }, [])
 
@@ -163,7 +185,14 @@ export default function CarLocationPicker({ onChange, onCoordsChange, error, ini
     if (!province) return
     setLoadingC(true)
     psgcFetch(`psgc_cities_${province}`, `${PSGC}/provinces/${province}/cities-municipalities/`)
-      .then(setCities)
+      .then(data => {
+        setCities(data)
+        if (initPartsRef.current?.length > 1) {
+          const cName = initPartsRef.current[initPartsRef.current.length - 2]
+          const found = data.find(c => c.name === cName)
+          if (found) setCity(found.code)
+        }
+      })
       .finally(() => setLoadingC(false))
   }, [province])
 
@@ -173,14 +202,32 @@ export default function CarLocationPicker({ onChange, onCoordsChange, error, ini
     if (!city) return
     setLoadingB(true)
     psgcFetch(`psgc_brgy_${city}`, `${PSGC}/cities-municipalities/${city}/barangays/`)
-      .then(setBarangays)
+      .then(data => {
+        setBarangays(data)
+        if (initPartsRef.current?.length > 2) {
+          const bName = initPartsRef.current[initPartsRef.current.length - 3]
+          const found = data.find(b => b.name === bName)
+          if (found) setBarangay(found.code)
+        }
+        initPartsRef.current = null // Done initializing
+      })
       .finally(() => setLoadingB(false))
   }, [city])
 
   // Sync composed address string to parent form
+  const isInitRender = useRef(true)
   useEffect(() => {
     const parts = [brgyName, cityName, provName].filter(Boolean)
-    onChange(parts.join(', '))
+    const newAddress = parts.join(', ')
+    
+    // Prevent overriding form state with empty string immediately on mount
+    // if an initialAddress is expected
+    if (isInitRender.current && !newAddress && initialAddress) {
+       isInitRender.current = false
+       return
+    }
+
+    onChange(newAddress)
   }, [brgyName, cityName, provName])
 
   // Map click → reverse-geocode and notify parent

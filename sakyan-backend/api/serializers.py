@@ -162,6 +162,7 @@ class PartnerApplySerializer(serializers.ModelSerializer):
         model = Partner
         fields = [
             'business_name', 'partner_type', 'business_address',
+            'business_lat', 'business_lng',
             'business_permit_url', 'government_id_url',
             'contact_person', 'contact_phone'
         ]
