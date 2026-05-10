@@ -1,126 +1,170 @@
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Users, Car, CalendarCheck,
-  Clock, CheckCircle2, AlertCircle,
-  Shield, Wallet, ArrowUpRight,
-  CreditCard, UserCheck, ChevronRight,
-  Activity, BarChart3, DollarSign,
+  Users, Car, CalendarCheck, DollarSign,
+  Clock, CheckCircle2, AlertCircle, Shield,
+  Wallet, CreditCard, UserCheck, ChevronRight,
+  ArrowUpRight, BarChart3,
 } from 'lucide-react'
 import { useAdminStats, useAdminPartners, useAdminAllBookings } from '@/hooks/useAdmin'
 import { formatCurrency, formatDate } from '@/utils/formatters'
-import { format } from 'date-fns'
+import { format, startOfWeek } from 'date-fns'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
-  BarChart, Bar, ComposedChart,
+  BarChart, Bar, LineChart, Line,
 } from 'recharts'
+import { useUIStore } from '@/store/uiStore'
 
-/* ─── Color Palette ─────────────────────────────────────────────────────────── */
-const CHART_COLORS = {
-  brand:    '#4F6BF6',
-  brandLight: '#7793f7',
-  green:    '#10B981',
-  amber:    '#F59E0B',
-  red:      '#EF4444',
-  sky:      '#0EA5E9',
-  violet:   '#8B5CF6',
-  orange:   '#F97316',
-  teal:     '#14B8A6',
-  rose:     '#F43F5E',
-  slate:    '#64748B',
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SHARED UTILITIES  (matching partner dashboard style)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+// ─── Period config ────────────────────────────────────────────────────────────
+const PERIODS = [
+  { key: 'daily',   label: 'Daily'   },
+  { key: 'weekly',  label: 'Weekly'  },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'yearly',  label: 'Yearly'  },
+]
+
+function getPeriodKey(dateStr, period) {
+  const d = new Date(dateStr)
+  switch (period) {
+    case 'daily':   return format(d, 'MMM d')
+    case 'weekly': {
+      const weekStart = startOfWeek(d, { weekStartsOn: 1 })
+      return format(weekStart, 'MMM d')
+    }
+    case 'monthly': return format(d, 'MMM yy')
+    case 'yearly':  return format(d, 'yyyy')
+    default:        return format(d, 'MMM yy')
+  }
 }
 
-const STATUS_COLORS = {
-  pending_review: CHART_COLORS.amber,
-  approved:       CHART_COLORS.sky,
-  active:         CHART_COLORS.green,
-  completed:      CHART_COLORS.brand,
-  rejected:       CHART_COLORS.red,
-  cancelled:      CHART_COLORS.slate,
+function sortPeriodKeys(keys, period) {
+  return [...keys].sort((a, b) => {
+    const parseKey = k => {
+      try {
+        if (period === 'yearly') return new Date(`Jan 1 ${k}`)
+        return new Date(`${k} ${new Date().getFullYear()}`)
+      } catch { return new Date(0) }
+    }
+    return parseKey(a) - parseKey(b)
+  })
 }
 
-const STATUS_LABELS = {
-  pending_review: 'Pending Review',
-  approved:       'Approved',
-  active:         'Active',
-  completed:      'Completed',
-  rejected:       'Rejected',
-  cancelled:      'Cancelled',
-}
-
-/* ─── Custom Tooltip ────────────────────────────────────────────────────────── */
-function GlassTooltip({ active, payload, label, formatter }) {
-  if (!active || !payload?.length) return null
+// ─── Period toggle ────────────────────────────────────────────────────────────
+function PeriodToggle({ value, onChange }) {
   return (
-    <div className="bg-white/95 dark:bg-[#1e2235]/95 backdrop-blur-xl rounded-xl border border-gray-200/50 dark:border-gray-700/50 shadow-xl px-4 py-3 text-sm">
-      <p className="text-gray-500 dark:text-gray-400 text-xs font-medium mb-1.5">{label}</p>
-      {payload.map((entry, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="text-gray-600 dark:text-gray-300 text-xs">{entry.name}:</span>
-          <span className="font-semibold text-gray-900 dark:text-white text-xs">
-            {formatter ? formatter(entry.value, entry.name) : entry.value}
-          </span>
-        </div>
+    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+      {PERIODS.map(p => (
+        <button
+          key={p.key}
+          onClick={() => onChange(p.key)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+            value === p.key
+              ? 'bg-white dark:bg-[#1a1d2e] text-brand-600 dark:text-brand-400 shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          {p.label}
+        </button>
       ))}
     </div>
   )
 }
 
-/* ─── Stat Card ─────────────────────────────────────────────────────────────── */
-function HeroStatCard({ icon: Icon, label, value, gradient, sub, trend }) {
+// ─── Chart theme ──────────────────────────────────────────────────────────────
+function useChartTheme(theme) {
+  const isDark = theme === 'dark'
+  return {
+    isDark,
+    text  : isDark ? '#6B7280' : '#9CA3AF',
+    grid  : isDark ? '#1F2937' : '#F3F4F6',
+    tip   : {
+      borderRadius   : '12px',
+      border         : `1px solid ${isDark ? '#1F2937' : '#F0F0F0'}`,
+      boxShadow      : '0 10px 30px -5px rgb(0 0 0 / 0.15)',
+      backgroundColor: isDark ? '#111827' : '#ffffff',
+      color          : isDark ? '#F9FAFB' : '#111827',
+      fontSize       : '12px',
+      padding        : '10px 14px',
+    },
+    cursor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+  }
+}
+
+// ─── Shared components ────────────────────────────────────────────────────────
+function Panel({ children, className = '' }) {
   return (
-    <div className="relative overflow-hidden bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5 group hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-black/20 transition-all duration-300">
-      {/* Background decorative gradient */}
-      <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-[0.08] dark:opacity-[0.12] ${gradient} blur-2xl group-hover:opacity-[0.15] dark:group-hover:opacity-[0.2] transition-opacity duration-500`} />
-      
-      <div className="flex items-start justify-between relative">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
-          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-            {value ?? '—'}
-          </p>
-          {sub && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
-              {trend === 'up' && <ArrowUpRight size={12} className="text-emerald-500" />}
-              {trend === 'down' && <ArrowDownRight size={12} className="text-red-400" />}
-              {sub}
-            </p>
-          )}
-        </div>
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-lg`}>
-          <Icon size={22} className="text-white" />
-        </div>
-      </div>
+    <div className={`bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 ${className}`}>
+      {children}
     </div>
   )
 }
 
-/* ─── Quick Stat Pill ───────────────────────────────────────────────────────── */
-function QuickStatPill({ icon: Icon, label, value, color, to }) {
-  const inner = (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-[#1a1d2e] border border-gray-100 dark:border-gray-700/50 hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200 group cursor-pointer">
-      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${color}`} />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{label}</p>
-        <p className="text-lg font-bold text-gray-900 dark:text-white">{value ?? 0}</p>
-      </div>
-      {to && <ChevronRight size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-500 transition-colors shrink-0" />}
+function Empty({ message }) {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <p className="text-sm text-gray-400 dark:text-gray-500">{message}</p>
     </div>
   )
-  return to ? <Link to={to}>{inner}</Link> : inner
 }
 
-/* ─── Quick Action Button ───────────────────────────────────────────────────── */
-function QuickAction({ icon: Icon, label, to, color }) {
+// ─── Stat card ────────────────────────────────────────────────────────────────
+function StatCard({ icon: Icon, label, value, accent, sub }) {
+  return (
+    <div
+      className="relative bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100
+                 dark:border-gray-800 p-5 overflow-hidden
+                 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]
+                 dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.3)]
+                 transition-all duration-300 group"
+    >
+      <div
+        className="absolute -top-5 -right-5 w-24 h-24 rounded-full
+                   opacity-[0.07] dark:opacity-[0.12]
+                   group-hover:opacity-[0.13] dark:group-hover:opacity-[0.18]
+                   transition-opacity duration-300"
+        style={{ background: accent }}
+      />
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 shadow-sm"
+        style={{ background: accent }}
+      >
+        <Icon size={17} className="text-white" />
+      </div>
+      <p className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight leading-none">
+        {value ?? '—'}
+      </p>
+      <div className="flex items-center justify-between mt-1.5">
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">{label}</p>
+        <ArrowUpRight
+          size={13}
+          className="text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        />
+      </div>
+      {sub && (
+        <p className="text-[11px] text-gray-400 dark:text-gray-600 mt-1 truncate">{sub}</p>
+      )}
+    </div>
+  )
+}
+
+// ─── Quick action ─────────────────────────────────────────────────────────────
+function QuickAction({ icon: Icon, label, to, accent }) {
   return (
     <Link
       to={to}
-      className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700/50 hover:border-gray-200 dark:hover:border-gray-600 bg-white dark:bg-[#1a1d2e] hover:shadow-md transition-all duration-200 group"
+      className="flex items-center gap-3 p-3 rounded-xl border border-gray-50 dark:border-gray-800/50
+                 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors group"
     >
-      <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shrink-0`}>
-        <Icon size={16} className="text-white" />
+      <div
+        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+        style={{ background: accent }}
+      >
+        <Icon size={15} className="text-white" />
       </div>
       <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors">
         {label}
@@ -130,7 +174,16 @@ function QuickAction({ icon: Icon, label, to, color }) {
   )
 }
 
-/* ─── Status Badge ──────────────────────────────────────────────────────────── */
+// ─── Status badge ─────────────────────────────────────────────────────────────
+const STATUS_COLORS_MAP = {
+  pending_review: '#F59E0B',
+  approved:       '#3B82F6',
+  active:         '#10B981',
+  completed:      '#6B7280',
+  rejected:       '#EF4444',
+  cancelled:      '#F87171',
+}
+
 const STATUS_BADGE_STYLES = {
   pending_review: 'bg-amber-50 text-amber-700 ring-amber-200/50 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-800/30',
   approved:       'bg-blue-50 text-blue-700 ring-blue-200/50 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-800/30',
@@ -141,27 +194,13 @@ const STATUS_BADGE_STYLES = {
 }
 
 function StatusBadge({ status }) {
+  const label = status?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1
                       ${STATUS_BADGE_STYLES[status] || 'bg-gray-50 dark:bg-gray-800 text-gray-500 ring-gray-200/50 dark:ring-gray-700/30'}`}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[status] || '#94A3B8' }} />
-      {STATUS_LABELS[status] || status?.replace('_', ' ')}
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: STATUS_COLORS_MAP[status] || '#94A3B8' }} />
+      {label}
     </span>
-  )
-}
-
-/* ─── Donut Center Label ────────────────────────────────────────────────────── */
-function DonutCenterLabel({ viewBox, value, label }) {
-  const { cx, cy } = viewBox || {}
-  return (
-    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central">
-      <tspan x={cx} y={cy - 8} className="fill-gray-900 dark:fill-white text-2xl font-bold">
-        {value}
-      </tspan>
-      <tspan x={cx} y={cy + 14} className="fill-gray-400 dark:fill-gray-500 text-[11px]">
-        {label}
-      </tspan>
-    </text>
   )
 }
 
@@ -172,550 +211,554 @@ function DonutCenterLabel({ viewBox, value, label }) {
 export default function AdminHomePage() {
   const { data: stats, isLoading: statsLoading } = useAdminStats()
   const { data: pendingPartners } = useAdminPartners('pending')
-  const { data: recentBookings } = useAdminAllBookings({})
+  const { data: recentBookings }  = useAdminAllBookings({})
+  const { theme } = useUIStore()
+  const c = useChartTheme(theme)
+
+  const [period, setPeriod] = useState('daily')
 
   const partnerList = pendingPartners?.results || pendingPartners || []
-  const allBookings = recentBookings?.results || recentBookings || []
+  const allBookings = recentBookings?.results  || recentBookings  || []
   const bookingList = allBookings.slice(0, 5)
 
-  /* ── Revenue by month ────────────────────────────────────────────────────── */
+  const completedBookings = useMemo(
+    () => allBookings.filter(b => b.booking_status === 'completed'),
+    [allBookings]
+  )
+
+  /* ── Revenue data (period-aware) ─────────────────────────────────────────── */
   const revenueData = useMemo(() => {
-    const byMonth = allBookings
-      .filter(b => b.booking_status === 'completed')
-      .reduce((acc, b) => {
-        if (!b.end_date) return acc
-        const month = format(new Date(b.end_date), 'MMM yyyy')
-        const rev = (Number(b.commission_amount) || 0) + (Number(b.booking_fee) || 0)
-        if (!acc[month]) acc[month] = { Revenue: 0, Bookings: 0 }
-        acc[month].Revenue += rev
-        acc[month].Bookings += 1
-        return acc
-      }, {})
+    const map = completedBookings.reduce((acc, b) => {
+      if (!b.end_date) return acc
+      const key = getPeriodKey(b.end_date, period)
+      const rev = (Number(b.commission_amount) || 0) + (Number(b.booking_fee) || 0)
+      acc[key] = (acc[key] || 0) + rev
+      return acc
+    }, {})
+    return sortPeriodKeys(Object.keys(map), period).map(k => ({ name: k, Revenue: map[k] }))
+  }, [completedBookings, period])
 
-    return Object.keys(byMonth)
-      .sort((a, b) => new Date(a) - new Date(b))
-      .map(m => ({ name: m, ...byMonth[m] }))
-  }, [allBookings])
+  const totalRevenue = stats?.total_revenue || 0
 
-  /* ── Booking status breakdown ────────────────────────────────────────────── */
-  const bookingStatusData = useMemo(() => {
-    if (!stats) return []
-    const mapping = [
-      { key: 'pending_bookings',   status: 'pending_review' },
-      { key: 'active_bookings',    status: 'active' },
-      { key: 'completed_bookings', status: 'completed' },
-      { key: 'cancelled_bookings', status: 'cancelled' },
-      { key: 'rejected_bookings',  status: 'rejected' },
-    ]
-    return mapping
-      .map(({ key, status }) => ({
-        name:  STATUS_LABELS[status],
-        value: stats[key] || 0,
-        color: STATUS_COLORS[status],
-      }))
-      .filter(d => d.value > 0)
-  }, [stats])
+  /* ── Bookings overview (period-aware bar chart) ──────────────────────────── */
+  const bookingsChartData = useMemo(() => {
+    const map = allBookings.reduce((acc, b) => {
+      const key = getPeriodKey(b.created_at || b.start_date, period)
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {})
+    return sortPeriodKeys(Object.keys(map), period).map(k => ({ name: k, Bookings: map[k] }))
+  }, [allBookings, period])
 
-  /* ── Top grossing partners ───────────────────────────────────────────────── */
+  /* ── Booking status donut (period-filtered) ──────────────────────────────── */
+  const statusData = useMemo(() => {
+    const STATUS_COLORS = {
+      pending_review: '#F59E0B', approved: '#3B82F6',
+      active: '#10B981', completed: '#4F6BF6',
+      rejected: '#EF4444', cancelled: '#F87171',
+    }
+    const filtered = allBookings.filter(b => {
+      try {
+        const key = getPeriodKey(b.created_at || b.start_date, period)
+        const allKeys = bookingsChartData.map(d => d.name)
+        return allKeys.includes(key)
+      } catch { return true }
+    })
+    const map = filtered.reduce((acc, b) => {
+      acc[b.booking_status] = (acc[b.booking_status] || 0) + 1
+      return acc
+    }, {})
+    return Object.entries(map).map(([k, v]) => ({
+      name:  k.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      value: v,
+      color: STATUS_COLORS[k] || '#9CA3AF',
+    }))
+  }, [allBookings, period, bookingsChartData])
+
+  /* ── Top performing partners (compact) ───────────────────────────────────── */
   const topPartnersData = useMemo(() => {
-    const map = allBookings
-      .filter(b => b.booking_status === 'completed')
-      .reduce((acc, b) => {
-        const name = b.partner_name || 'Unknown Partner'
-        const rev = (Number(b.commission_amount) || 0) + (Number(b.booking_fee) || 0)
-        acc[name] = (acc[name] || 0) + rev
-        return acc
-      }, {})
-
+    const map = completedBookings.reduce((acc, b) => {
+      // Filter by period
+      const key = getPeriodKey(b.end_date, period)
+      const inRange = revenueData.some(d => d.name === key)
+      if (!inRange) return acc
+      const name = b.partner_name || 'Unknown Partner'
+      const rev = (Number(b.commission_amount) || 0) + (Number(b.booking_fee) || 0)
+      acc[name] = (acc[name] || 0) + rev
+      return acc
+    }, {})
     return Object.entries(map)
-      .map(([name, rev]) => ({ name, Commission: rev }))
+      .map(([name, Commission]) => ({ name, Commission }))
       .sort((a, b) => b.Commission - a.Commission)
       .slice(0, 5)
-  }, [allBookings])
+  }, [completedBookings, period, revenueData])
 
   /* ── Earnings breakdown ──────────────────────────────────────────────────── */
   const earnings = useMemo(() => {
     if (!stats) return null
     const total = stats.total_revenue || 0
-    const comm = stats.total_commission || 0
-    const fees = stats.total_booking_fees || 0
+    const comm  = stats.total_commission || 0
+    const fees  = stats.total_booking_fees || 0
     return {
-      total,
-      commission: comm,
-      fees,
+      total, commission: comm, fees,
       commPct: total > 0 ? (comm / total) * 100 : 0,
       feesPct: total > 0 ? (fees / total) * 100 : 0,
     }
   }, [stats])
 
+  const periodLabel = PERIODS.find(p => p.key === period)?.label ?? 'Daily'
+
   return (
-    <div className="space-y-6">
+    <div>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Platform overview and key metrics
-          </p>
-        </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-          Last updated: {format(new Date(), 'MMM d, yyyy · h:mm a')}
+      <div className="mb-7">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+          Platform-wide financial overview and commission tracking.
         </p>
       </div>
 
-      {/* ── Hero Stat Cards ────────────────────────────────────────────────── */}
+      {/* ── Stat Cards ─────────────────────────────────────────────────────── */}
       {statsLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 h-[110px] animate-pulse" />
+            <div key={i} className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 h-[120px] animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <HeroStatCard
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <StatCard
             icon={DollarSign}
             label="Total Revenue"
-            value={stats?.total_revenue != null ? formatCurrency(stats.total_revenue) : '—'}
-            gradient="from-brand-500 to-violet-500"
-            sub="Platform commissions & fees"
-            trend="up"
+            value={formatCurrency(totalRevenue)}
+            accent="#4F6BF6"
+            sub="Commissions + booking fees"
           />
-          <HeroStatCard
+          <StatCard
             icon={CalendarCheck}
             label="Total Bookings"
             value={stats?.total_bookings}
-            gradient="from-emerald-500 to-teal-500"
+            accent="#10B981"
             sub={`${stats?.completed_bookings || 0} completed`}
           />
-          <HeroStatCard
+          <StatCard
             icon={Users}
             label="Total Users"
             value={stats?.total_users}
-            gradient="from-sky-500 to-blue-500"
+            accent="#F59E0B"
             sub={`${stats?.total_customers || 0} customers · ${stats?.total_partners || 0} partners`}
           />
-          <HeroStatCard
+          <StatCard
             icon={Car}
             label="Listed Cars"
             value={stats?.total_cars}
-            gradient="from-orange-500 to-amber-500"
+            accent="#6366F1"
             sub="Available on platform"
           />
         </div>
       )}
 
-      {/* ── Quick Stats Strip ──────────────────────────────────────────────── */}
-      {!statsLoading && stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <QuickStatPill
-            icon={Clock}
-            label="Pending Partners"
-            value={stats.pending_partners}
-            color="bg-amber-400"
-            to="/admin/partners"
-          />
-          <QuickStatPill
-            icon={CheckCircle2}
-            label="Active Partners"
-            value={stats.active_partners}
-            color="bg-emerald-500"
-          />
-          <QuickStatPill
-            icon={Shield}
-            label="Pending KYC"
-            value={stats.kyc_pending || stats.pending_kyc || 0}
-            color="bg-violet-500"
-            to="/admin/kyc"
-          />
-          <QuickStatPill
-            icon={AlertCircle}
-            label="Pending Bookings"
-            value={stats.pending_bookings}
-            color="bg-sky-500"
-            to="/admin/bookings"
-          />
+      {/* ── Period toggle ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Analytics Overview</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            Showing {periodLabel.toLowerCase()} data across all charts
+          </p>
         </div>
-      )}
+        <PeriodToggle value={period} onChange={setPeriod} />
+      </div>
 
-      {/* ── Charts Row: Revenue + Booking Status + Earnings ────────────────── */}
-      {!statsLoading && stats && (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      {/* ── Charts Row 1: Bookings Overview + Booking Status ───────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
 
-          {/* Revenue & Bookings Combo Chart */}
-          <div className="xl:col-span-7 bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="font-semibold text-gray-800 dark:text-white">Revenue Overview</h2>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Monthly revenue from completed bookings</p>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-brand-500" /> Revenue
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Bookings
-                </span>
-              </div>
-            </div>
-            <div className="h-72 w-full">
-              {revenueData.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-                  <BarChart3 size={36} className="mb-2 opacity-40" />
-                  <p className="text-sm">No completed bookings yet</p>
-                </div>
-              ) : (
+        {/* Bookings Overview — Bar Chart (2 cols) */}
+        <Panel className="p-6 lg:col-span-2">
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Bookings Overview</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Total bookings · {periodLabel}</p>
+          </div>
+          <div className="h-60">
+            {bookingsChartData.length === 0
+              ? <Empty message="No bookings for this period" />
+              : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={revenueData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                  <BarChart data={bookingsChartData} margin={{ top: 5, right: 8, left: -10, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={CHART_COLORS.brand} stopOpacity={0.25} />
-                        <stop offset="100%" stopColor={CHART_COLORS.brand} stopOpacity={0} />
+                      <linearGradient id="gradBook" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#4F6BF6" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#4F6BF6" stopOpacity={0.4} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" strokeOpacity={0.5} />
+                    <CartesianGrid vertical={false} stroke={c.grid} strokeDasharray="0" />
                     <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                      dy={8}
+                      dataKey="name" axisLine={false} tickLine={false}
+                      tick={{ fontSize: 11, fill: c.text }} dy={8}
+                      interval="preserveStartEnd"
                     />
                     <YAxis
-                      yAxisId="rev"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                      tickFormatter={v => `₱${(v / 1000).toFixed(0)}k`}
+                      axisLine={false} tickLine={false}
+                      tick={{ fontSize: 11, fill: c.text }}
+                      width={30}
                     />
-                    <YAxis
-                      yAxisId="count"
-                      orientation="right"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                    <Tooltip
+                      formatter={v => [v, 'Bookings']}
+                      contentStyle={c.tip}
+                      cursor={{ fill: c.cursor }}
                     />
-                    <Tooltip content={
-                      <GlassTooltip formatter={(v, name) =>
-                        name === 'Revenue' ? `₱${v.toLocaleString()}` : v
-                      } />
-                    } />
                     <Bar
-                      yAxisId="count"
-                      dataKey="Bookings"
-                      fill={CHART_COLORS.green}
-                      opacity={0.25}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={32}
+                      dataKey="Bookings" fill="url(#gradBook)"
+                      radius={[4, 4, 0, 0]} maxBarSize={28}
                     />
-                    <Area
-                      yAxisId="rev"
-                      type="monotone"
-                      dataKey="Revenue"
-                      stroke={CHART_COLORS.brand}
-                      strokeWidth={2.5}
-                      fill="url(#gradRevenue)"
-                      dot={{ r: 3, fill: CHART_COLORS.brand, strokeWidth: 0 }}
-                      activeDot={{ r: 5, fill: CHART_COLORS.brand, stroke: '#fff', strokeWidth: 2 }}
-                    />
-                  </ComposedChart>
+                  </BarChart>
                 </ResponsiveContainer>
+              )
+            }
+          </div>
+        </Panel>
+
+        {/* Booking Status — Donut (1 col) */}
+        <Panel className="p-6">
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Booking Status</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Distribution · {periodLabel}</p>
+          </div>
+          <div className="h-60">
+            {statusData.length === 0
+              ? <Empty message="No bookings for this period" />
+              : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData} cx="50%" cy="43%"
+                      innerRadius={50} outerRadius={72}
+                      paddingAngle={3} dataKey="value" strokeWidth={0}
+                    >
+                      {statusData.map((e, i) => (
+                        <Cell key={i} fill={e.color} stroke="transparent" />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={c.tip} />
+                    <Legend
+                      verticalAlign="bottom" height={30}
+                      iconType="circle" iconSize={7}
+                      wrapperStyle={{ fontSize: '11px', color: c.text }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )
+            }
+          </div>
+        </Panel>
+      </div>
+
+      {/* ── Revenue Growth — Full Width Area Chart ─────────────────────────── */}
+      <Panel className="p-6 mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-5 gap-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Revenue Growth</p>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                {formatCurrency(totalRevenue)}
+              </span>
+              {completedBookings.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {completedBookings.length} completed
+                </span>
               )}
             </div>
           </div>
-
-          {/* Right column: Booking Status Donut + Earnings Breakdown */}
-          <div className="xl:col-span-5 flex flex-col gap-6">
-
-            {/* Booking Status Donut */}
-            <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5 flex-1">
-              <h2 className="font-semibold text-gray-800 dark:text-white mb-1">Booking Status</h2>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Current booking pipeline</p>
-              <div className="h-52 w-full">
-                {bookingStatusData.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-                    No bookings yet
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={bookingStatusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={52}
-                        outerRadius={72}
-                        paddingAngle={3}
-                        dataKey="value"
-                        strokeWidth={0}
-                      >
-                        {bookingStatusData.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={<GlassTooltip />}
-                      />
-                      <Legend
-                        verticalAlign="bottom"
-                        height={36}
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: '11px' }}
-                        formatter={(value) => <span className="text-gray-600 dark:text-gray-400">{value}</span>}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-
-            {/* Earnings Breakdown */}
-            {earnings && (
-              <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5">
-                <h2 className="font-semibold text-gray-800 dark:text-white mb-4">Earnings Breakdown</h2>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="text-gray-500 dark:text-gray-400">Platform Commission</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(earnings.commission)}</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500 transition-all duration-700"
-                        style={{ width: `${Math.min(earnings.commPct, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="text-gray-500 dark:text-gray-400">Booking Fees</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(earnings.fees)}</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-700"
-                        style={{ width: `${Math.min(earnings.feesPct, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(earnings.total)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
-      )}
+        <div className="h-72">
+          {revenueData.length === 0
+            ? <Empty message="No completed bookings yet to calculate revenue" />
+            : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueData} margin={{ top: 5, right: 8, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4F6BF6" stopOpacity={0.18} />
+                      <stop offset="100%" stopColor="#4F6BF6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} stroke={c.grid} strokeDasharray="0" />
+                  <XAxis
+                    dataKey="name" axisLine={false} tickLine={false}
+                    tick={{ fontSize: 11, fill: c.text }} dy={8}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    axisLine={false} tickLine={false}
+                    tick={{ fontSize: 11, fill: c.text }}
+                    tickFormatter={v => `₱${(v / 1000).toFixed(0)}k`}
+                    width={48}
+                  />
+                  <Tooltip
+                    formatter={v => [`₱${v.toLocaleString()}`, 'Revenue']}
+                    contentStyle={c.tip}
+                    cursor={{ stroke: '#4F6BF6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  />
+                  <Area
+                    type="monotone" dataKey="Revenue"
+                    stroke="#4F6BF6" strokeWidth={2.5}
+                    fill="url(#gradRev)" fillOpacity={1} dot={false}
+                    activeDot={{ r: 5, fill: '#4F6BF6', stroke: '#fff', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+      </Panel>
 
-      {/* ── Top Partners + Quick Actions ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ── Row 2: Top Partners (compact) + Earnings Breakdown ─────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
 
-        {/* Top Grossing Partners */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5">
+        {/* Top Performing Partners */}
+        <Panel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="font-semibold text-gray-800 dark:text-white">Top Revenue Partners</h2>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Commission generated by partner</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Top Performing Partners</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">By commission · {periodLabel}</p>
             </div>
             <Link
               to="/admin/partners"
-              className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
+              className="text-xs text-brand-600 dark:text-brand-400 font-medium hover:underline"
             >
-              View all →
+              View all
             </Link>
           </div>
-          <div className="h-64 w-full">
-            {topPartnersData.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-                <Activity size={32} className="mb-2 opacity-40" />
-                <p className="text-sm">Not enough data yet</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topPartnersData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gradPartner" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor={CHART_COLORS.brand} stopOpacity={0.9} />
-                      <stop offset="100%" stopColor={CHART_COLORS.violet} stopOpacity={0.7} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#E5E7EB" strokeOpacity={0.4} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={v => `₱${(v / 1000).toFixed(0)}k`}
-                  />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    tick={{ fontSize: 12, fill: '#6B7280' }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={110}
-                  />
-                  <Tooltip content={
-                    <GlassTooltip formatter={(v) => `₱${v.toLocaleString()}`} />
-                  } />
-                  <Bar
-                    dataKey="Commission"
-                    fill="url(#gradPartner)"
-                    radius={[0, 6, 6, 0]}
-                    maxBarSize={24}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+          <div className="h-60">
+            {topPartnersData.length === 0
+              ? <Empty message="No completed bookings for this period" />
+              : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topPartnersData} layout="vertical" margin={{ top: 0, right: 10, left: 6, bottom: 0 }}>
+                    <CartesianGrid horizontal={false} stroke={c.grid} strokeDasharray="0" />
+                    <XAxis
+                      type="number" axisLine={false} tickLine={false}
+                      tick={{ fontSize: 11, fill: c.text }}
+                      tickFormatter={v => `₱${(v / 1000).toFixed(0)}k`}
+                    />
+                    <YAxis
+                      dataKey="name" type="category"
+                      axisLine={false} tickLine={false}
+                      tick={{ fontSize: 11, fill: c.text }} width={90}
+                    />
+                    <Tooltip
+                      formatter={v => [`₱${v.toLocaleString()}`, 'Commission']}
+                      contentStyle={c.tip} cursor={{ fill: c.cursor }}
+                    />
+                    <Bar
+                      dataKey="Commission" fill="#4F6BF6"
+                      radius={[0, 6, 6, 0]} maxBarSize={20}
+                      background={{
+                        fill  : c.isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)',
+                        radius: [0, 6, 6, 0],
+                      }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
+            }
           </div>
-        </div>
+        </Panel>
 
-        {/* Quick Actions */}
-        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5">
-          <h2 className="font-semibold text-gray-800 dark:text-white mb-4">Quick Actions</h2>
-          <div className="space-y-2.5">
-            <QuickAction
-              icon={UserCheck}
-              label="Review Partners"
-              to="/admin/partners"
-              color="from-amber-400 to-orange-500"
-            />
-            <QuickAction
-              icon={Shield}
-              label="Verify KYC"
-              to="/admin/kyc"
-              color="from-violet-500 to-purple-600"
-            />
-            <QuickAction
-              icon={CalendarCheck}
-              label="Manage Bookings"
-              to="/admin/bookings"
-              color="from-sky-400 to-blue-500"
-            />
-            <QuickAction
-              icon={CreditCard}
-              label="Process Refunds"
-              to="/admin/refunds"
-              color="from-rose-400 to-red-500"
-            />
-            <QuickAction
-              icon={Wallet}
-              label="Settlements"
-              to="/admin/settlements"
-              color="from-emerald-400 to-teal-500"
-            />
-            <QuickAction
-              icon={BarChart3}
-              label="View Reports"
-              to="/admin/reports"
-              color="from-brand-400 to-brand-600"
-            />
+        {/* Earnings Breakdown */}
+        <Panel className="p-6">
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Earnings Breakdown</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Platform revenue composition</p>
           </div>
-        </div>
+          {earnings ? (
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-brand-500" />
+                    Platform Commission
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(earnings.commission)}</span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-brand-500 transition-all duration-700"
+                    style={{ width: `${Math.min(earnings.commPct, 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-600 mt-1">{earnings.commPct.toFixed(1)}% of total</p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    Booking Fees
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(earnings.fees)}</span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+                    style={{ width: `${Math.min(earnings.feesPct, 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-600 mt-1">{earnings.feesPct.toFixed(1)}% of total</p>
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(earnings.total)}</span>
+              </div>
+            </div>
+          ) : (
+            <Empty message="No revenue data" />
+          )}
+        </Panel>
       </div>
 
-      {/* ── Activity Panels: Pending Partners + Recent Bookings ─────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* ── Quick Stats + Quick Actions Row ────────────────────────────────── */}
+      {!statsLoading && stats && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+
+          {/* Quick Stats */}
+          <Panel className="p-6 lg:col-span-2">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Platform Health</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Key metrics requiring attention</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Pending Partners',  value: stats.pending_partners,  color: '#F59E0B', to: '/admin/partners' },
+                { label: 'Active Partners',   value: stats.active_partners,   color: '#10B981' },
+                { label: 'Pending KYC',       value: stats.kyc_pending || stats.pending_kyc || 0, color: '#6366F1', to: '/admin/kyc' },
+                { label: 'Pending Bookings',  value: stats.pending_bookings,  color: '#0EA5E9', to: '/admin/bookings' },
+              ].map(item => (
+                <Link
+                  key={item.label}
+                  to={item.to || '#'}
+                  className="p-3.5 rounded-xl bg-gray-50/70 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800
+                             hover:border-gray-200 dark:hover:border-gray-700 transition-all group"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }} />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.label}</p>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{item.value ?? 0}</p>
+                </Link>
+              ))}
+            </div>
+          </Panel>
+
+          {/* Quick Actions */}
+          <Panel className="p-6">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Quick Actions</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Go to common tasks</p>
+            </div>
+            <div className="space-y-2">
+              <QuickAction icon={UserCheck}     label="Review Partners"  to="/admin/partners"    accent="#F59E0B" />
+              <QuickAction icon={Shield}        label="Verify KYC"      to="/admin/kyc"         accent="#6366F1" />
+              <QuickAction icon={CreditCard}    label="Process Refunds" to="/admin/refunds"     accent="#EF4444" />
+              <QuickAction icon={Wallet}        label="Settlements"     to="/admin/settlements" accent="#10B981" />
+              <QuickAction icon={BarChart3}     label="View Reports"    to="/admin/reports"     accent="#4F6BF6" />
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {/* ── Activity Panels: Pending Partners + Recent Bookings ────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* Pending Partners */}
-        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5">
-          <div className="flex items-center justify-between mb-4">
+        <Panel className="overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-50 dark:border-gray-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-gray-800 dark:text-white">Pending Applications</h2>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Pending Applications</p>
               {partnerList.length > 0 && (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   {partnerList.length}
                 </span>
               )}
             </div>
-            <Link
-              to="/admin/partners"
-              className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
-            >
-              View all →
+            <Link to="/admin/partners" className="text-xs text-brand-600 dark:text-brand-400 font-medium hover:underline">
+              View all
             </Link>
           </div>
 
           {partnerList.length === 0 ? (
-            <div className="py-10 text-center">
-              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-3">
-                <CheckCircle2 size={24} className="text-emerald-500" />
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">All caught up!</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">No pending applications</p>
+            <div className="py-14 text-center">
+              <CheckCircle2 size={28} className="mx-auto text-gray-200 dark:text-gray-700 mb-3" />
+              <p className="text-sm text-gray-400 dark:text-gray-500">No pending applications</p>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="divide-y divide-gray-50 dark:divide-gray-800/50">
               {partnerList.slice(0, 5).map(partner => (
                 <div
                   key={partner.id}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
+                  className="px-6 py-4 flex items-center justify-between gap-4
+                             hover:bg-gray-50/60 dark:hover:bg-gray-800/20 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-amber-700 dark:text-amber-400">
-                      {(partner.business_name || '?')[0].toUpperCase()}
-                    </span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                      <span className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                        {(partner.business_name || '?')[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{partner.business_name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                        {partner.partner_type} · {partner.user?.email}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
-                      {partner.business_name}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                      {partner.partner_type} · {partner.user?.email}
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-semibold ring-1 ring-amber-200/50 dark:ring-amber-800/30 shrink-0">
-                    <Clock size={10} /> Pending
-                  </span>
+                  <Link
+                    to="/admin/partners"
+                    className="shrink-0 px-3 py-1.5 bg-brand-50 dark:bg-brand-900/30
+                               text-brand-600 dark:text-brand-400 text-xs font-semibold rounded-lg
+                               hover:bg-brand-100 dark:hover:bg-brand-900/50 transition
+                               border border-brand-100 dark:border-brand-800"
+                  >
+                    Review
+                  </Link>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </Panel>
 
         {/* Recent Bookings */}
-        <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5">
-          <div className="flex items-center justify-between mb-4">
+        <Panel className="overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-50 dark:border-gray-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-gray-800 dark:text-white">Recent Bookings</h2>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Recent Bookings</p>
               {bookingList.length > 0 && (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-400">
                   {stats?.total_bookings || allBookings.length}
                 </span>
               )}
             </div>
-            <Link
-              to="/admin/bookings"
-              className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
-            >
-              View all →
+            <Link to="/admin/bookings" className="text-xs text-brand-600 dark:text-brand-400 font-medium hover:underline">
+              View all
             </Link>
           </div>
 
           {bookingList.length === 0 ? (
-            <div className="py-10 text-center">
-              <div className="w-12 h-12 mx-auto rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center mb-3">
-                <CalendarCheck size={24} className="text-gray-400" />
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">No bookings yet</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Bookings will appear here</p>
+            <div className="py-14 text-center">
+              <CalendarCheck size={28} className="mx-auto text-gray-200 dark:text-gray-700 mb-3" />
+              <p className="text-sm text-gray-400 dark:text-gray-500">No bookings yet</p>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="divide-y divide-gray-50 dark:divide-gray-800/50">
               {bookingList.map(booking => (
                 <div
                   key={booking.id}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
+                  className="px-6 py-4 flex items-center justify-between gap-4
+                             hover:bg-gray-50/60 dark:hover:bg-gray-800/20 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-50 to-blue-50 dark:from-brand-900/30 dark:to-blue-900/30 flex items-center justify-center shrink-0">
-                    <Car size={16} className="text-brand-500 dark:text-brand-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                         {booking.car_name}
                       </p>
                       <StatusBadge status={booking.booking_status} />
@@ -731,7 +774,7 @@ export default function AdminHomePage() {
               ))}
             </div>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   )
