@@ -94,7 +94,10 @@ class _KycVerificationScreenState
   String _barangayName = '';
 
   // Map
-  final _mapCtrl = MapController();
+  final _mapCtrl  = MapController();
+  bool   _mapReady = false;          // true once FlutterMap fires onMapReady
+  LatLng? _pendingCenter;            // move queued before the map was ready
+  double? _pendingZoom;
   LatLng? _pin;
   String  _pinLabel  = '';
   bool    _reversing = false;
@@ -183,19 +186,45 @@ class _KycVerificationScreenState
     }
   }
 
-  // ── FIX (map zoom): always schedule move inside a post-frame callback so
-  //   the MapController is guaranteed to be attached to a live FlutterMap
-  //   widget before we call move(). ─────────────────────────────────────────
+  // ── Map zoom: called whenever province / city / barangay changes ─────────
+  //
+  // Problem: FlutterMap attaches its controller asynchronously. If _moveMap
+  // is called before `onMapReady` fires the controller is not yet live and
+  // the call silently does nothing — which was why the map never zoomed.
+  //
+  // Fix:
+  //   • Track whether the map is ready via _mapReady.
+  //   • Store the last requested center+zoom as _pendingCenter/_pendingZoom.
+  //   • Apply the pending move the moment onMapReady fires.
+  //   • If the map IS ready, call move() directly (still wrapped in a
+  //     post-frame callback so we never call it mid-build).
+  // ──────────────────────────────────────────────────────────────────────────
   void _moveMap(LatLng center, double zoom) {
+    _pendingCenter = center;
+    _pendingZoom   = zoom;
+    if (!_mapReady) return; // will be applied in onMapReady
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        try {
-          _mapCtrl.move(center, zoom);
-        } catch (_) {
-          // Controller not yet attached — safe to ignore
-        }
+      if (!mounted || !_mapReady) return;
+      try {
+        _mapCtrl.move(center, zoom);
+      } catch (_) {
+        // controller detached during a rebuild — ignore
       }
     });
+  }
+
+  void _onMapReady() {
+    if (!mounted) return;
+    setState(() => _mapReady = true);
+    // Apply any move that was requested before the map finished loading
+    if (_pendingCenter != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        try {
+          _mapCtrl.move(_pendingCenter!, _pendingZoom ?? 6);
+        } catch (_) {}
+      });
+    }
   }
 
   // ── Nominatim fallback (used only when PSGC has no coordinates) ───────────
@@ -271,9 +300,9 @@ class _KycVerificationScreenState
     if (_contactCtrl.text.trim().length < 10) {
       return 'Enter a valid phone number.';
     }
-    if (_provinceCode.isEmpty || _cityCode.isEmpty) {
-      return 'Please select your province and city / municipality.';
-    }
+    if (_provinceCode.isEmpty) return 'Please select your province.';
+    if (_cityCode.isEmpty) return 'Please select your city / municipality.';
+    if (_fullAddress.trim().isEmpty) return 'Please complete your address.';
     return null;
   }
 
@@ -288,6 +317,19 @@ class _KycVerificationScreenState
     return null;
   }
 
+  // ── Step navigation ───────────────────────────────────────────────────────
+  // Reset map-ready flag whenever the map widget is removed from the tree
+  // (i.e. whenever the user leaves step 0). This prevents _moveMap from
+  // calling _mapCtrl.move() on a detached controller after coming back.
+  void _goToStep(int step) {
+    if (step != 0) {
+      // Map is no longer in the tree — mark it as not ready so pending moves
+      // are queued rather than sent to a detached controller.
+      _mapReady = false;
+    }
+    setState(() => _step = step);
+  }
+
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content:         Text(msg),
@@ -296,9 +338,21 @@ class _KycVerificationScreenState
     ));
   }
 
+  // ── Image picker ──────────────────────────────────────────────────────────
+  //
+  // FIX: The old implementation called Navigator.pop(ctx) and then awaited
+  // _picker.pickImage() INSIDE the sheet builder's onTap.  The problem is
+  // that showModalBottomSheet's outer `await` resolves the moment the sheet
+  // is dismissed, so `result` was always null when we returned it.
+  //
+  // Correct pattern:
+  //   1. Show a sheet that returns an ImageSource value (camera / gallery).
+  //   2. Await the sheet — which closes as soon as the user taps an option.
+  //   3. Then call the picker OUTSIDE the sheet with the returned source.
+  // ──────────────────────────────────────────────────────────────────────────
   Future<File?> _pickImage() async {
-    File? result;
-    await showModalBottomSheet<void>(
+    // Step 1: ask the user which source they want
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -306,10 +360,11 @@ class _KycVerificationScreenState
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
+            // drag handle
             Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
-                  color:        AppColors.border,
+                  color: AppColors.border,
                   borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
@@ -318,52 +373,89 @@ class _KycVerificationScreenState
             const SizedBox(height: 16),
             Row(children: [
               Expanded(child: _SourceButton(
-                icon: Icons.camera_alt_rounded, label: 'Camera',
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final xf = await _picker.pickImage(
-                      source: ImageSource.camera,
-                      imageQuality: 85, maxWidth: 1920);
-                  if (xf != null) result = File(xf.path);
-                },
+                icon:  Icons.camera_alt_rounded,
+                label: 'Camera',
+                // pop with the chosen source — no picker call here
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
               )),
               const SizedBox(width: 12),
               Expanded(child: _SourceButton(
-                icon: Icons.photo_library_rounded, label: 'Gallery',
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final xf = await _picker.pickImage(
-                      source: ImageSource.gallery,
-                      imageQuality: 85, maxWidth: 1920);
-                  if (xf != null) result = File(xf.path);
-                },
+                icon:  Icons.photo_library_rounded,
+                label: 'Gallery',
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               )),
             ]),
           ]),
         ),
       ),
     );
-    return result;
+
+    // Step 2: user cancelled (tapped outside the sheet)
+    if (source == null || !mounted) return null;
+
+    // Step 3: now that the sheet is fully gone, launch the picker
+    try {
+      final xf = await _picker.pickImage(
+        source:       source,
+        imageQuality: 85,
+        maxWidth:     1920,
+      );
+      return xf != null ? File(xf.path) : null;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:         Text('Could not pick image: $e'),
+          backgroundColor: AppColors.error,
+          behavior:        SnackBarBehavior.floating,
+        ));
+      }
+      return null;
+    }
   }
 
   Future<void> _submit() async {
-    final kyc = await ref.read(submitKycProvider.notifier).submit(
-          birthday:             _birthdayCtrl.text.trim(),
-          contactNumber:        _contactCtrl.text.trim(),
-          address:              _fullAddress,
-          addressLat:           _addrLat,
-          addressLng:           _addrLng,
-          driversLicenseNumber: _licenseNumCtrl.text.trim(),
-          licenseExpiry:        _licenseExpiryCtrl.text.trim(),
-          validIdType:          _idType,
-          licenseFile:          _licenseFile!,
-          validIdFile:          _validIdFile!,
-        );
-    if (!mounted) return;
-    if (kyc != null) {
-      context.go(AppRoutes.kycPending);
-    } else {
-      _showError('Submission failed. Please try again.');
+    // Guard: don't double-submit while a request is already in flight
+    if (ref.read(submitKycProvider).isLoading) return;
+    // Safety: both files must exist (the button is already disabled if not,
+    // but guard defensively in case of a race condition)
+    if (_licenseFile == null || _validIdFile == null) {
+      _showError('Please upload both documents before submitting.');
+      return;
+    }
+
+    try {
+      final kyc = await ref.read(submitKycProvider.notifier).submit(
+            birthday:             _birthdayCtrl.text.trim(),
+            contactNumber:        _contactCtrl.text.trim(),
+            address:              _fullAddress,
+            addressLat:           _addrLat,
+            addressLng:           _addrLng,
+            driversLicenseNumber: _licenseNumCtrl.text.trim(),
+            licenseExpiry:        _licenseExpiryCtrl.text.trim(),
+            validIdType:          _idType,
+            licenseFile:          _licenseFile!,
+            validIdFile:          _validIdFile!,
+          );
+
+      if (!mounted) return;
+
+      if (kyc != null) {
+        // Success — navigate to pending screen
+        context.go(AppRoutes.kycPending);
+      } else {
+        // Provider returned null → check for an error stored in state
+        final providerState = ref.read(submitKycProvider);
+        final rawErr = providerState.error?.toString() ?? '';
+        final msg = rawErr.isNotEmpty
+            ? rawErr.replaceFirst('Exception: ', '')
+            : 'Submission failed. Please check your connection and try again.';
+        _showError(msg);
+      }
+    } catch (e) {
+      // Unexpected exception that bypassed AsyncValue.guard
+      if (mounted) {
+        _showError(e.toString().replaceFirst('Exception: ', ''));
+      }
     }
   }
 
@@ -392,7 +484,7 @@ class _KycVerificationScreenState
         leading: _step > 0
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => setState(() => _step--),
+                onPressed: () => _goToStep(_step - 1),
               )
             : null,
       ),
@@ -600,6 +692,7 @@ class _KycVerificationScreenState
                     initialCenter: _kPhCenter,
                     initialZoom:   6,
                     onTap: (_, latlng) => _onMapTap(latlng),
+                    onMapReady: _onMapReady,
                   ),
                   children: [
                     TileLayer(
@@ -693,7 +786,7 @@ class _KycVerificationScreenState
           onPressed: () {
             final err = _validateStep0();
             if (err != null) { _showError(err); return; }
-            setState(() => _step = 1);
+            _goToStep(1);
           },
         ),
       ),
@@ -785,7 +878,7 @@ class _KycVerificationScreenState
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 52), // remove double.infinity width
             ),
-            onPressed: () => setState(() => _step = 0),
+            onPressed: () => _goToStep(0),
           ),
         ),
         const SizedBox(width: 12),
@@ -798,7 +891,7 @@ class _KycVerificationScreenState
             onPressed: () {
               final err = _validateStep1();
               if (err != null) { _showError(err); return; }
-              setState(() => _step = 2);
+              _goToStep(2);
             },
           ),
         ),
@@ -828,25 +921,26 @@ class _KycVerificationScreenState
           style: TextStyle(color: textSec, fontSize: 13)),
       const SizedBox(height: 20),
 
-      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: _UploadBox(
-          label:      "Driver's License",
-          hint:       'Front side of your driver\'s license',
-          required:   true,
-          file:       _licenseFile,
-          textMuted:  textMuted,
-          cardColor:  cardColor,
+      // ── Upload boxes — stacked vertically for full-width layout ─────────
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _UploadBox(
+          label:       "Driver's License",
+          hint:        'Front side of your Philippine driver\'s license',
+          required:    true,
+          file:        _licenseFile,
+          textMuted:   textMuted,
+          cardColor:   cardColor,
           borderColor: borderColor,
           onTap: () async {
             final f = await _pickImage();
-            if (f != null) setState(() => _licenseFile = f);
+            if (f != null && mounted) setState(() => _licenseFile = f);
           },
           onClear: () => setState(() => _licenseFile = null),
-        )),
-        const SizedBox(width: 12),
-        Expanded(child: _UploadBox(
+        ),
+        const SizedBox(height: 16),
+        _UploadBox(
           label:       'Valid Government ID',
-          hint:        'SSS, PhilHealth, UMID, Passport, etc.',
+          hint:        'SSS, PhilHealth, UMID, Passport, Voter\'s ID, etc.',
           required:    true,
           file:        _validIdFile,
           textMuted:   textMuted,
@@ -854,10 +948,10 @@ class _KycVerificationScreenState
           borderColor: borderColor,
           onTap: () async {
             final f = await _pickImage();
-            if (f != null) setState(() => _validIdFile = f);
+            if (f != null && mounted) setState(() => _validIdFile = f);
           },
           onClear: () => setState(() => _validIdFile = null),
-        )),
+        ),
       ]),
       const SizedBox(height: 16),
 
@@ -889,7 +983,7 @@ class _KycVerificationScreenState
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 52),
             ),
-            onPressed: isLoading ? null : () => setState(() => _step = 1),
+            onPressed: isLoading ? null : () => _goToStep(1),
           ),
         ),
         const SizedBox(width: 12),
@@ -1207,10 +1301,11 @@ class _UploadBox extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          height: 160,
+          width: double.infinity,
+          height: 180,
           decoration: BoxDecoration(
             color: file != null ? Colors.transparent : cardColor,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: file != null ? AppColors.success : borderColor,
               width: file != null ? 2 : 1,
@@ -1219,7 +1314,7 @@ class _UploadBox extends StatelessWidget {
           child: file != null
               ? Stack(fit: StackFit.expand, children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     child: Image.file(file!, fit: BoxFit.cover),
                   ),
                   Positioned(
@@ -1254,14 +1349,23 @@ class _UploadBox extends StatelessWidget {
               : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.upload_rounded,
-                        color: AppColors.primary, size: 28),
-                    const SizedBox(height: 8),
-                    const Text('Click to upload',
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGlow,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.upload_rounded,
+                          color: AppColors.primary, size: 26),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Tap to upload',
                         style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w500)),
-                    Text('JPG or PNG · Max 5 MB',
-                        style: TextStyle(fontSize: 10, color: textMuted)),
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text('Camera or Gallery · JPG / PNG',
+                        style: TextStyle(fontSize: 11, color: textMuted)),
                   ],
                 ),
         ),
