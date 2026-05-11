@@ -26,10 +26,10 @@ class MyBookingsScreen extends ConsumerWidget {
         appBar: AppBar(
           title: const Text('My Bookings'),
           bottom: TabBar(
-            isScrollable:        true,
-            tabAlignment:        TabAlignment.start,
-            indicatorColor:      AppColors.primary,
-            labelColor:          AppColors.primary,
+            isScrollable:         true,
+            tabAlignment:         TabAlignment.start,
+            indicatorColor:       AppColors.primary,
+            labelColor:           AppColors.primary,
             unselectedLabelColor: textMuted,
             tabs: const [
               Tab(text: 'All'),
@@ -61,7 +61,8 @@ class MyBookingsScreen extends ConsumerWidget {
           data: (bookings) => TabBarView(
             children: [
               _BookingList(
-                bookings: bookings, ref: ref,
+                bookings: bookings,
+                ref: ref,
                 cardColor: cardColor, borderColor: borderColor,
                 textPrim: textPrim, textSec: textSec, textMuted: textMuted,
               ),
@@ -81,7 +82,8 @@ class MyBookingsScreen extends ConsumerWidget {
               ),
               _BookingList(
                 bookings: bookings
-                    .where((b) => b.isCompleted || b.isCancelled || b.isRejected)
+                    .where((b) =>
+                        b.isCompleted || b.isCancelled || b.isRejected)
                     .toList(),
                 ref: ref,
                 cardColor: cardColor, borderColor: borderColor,
@@ -187,14 +189,16 @@ class _BookingCardState extends State<_BookingCard> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Cancel Booking'),
-        content: const Text('Are you sure you want to cancel this booking?'),
+        content:
+            const Text('Are you sure you want to cancel this booking?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: const Text('No')),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error),
             child: const Text('Yes, Cancel'),
           ),
         ],
@@ -234,7 +238,7 @@ class _BookingCardState extends State<_BookingCard> {
         ),
         child: Column(
           children: [
-            // ── Header ──────────────────────────────────────────────
+            // ── Header ─────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -289,7 +293,7 @@ class _BookingCardState extends State<_BookingCard> {
               ),
             ),
 
-            // ── Expanded detail ──────────────────────────────────────
+            // ── Expanded detail ─────────────────────────────────────────
             if (_expanded) ...[
               Divider(color: widget.borderColor, height: 1),
               Padding(
@@ -298,25 +302,44 @@ class _BookingCardState extends State<_BookingCard> {
                   children: [
                     _DetailRow('Total Days',
                         '${b.totalDays} day${b.totalDays == 1 ? '' : 's'}',
-                        textPrim: widget.textPrim, textSec: widget.textSec),
+                        textPrim: widget.textPrim,
+                        textSec:  widget.textSec),
                     _DetailRow('Price/Day',
                         '₱${b.pricePerDay.toStringAsFixed(0)}',
-                        textPrim: widget.textPrim, textSec: widget.textSec),
-                    _DetailRow('Payment Method', b.paymentMethod.toUpperCase(),
-                        textPrim: widget.textPrim, textSec: widget.textSec),
+                        textPrim: widget.textPrim,
+                        textSec:  widget.textSec),
+                    _DetailRow(
+                        'Payment Method',
+                        b.paymentMethod.toUpperCase(),
+                        textPrim: widget.textPrim,
+                        textSec:  widget.textSec),
                     _DetailRow('Payment Status', b.paymentStatus,
-                        textPrim: widget.textPrim, textSec: widget.textSec),
-                    _DetailRow('Fulfillment',
+                        textPrim: widget.textPrim,
+                        textSec:  widget.textSec),
+                    _DetailRow(
+                        'Fulfillment',
                         b.fulfillmentType == 'delivery'
                             ? 'Delivery'
                             : 'Self-Pickup',
-                        textPrim: widget.textPrim, textSec: widget.textSec),
+                        textPrim: widget.textPrim,
+                        textSec:  widget.textSec),
+
+                    // FIX: delivery address was overflowing because the
+                    // old _DetailRow used a plain Row without Flexible on
+                    // the value Text. Long addresses like
+                    // "Barangay X, City Y, Province Z" would exceed the
+                    // card width and render outside the bounds.
+                    // Now uses _DetailRowWrap for multi-line long values.
                     if (b.deliveryAddress.isNotEmpty)
-                      _DetailRow('Delivery Address', b.deliveryAddress,
-                          textPrim: widget.textPrim, textSec: widget.textSec),
+                      _DetailRowWrap('Delivery Address', b.deliveryAddress,
+                          textPrim: widget.textPrim,
+                          textSec:  widget.textSec),
+
                     if (b.specialRequests.isNotEmpty)
-                      _DetailRow('Special Requests', b.specialRequests,
-                          textPrim: widget.textPrim, textSec: widget.textSec),
+                      _DetailRowWrap('Special Requests', b.specialRequests,
+                          textPrim: widget.textPrim,
+                          textSec:  widget.textSec),
+
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -326,16 +349,13 @@ class _BookingCardState extends State<_BookingCard> {
                                 size: 16),
                             label: const Text('Message Partner'),
                             onPressed: () {
-                              // partnerUserId is the partner's USER uuid,
-                              // not the partner-profile uuid.
-                              // If empty after model fix, open chat anyway
-                              // and let ChatScreen resolve from history.
                               context.push(
                                 '/chat/${b.id}',
                                 extra: {
-                                  'receiverId': b.partnerUserId.isNotEmpty
-                                      ? b.partnerUserId
-                                      : null,
+                                  'receiverId':
+                                      b.partnerUserId.isNotEmpty
+                                          ? b.partnerUserId
+                                          : null,
                                   'name': b.partnerName.isNotEmpty
                                       ? b.partnerName
                                       : 'Partner',
@@ -369,7 +389,7 @@ class _BookingCardState extends State<_BookingCard> {
   }
 }
 
-// ── Detail row ────────────────────────────────────────────────────────────────
+// ── Detail row (short single-line values) ─────────────────────────────────────
 class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
@@ -385,11 +405,76 @@ class _DetailRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: textSec, fontSize: 13)),
-          Text(value,
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
               style: TextStyle(
                   color: textPrim,
                   fontSize: 13,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Detail row — wrapping variant for long values ─────────────────────────────
+//
+// FIX: Addresses like "Barangay Xyz, City Abc, Province Def" are too long
+// for a single horizontal row. This variant stacks label above value so
+// both have full card width and nothing overflows.
+//
+class _DetailRowWrap extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color textPrim, textSec;
+  const _DetailRowWrap(this.label, this.value,
+      {required this.textPrim, required this.textSec});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  color: textSec,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500)),
+          const SizedBox(height: 3),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppColors.primaryGlow.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.location_on_outlined,
+                    size: 13,
+                    color: AppColors.primary.withOpacity(0.8)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                        color: textPrim,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

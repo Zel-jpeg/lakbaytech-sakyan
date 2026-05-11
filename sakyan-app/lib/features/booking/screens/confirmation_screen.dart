@@ -34,12 +34,12 @@ class ConfirmationScreen extends StatelessWidget {
             children: [
               const Spacer(flex: 2),
 
-              // ── Success icon ───────────────────────────────────────────
+              // ── Success icon ─────────────────────────────────────────────
               Container(
                 width: 120, height: 120,
                 decoration: BoxDecoration(
-                  color:  AppColors.successBg,
-                  shape:  BoxShape.circle,
+                  color: AppColors.successBg,
+                  shape: BoxShape.circle,
                   border: Border.all(
                       color: AppColors.success.withOpacity(0.3), width: 2),
                 ),
@@ -53,7 +53,9 @@ class ConfirmationScreen extends StatelessWidget {
               Text(
                 'Booking Submitted!',
                 style: TextStyle(
-                    fontSize: 26, fontWeight: FontWeight.w800, color: textPrim),
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: textPrim),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
@@ -64,7 +66,7 @@ class ConfirmationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              // ── Booking code card ──────────────────────────────────────
+              // ── Booking code card ────────────────────────────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -95,7 +97,7 @@ class ConfirmationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // ── Payment info banner ────────────────────────────────────
+              // ── Payment info banner ──────────────────────────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
@@ -112,7 +114,9 @@ class ConfirmationScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      isGcash ? Icons.chat_bubble_rounded : Icons.payments_rounded,
+                      isGcash
+                          ? Icons.chat_bubble_rounded
+                          : Icons.payments_rounded,
                       color: isGcash ? AppColors.info : AppColors.success,
                       size: 18,
                     ),
@@ -126,7 +130,9 @@ class ConfirmationScreen extends StatelessWidget {
                                 ? 'After approval, coordinate GCash via chat'
                                 : 'Cash payment on pickup/delivery day',
                             style: TextStyle(
-                              color: isGcash ? AppColors.info : AppColors.success,
+                              color: isGcash
+                                  ? AppColors.info
+                                  : AppColors.success,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -135,7 +141,7 @@ class ConfirmationScreen extends StatelessWidget {
                           Text(
                             isGcash
                                 ? 'Once approved, message the partner. They will share their GCash number with you.'
-                                : 'Pay the full amount (rental + ₱100 fee) directly to the partner when they arrive or you pick up.',
+                                : 'Pay the full amount (rental + booking fee) directly to the partner when they arrive or you pick up.',
                             style: TextStyle(
                               color: isDark ? textSec : textPrim,
                               fontSize: 12,
@@ -151,43 +157,52 @@ class ConfirmationScreen extends StatelessWidget {
 
               const Spacer(flex: 3),
 
-              // ── Actions — always show "Chat with Partner" if we have an ID
+              // ── Chat with partner ────────────────────────────────────────
               if (bookingId != null && bookingId.isNotEmpty) ...[
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                     label: const Text('Chat with Partner',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    onPressed: () => context.go('/chat/$bookingId', extra: {
-                      'receiverId': partnerUserId.isNotEmpty ? partnerUserId : null,
-                      'name':       partnerName,
-                      'carName':    carName,
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                    onPressed: () => context.push('/chat/$bookingId', extra: {
+                      'receiverId':
+                          partnerUserId.isNotEmpty ? partnerUserId : null,
+                      'name':    partnerName,
+                      'carName': carName,
                     }),
                   ),
                 ),
                 const SizedBox(height: 10),
               ],
 
+              // ── View My Bookings ─────────────────────────────────────────
+              // FIX: was using AppColors.bgElevated (very dark) as background
+              // with textPrim as foreground — on dark mode both were dark so
+              // the text was invisible. Now uses a bordered outline-style
+              // button that always has visible contrast in both themes.
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: OutlinedButton.icon(
+                  icon: Icon(Icons.receipt_long_rounded,
+                      size: 18, color: AppColors.primary),
+                  label: const Text('View My Bookings',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
                   onPressed: () => context.go(AppRoutes.bookings),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.bgElevated,
-                    foregroundColor: textPrim,
-                  ),
-                  child: const Text('View My Bookings',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
               const SizedBox(height: 12),
+
+              // ── Back to Home ─────────────────────────────────────────────
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton(
+                child: TextButton(
                   onPressed: () => context.go(AppRoutes.home),
-                  child: const Text('Back to Home',
-                      style: TextStyle(fontSize: 16)),
+                  child: Text('Back to Home',
+                      style: TextStyle(
+                          fontSize: 16, color: textMuted)),
                 ),
               ),
             ],

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
@@ -108,7 +109,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final max = _scrollCtrl.position.maxScrollExtent;
       if (animated) {
         _scrollCtrl.animateTo(max,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut);
       } else {
         _scrollCtrl.jumpTo(max);
       }
@@ -157,8 +159,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (_pickedImage == null || _pickedImageBytes == null) return null;
     setState(() => _uploading = true);
     try {
-      final ext      = _pickedImage!.name.split('.').last.toLowerCase();
-      final safeExt  = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext) ? ext : 'jpg';
+      final ext     = _pickedImage!.name.split('.').last.toLowerCase();
+      final safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)
+          ? ext
+          : 'jpg';
       final fileName =
           '${DateTime.now().millisecondsSinceEpoch}-${widget.bookingId.substring(0, 8)}.$safeExt';
       final url = await SupabaseService.uploadFile(
@@ -261,9 +265,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           fit: StackFit.expand,
           children: [
             InteractiveViewer(
-              panEnabled:  true,
-              minScale:    0.5,
-              maxScale:    5.0,
+              panEnabled: true,
+              minScale:   0.5,
+              maxScale:   5.0,
               child: Center(
                 child: Image.network(
                   url,
@@ -303,6 +307,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  // ── Safe back navigation ───────────────────────────────────────────────────
+  //
+  // FIX: Pressing the system back button or the in-app back button while
+  // the chat was pushed via context.push() from confirmation_screen caused
+  // a crash because GoRouter had no previous route to pop to (the
+  // confirmation screen itself was navigated away from with context.go()).
+  //
+  // Solution: use context.canPop() first. If we can pop safely, do it.
+  // Otherwise fall back to the bookings list which is always in the shell.
+  //
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/bookings');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(chatProvider(widget.bookingId));
@@ -321,355 +343,373 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       (messages) => _tryResolveReceiver(messages, currentUser?.id),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            Container(
-              width: 36, height: 36,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  (_receiverName ?? 'U').isNotEmpty
-                      ? (_receiverName ?? 'U')[0].toUpperCase()
-                      : 'U',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _receiverName ?? 'Chat',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: textPrim),
-                ),
-                if (widget.carName?.isNotEmpty == true)
-                  Text(
-                    widget.carName!,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500),
+    // ── PopScope: intercepts the system back gesture / button ─────────────
+    // Without this, pressing system back when there's nowhere to pop
+    // exits the app entirely instead of going to the bookings list.
+    return PopScope(
+      canPop: false, // we handle it ourselves
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          // ── Explicit back button ───────────────────────────────────────
+          // FIX: AppBar had no leading widget so there was no visible back
+          // button. Added one that uses _handleBack() for safe navigation.
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: _handleBack,
+          ),
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-              ],
+                ),
+                child: Center(
+                  child: Text(
+                    (_receiverName ?? 'U').isNotEmpty
+                        ? (_receiverName ?? 'U')[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _receiverName ?? 'Chat',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: textPrim),
+                  ),
+                  if (widget.carName?.isNotEmpty == true)
+                    Text(
+                      widget.carName!,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.refresh_rounded, color: textSec),
+              tooltip: 'Refresh',
+              onPressed: () =>
+                  ref.read(chatProvider(widget.bookingId).notifier).refresh(),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh_rounded, color: textSec),
-            tooltip: 'Refresh',
-            onPressed: () =>
-                ref.read(chatProvider(widget.bookingId).notifier).refresh(),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ── Receiver-unknown warning banner ────────────────────────────────
-          if (!_hasValidReceiver && messagesAsync.hasValue)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: AppColors.warning.withOpacity(0.12),
-              child: Row(children: [
-                const Icon(Icons.warning_rounded,
-                    color: AppColors.warning, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Recipient info unavailable — send a message first '
-                    'or open this chat from your booking.',
-                    style: const TextStyle(
-                        color: AppColors.warning, fontSize: 12),
+        body: Column(
+          children: [
+            // ── Receiver-unknown warning banner ──────────────────────────────
+            if (!_hasValidReceiver && messagesAsync.hasValue)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: AppColors.warning.withOpacity(0.12),
+                child: Row(children: [
+                  const Icon(Icons.warning_rounded,
+                      color: AppColors.warning, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Recipient info unavailable — send a message first '
+                      'or open this chat from your booking.',
+                      style: const TextStyle(
+                          color: AppColors.warning, fontSize: 12),
+                    ),
+                  ),
+                ]),
+              ),
+
+            // ── Messages list ────────────────────────────────────────────────
+            Expanded(
+              child: messagesAsync.when(
+                loading: () => const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary)),
+                error: (e, st) => Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off_rounded, size: 48, color: textMuted),
+                      const SizedBox(height: 12),
+                      Text('Failed to load messages',
+                          style: TextStyle(
+                              color: textMuted,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15)),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          e.toString().replaceFirst('Exception: ', ''),
+                          style: TextStyle(color: textMuted, fontSize: 12),
+                          textAlign: TextAlign.center,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Retry'),
+                        onPressed: () => ref
+                            .read(chatProvider(widget.bookingId).notifier)
+                            .refresh(),
+                      ),
+                    ],
                   ),
                 ),
-              ]),
+                data: (messages) {
+                  _scrollToBottom();
+
+                  if (messages.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 80, height: 80,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primaryGlow,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                color: AppColors.primary,
+                                size: 38),
+                          ),
+                          const SizedBox(height: 16),
+                          Text('No messages yet',
+                              style: TextStyle(
+                                  color: textMuted,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('Send a message to get started!',
+                              style:
+                                  TextStyle(color: textMuted, fontSize: 13)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    itemCount: messages.length,
+                    itemBuilder: (_, i) {
+                      final msg  = messages[i];
+                      final isMe = msg.senderId == currentUser?.id;
+                      final showTime = i == 0 ||
+                          messages[i]
+                                  .createdAt
+                                  .difference(messages[i - 1].createdAt)
+                                  .inMinutes
+                                  .abs() >
+                              10;
+                      return Column(
+                        children: [
+                          if (showTime)
+                            _TimeDivider(
+                                time: msg.createdAt, textMuted: textMuted),
+                          _MessageBubble(
+                            message:   msg,
+                            isMe:      isMe,
+                            cardColor: cardColor,
+                            textPrim:  textPrim,
+                            textMuted: textMuted,
+                            isDark:    isDark,
+                            onImageTap: (url) =>
+                                _showFullScreenImage(context, url),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
 
-          // ── Messages list ──────────────────────────────────────────────────
-          Expanded(
-            child: messagesAsync.when(
-              loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary)),
-              error: (e, st) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+            // ── Image preview strip ──────────────────────────────────────────
+            if (_pickedImageBytes != null)
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                color: cardColor,
+                child: Row(
                   children: [
-                    Icon(Icons.wifi_off_rounded, size: 48, color: textMuted),
-                    const SizedBox(height: 12),
-                    Text('Failed to load messages',
-                        style: TextStyle(
-                            color: textMuted,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15)),
-                    const SizedBox(height: 6),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Text(
-                        e.toString().replaceFirst('Exception: ', ''),
-                        style: TextStyle(color: textMuted, fontSize: 12),
-                        textAlign: TextAlign.center,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.memory(
+                            _pickedImageBytes!,
+                            width: 72, height: 72,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: 2, right: 2,
+                          child: GestureDetector(
+                            onTap: _clearImage,
+                            child: Container(
+                              width: 20, height: 20,
+                              decoration: const BoxDecoration(
+                                color: Colors.black87,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close_rounded,
+                                  color: Colors.white, size: 13),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Image attached',
+                            style: TextStyle(
+                                color: textPrim,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text('Tap send to share',
+                            style: TextStyle(color: textMuted, fontSize: 11)),
+                      ],
+                    ),
+                    if (_uploading) ...[
+                      const Spacer(),
+                      const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.primary),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('Retry'),
-                      onPressed: () => ref
-                          .read(chatProvider(widget.bookingId).notifier)
-                          .refresh(),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              data: (messages) {
-                _scrollToBottom();
 
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 80, height: 80,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primaryGlow,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.chat_bubble_outline_rounded,
-                              color: AppColors.primary, size: 38),
-                        ),
-                        const SizedBox(height: 16),
-                        Text('No messages yet',
-                            style: TextStyle(
-                                color: textMuted,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        Text('Send a message to get started!',
-                            style: TextStyle(color: textMuted, fontSize: 13)),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: _scrollCtrl,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  itemCount: messages.length,
-                  itemBuilder: (_, i) {
-                    final msg  = messages[i];
-                    final isMe = msg.senderId == currentUser?.id;
-                    final showTime = i == 0 ||
-                        messages[i]
-                                .createdAt
-                                .difference(messages[i - 1].createdAt)
-                                .inMinutes
-                                .abs() >
-                            10;
-                    return Column(
-                      children: [
-                        if (showTime)
-                          _TimeDivider(
-                              time: msg.createdAt, textMuted: textMuted),
-                        _MessageBubble(
-                          message:   msg,
-                          isMe:      isMe,
-                          cardColor: cardColor,
-                          textPrim:  textPrim,
-                          textMuted: textMuted,
-                          isDark:    isDark,
-                          onImageTap: (url) =>
-                              _showFullScreenImage(context, url),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-
-          // ── Image preview strip ────────────────────────────────────────────
-          if (_pickedImageBytes != null)
+            // ── Input bar ────────────────────────────────────────────────────
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              color: cardColor,
+              padding: EdgeInsets.fromLTRB(
+                  12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
+              decoration: BoxDecoration(
+                color:  cardColor,
+                border: Border(top: BorderSide(color: borderColor)),
+              ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.memory(
-                          _pickedImageBytes!,
-                          width: 72, height: 72,
-                          fit: BoxFit.cover,
-                        ),
+                  // Attachment button
+                  GestureDetector(
+                    onTap: (_sending || _uploading) ? null : _pickImage,
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        shape: BoxShape.circle,
                       ),
-                      Positioned(
-                        top: 2, right: 2,
-                        child: GestureDetector(
-                          onTap: _clearImage,
-                          child: Container(
-                            width: 20, height: 20,
-                            decoration: const BoxDecoration(
-                              color:  Colors.black87,
-                              shape:  BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.close_rounded,
-                                color: Colors.white, size: 13),
-                          ),
-                        ),
+                      child: Icon(
+                        Icons.attach_file_rounded,
+                        color: (_pickedImage != null)
+                            ? AppColors.primary
+                            : AppColors.primary.withOpacity(0.6),
+                        size: 20,
                       ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Image attached',
-                          style: TextStyle(
-                              color: textPrim,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
-                      Text('Tap send to share',
-                          style:
-                              TextStyle(color: textMuted, fontSize: 11)),
-                    ],
-                  ),
-                  if (_uploading) ...[
-                    const Spacer(),
-                    const SizedBox(
-                      width: 20, height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.primary),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Text input
+                  Expanded(
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 120),
+                      decoration: BoxDecoration(
+                        color:        inputBg,
+                        borderRadius: BorderRadius.circular(22),
+                        border:       Border.all(color: borderColor),
+                      ),
+                      child: TextField(
+                        controller: _msgCtrl,
+                        maxLines:   null,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: TextStyle(color: textPrim, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: _hasValidReceiver
+                              ? (_pickedImage != null
+                                  ? 'Add a caption (optional)…'
+                                  : 'Type a message…')
+                              : 'Resolve recipient first…',
+                          hintStyle:
+                              TextStyle(color: textMuted, fontSize: 14),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                        ),
+                        onSubmitted: (_) => _send(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Send button
+                  GestureDetector(
+                    onTap: (_sending || _uploading) ? null : _send,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: (_sending || _uploading || !_hasValidReceiver)
+                            ? AppColors.primary.withOpacity(0.4)
+                            : AppColors.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: _hasValidReceiver
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: (_sending || _uploading)
+                          ? const Center(
+                              child: SizedBox(
+                                width: 20, height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded,
+                              color: Colors.white, size: 20),
+                    ),
+                  ),
                 ],
               ),
             ),
-
-          // ── Input bar ──────────────────────────────────────────────────────
-          Container(
-            padding: EdgeInsets.fromLTRB(
-                12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
-            decoration: BoxDecoration(
-              color:  cardColor,
-              border: Border(top: BorderSide(color: borderColor)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Attachment button
-                GestureDetector(
-                  onTap: (_sending || _uploading) ? null : _pickImage,
-                  child: Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.attach_file_rounded,
-                      color: (_pickedImage != null)
-                          ? AppColors.primary
-                          : AppColors.primary.withOpacity(0.6),
-                      size: 20,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Text input
-                Expanded(
-                  child: Container(
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    decoration: BoxDecoration(
-                      color:        inputBg,
-                      borderRadius: BorderRadius.circular(22),
-                      border:       Border.all(color: borderColor),
-                    ),
-                    child: TextField(
-                      controller: _msgCtrl,
-                      maxLines:   null,
-                      textCapitalization: TextCapitalization.sentences,
-                      style: TextStyle(color: textPrim, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: _hasValidReceiver
-                            ? (_pickedImage != null
-                                ? 'Add a caption (optional)…'
-                                : 'Type a message…')
-                            : 'Resolve recipient first…',
-                        hintStyle:
-                            TextStyle(color: textMuted, fontSize: 14),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                      ),
-                      onSubmitted: (_) => _send(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Send button
-                GestureDetector(
-                  onTap: (_sending || _uploading) ? null : _send,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: 44, height: 44,
-                    decoration: BoxDecoration(
-                      color: (_sending || _uploading || !_hasValidReceiver)
-                          ? AppColors.primary.withOpacity(0.4)
-                          : AppColors.primary,
-                      shape: BoxShape.circle,
-                      boxShadow: _hasValidReceiver
-                          ? [
-                              BoxShadow(
-                                color: AppColors.primary.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ]
-                          : [],
-                    ),
-                    child: (_sending || _uploading)
-                        ? const Center(
-                            child: SizedBox(
-                              width: 20, height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded,
-                            color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -752,19 +792,14 @@ class _MessageBubble extends StatelessWidget {
                   tag: message.imageUrl!,
                   child: ClipRRect(
                     borderRadius: BorderRadius.only(
-                      topLeft:
-                          Radius.circular(isMe ? 18 : 4),
-                      topRight:
-                          Radius.circular(isMe ? 4 : 18),
-                      bottomLeft:
-                          Radius.circular(hasText ? 0 : 18),
-                      bottomRight:
-                          Radius.circular(hasText ? 0 : 18),
+                      topLeft:     Radius.circular(isMe ? 18 : 4),
+                      topRight:    Radius.circular(isMe ? 4 : 18),
+                      bottomLeft:  Radius.circular(hasText ? 0 : 18),
+                      bottomRight: Radius.circular(hasText ? 0 : 18),
                     ),
                     child: Image.network(
                       message.imageUrl!,
-                      width: 220,
-                      height: 165,
+                      width: 220, height: 165,
                       fit: BoxFit.cover,
                       loadingBuilder: (ctx, child, progress) {
                         if (progress == null) return child;
@@ -802,7 +837,9 @@ class _MessageBubble extends StatelessWidget {
             if (hasText)
               Padding(
                 padding: EdgeInsets.only(
-                  top:    hasImage ? 6 : ((!isMe && message.senderName.isNotEmpty) ? 4 : 10),
+                  top: hasImage
+                      ? 6
+                      : ((!isMe && message.senderName.isNotEmpty) ? 4 : 10),
                   bottom: 4,
                   left:   14,
                   right:  14,
