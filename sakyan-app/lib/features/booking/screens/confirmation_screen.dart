@@ -9,7 +9,6 @@ class ConfirmationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Read optional extra data passed from checkout
     final extra         = GoRouterState.of(context).extra as Map<String, dynamic>? ?? {};
     final bookingId     = extra['bookingId']     as String?;
     final paymentMethod = extra['paymentMethod'] as String? ?? 'cash';
@@ -17,9 +16,9 @@ class ConfirmationScreen extends StatelessWidget {
     final partnerName   = extra['partnerName']   as String? ?? 'Partner';
     final carName       = extra['carName']       as String? ?? '';
 
-    final isGcash   = paymentMethod == 'gcash';
-    final theme     = Theme.of(context);
-    final isDark    = theme.brightness == Brightness.dark;
+    final isGcash = paymentMethod == 'gcash';
+    final theme   = Theme.of(context);
+    final isDark  = theme.brightness == Brightness.dark;
 
     final cardColor   = isDark ? AppColors.bgSurface    : AppColors.bgSurfaceLight;
     final borderColor = isDark ? AppColors.border        : AppColors.borderLight;
@@ -51,20 +50,16 @@ class ConfirmationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              // ── Title ──────────────────────────────────────────────────
               Text(
                 'Booking Submitted!',
                 style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: textPrim),
+                    fontSize: 26, fontWeight: FontWeight.w800, color: textPrim),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
               Text(
                 'Your booking is pending review.\nThe partner will approve or reject shortly.',
-                style: TextStyle(
-                    color: textSec, fontSize: 14, height: 1.6),
+                style: TextStyle(color: textSec, fontSize: 14, height: 1.6),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -74,9 +69,9 @@ class ConfirmationScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color:        cardColor,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  border:       Border.all(color: borderColor),
+                  border: Border.all(color: borderColor),
                 ),
                 child: Column(
                   children: [
@@ -86,9 +81,9 @@ class ConfirmationScreen extends StatelessWidget {
                     Text(
                       bookingCode,
                       style: const TextStyle(
-                        fontSize:      24,
-                        fontWeight:    FontWeight.w800,
-                        color:         AppColors.primary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
                         letterSpacing: 2,
                       ),
                     ),
@@ -98,7 +93,7 @@ class ConfirmationScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               // ── Payment info banner ────────────────────────────────────
               Container(
@@ -106,32 +101,48 @@ class ConfirmationScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: (isGcash ? AppColors.info : AppColors.success)
-                      .withOpacity(isDark ? 0.15 : 0.1),
+                      .withOpacity(isDark ? 0.14 : 0.08),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: (isGcash ? AppColors.info : AppColors.success)
-                        .withOpacity(0.4),
+                        .withOpacity(0.35),
                   ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      isGcash ? Icons.phone_android_rounded : Icons.payments_rounded,
+                      isGcash ? Icons.chat_bubble_rounded : Icons.payments_rounded,
                       color: isGcash ? AppColors.info : AppColors.success,
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        isGcash
-                            ? 'GCash Payment: Chat with the partner to send your payment receipt and confirm your booking.'
-                            : 'Cash Payment: Pay the full amount to the partner on the pickup/delivery date.',
-                        style: TextStyle(
-                          color: isDark ? textSec : textPrim,
-                          fontSize: 13,
-                          height: 1.5,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isGcash
+                                ? 'After approval, coordinate GCash via chat'
+                                : 'Cash payment on pickup/delivery day',
+                            style: TextStyle(
+                              color: isGcash ? AppColors.info : AppColors.success,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isGcash
+                                ? 'Once approved, message the partner. They will share their GCash number with you.'
+                                : 'Pay the full amount (rental + ₱100 fee) directly to the partner when they arrive or you pick up.',
+                            style: TextStyle(
+                              color: isDark ? textSec : textPrim,
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -140,16 +151,14 @@ class ConfirmationScreen extends StatelessWidget {
 
               const Spacer(flex: 3),
 
-              // ── Actions ─────────────────────────────────────────────────
-              // If GCash and we have a bookingId, offer Chat with Partner
-              if (isGcash && bookingId != null && bookingId.isNotEmpty) ...[
+              // ── Actions — always show "Chat with Partner" if we have an ID
+              if (bookingId != null && bookingId.isNotEmpty) ...[
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                     label: const Text('Chat with Partner',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w700)),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                     onPressed: () => context.go('/chat/$bookingId', extra: {
                       'receiverId': partnerUserId.isNotEmpty ? partnerUserId : null,
                       'name':       partnerName,
@@ -164,15 +173,12 @@ class ConfirmationScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => context.go(AppRoutes.bookings),
-                  style: isGcash
-                      ? ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.bgElevated,
-                          foregroundColor: textPrim,
-                        )
-                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.bgElevated,
+                    foregroundColor: textPrim,
+                  ),
                   child: const Text('View My Bookings',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
               const SizedBox(height: 12),
