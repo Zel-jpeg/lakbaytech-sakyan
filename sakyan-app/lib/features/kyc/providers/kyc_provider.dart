@@ -17,16 +17,33 @@ class SubmitKycNotifier extends AsyncNotifier<KycModel?> {
   Future<KycModel?> build() async => null;
 
   Future<KycModel?> submit({
+    // Step 1 — personal info
+    required String birthday,
+    required String contactNumber,
+    required String address,
+    double? addressLat,
+    double? addressLng,
+    // Step 2 — license & ID details
+    required String driversLicenseNumber,
+    required String licenseExpiry,
+    required String validIdType,
+    // Step 3 — document files
     required File licenseFile,
     required File validIdFile,
-    required File selfieFile,
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() =>
         ref.read(kycRepositoryProvider).submitKyc(
-          licenseFile: licenseFile,
-          validIdFile: validIdFile,
-          selfieFile:  selfieFile,
+          birthday:               birthday,
+          contactNumber:          contactNumber,
+          address:                address,
+          addressLat:             addressLat,
+          addressLng:             addressLng,
+          driversLicenseNumber:   driversLicenseNumber,
+          licenseExpiry:          licenseExpiry,
+          validIdType:            validIdType,
+          licenseFile:            licenseFile,
+          validIdFile:            validIdFile,
         ));
     if (state.hasValue) ref.invalidate(kycStatusProvider);
     return state.value;

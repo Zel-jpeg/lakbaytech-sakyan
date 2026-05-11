@@ -1,0 +1,31 @@
+﻿Analyzing kyc_verification_screen.dart...                       
+
+   info - Statements in an if should be enclosed in a block - lib\features\kyc\screens\kyc_verification_screen.dart:217:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\kyc\screens\kyc_verification_screen.dart:219:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\kyc\screens\kyc_verification_screen.dart:225:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\kyc\screens\kyc_verification_screen.dart:227:7 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:477:45 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:538:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:542:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:562:40 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:756:52 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:758:16 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\kyc\screens\kyc_verification_screen.dart:758:76 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:762:11 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:762:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:765:20 - prefer_const_constructors
+warning - A value for optional parameter 'enabled' isn't ever given - lib\features\kyc\screens\kyc_verification_screen.dart:932:46 - unused_element_parameter
+warning - A value for optional parameter 'onChanged' isn't ever given - lib\features\kyc\screens\kyc_verification_screen.dart:932:67 - unused_element_parameter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:1149:51 - deprecated_member_use
+
+flutter : 17 issues found. (ran in 3.9s)
+At line:1 char:1
++ flutter analyze lib/features/kyc/screens/kyc_ve
+rification_screen.dart ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (17 
+issu    es found. (ran in 3.9s):String) [], 
+RemoteExcept    ion
+    + FullyQualifiedErrorId : NativeCommandError
+ 

@@ -1,0 +1,22 @@
+﻿Analyzing kyc_verification_screen.dart...                       
+
+warning - The declaration '_validateStep2' isn't referenced - lib\features\kyc\screens\kyc_verification_screen.dart:102:11 - unused_element
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:528:54 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:530:18 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\kyc\screens\kyc_verification_screen.dart:530:78 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:533:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:534:22 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\kyc\screens\kyc_verification_screen.dart:537:24 - prefer_const_constructors
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\kyc\screens\kyc_verification_screen.dart:891:55 - deprecated_member_use
+
+flutter : 8 issues found. (ran in 3.9s)
+At line:1 char:1
++ flutter analyze lib/features/kyc/screens/kyc_verifi
+cation_screen.dart ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (8 issue 
+   s found. (ran in 3.9s):String) [], RemoteExcepti  
+  on
+    + FullyQualifiedErrorId : NativeCommandError
+ 

@@ -476,16 +476,34 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
       loading: () => const SizedBox.shrink(),
       error:   (_, __) => const SizedBox.shrink(),
       data: (kyc) {
+        // Use the actual status — defaults to 'not_submitted' if no KYC record
         final status = kyc?.status ?? 'not_submitted';
+
+        // No banner needed for approved users
         if (status == 'approved') return const SizedBox.shrink();
 
-        final isPending = status == 'pending';
-        final color  = isPending ? AppColors.warning : AppColors.primary;
-        final label  = isPending
-            ? '⏳ KYC verification is under review'
-            : '⚠️ Identity verification required to book';
-        final action = isPending ? 'Check Status' : 'Verify Now';
-        final route  = isPending ? '/kyc/pending' : '/kyc/verify';
+        late final Color color;
+        late final String label;
+        late final String action;
+        late final String route;
+
+        switch (status) {
+          case 'pending':
+            color  = AppColors.warning;
+            label  = '⏳ KYC verification is pending approval';
+            action = 'Check Status';
+            route  = '/kyc/pending';
+          case 'rejected':
+            color  = AppColors.error;
+            label  = '❌ KYC was rejected. Please re-submit.';
+            action = 'Re-submit';
+            route  = '/kyc/verify';
+          default: // 'not_submitted'
+            color  = AppColors.primary;
+            label  = '⚠️ Identity verification required before booking.';
+            action = 'Verify My Identity';
+            route  = '/kyc/verify';
+        }
 
         return GestureDetector(
           onTap: () => context.push(route),

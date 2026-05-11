@@ -1,12 +1,56 @@
-﻿import 'dart:io';
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/router/app_router.dart';
 import '../providers/kyc_provider.dart';
 
+// ── PSGC API helpers ──────────────────────────────────────────────────────────
+// Matches the web's psgcFetch() — full PSGC cloud data, fetched lazily.
+const _kPsgc = 'https://psgc.cloud/api';
+final _psgcDio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+
+Future<List<_PsgcItem>> _psgcFetch(String url) async {
+  final res  = await _psgcDio.get<List<dynamic>>(url);
+  final raw  = res.data ?? [];
+  final items = raw.map((e) {
+    final m = e as Map<String, dynamic>;
+    return _PsgcItem(
+      code: m['code'] as String? ?? '',
+      name: m['name'] as String? ?? '',
+    );
+  }).toList()
+    ..sort((a, b) => a.name.compareTo(b.name));
+  return items;
+}
+
+class _PsgcItem {
+  final String code, name;
+  const _PsgcItem({required this.code, required this.name});
+}
+
+// ── Valid ID options (matches web) ────────────────────────────────────────────
+const _kIdTypes = [
+  ('passport',   'Passport'),
+  ('sss',        'SSS ID'),
+  ('philhealth', 'PhilHealth ID'),
+  ('postal',     'Postal ID'),
+  ('voters',     "Voter's ID"),
+  ('prc',        'PRC ID'),
+  ('umid',       'UMID'),
+];
+
+// ── Default map center — Philippines ──────────────────────────────────────────
+const _kPhCenter = LatLng(12.8797, 121.774);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 class KycVerificationScreen extends ConsumerStatefulWidget {
   const KycVerificationScreen({super.key});
 
@@ -17,26 +61,189 @@ class KycVerificationScreen extends ConsumerStatefulWidget {
 
 class _KycVerificationScreenState
     extends ConsumerState<KycVerificationScreen> {
-  int _step = 0; // 0=Intro, 1=License, 2=Valid ID, 3=Selfie, 4=Review
+  int _step = 0; // 0=Personal Info, 1=License & ID, 2=Upload Docs
+
+  // ── Step 0 — address state ────────────────────────────────────────────────
+  final _birthdayCtrl    = TextEditingController();
+  final _contactCtrl     = TextEditingController();
+
+  List<_PsgcItem> _provinces = [];
+  List<_PsgcItem> _cities    = [];
+  List<_PsgcItem> _barangays = [];
+  bool _loadingP = true, _loadingC = false, _loadingB = false;
+
+  String _provinceCode = '', _provinceName = '';
+  String _cityCode     = '', _cityName     = '';
+  String _barangayName = '';
+
+  // Map
+  final _mapCtrl = MapController();
+  LatLng? _pin;
+  String  _pinLabel = '';
+  bool    _reversing = false;
+
+  // Coords to submit
+  double? _addrLat, _addrLng;
+
+  // ── Step 1 fields ─────────────────────────────────────────────────────────
+  final _licenseNumCtrl    = TextEditingController();
+  final _licenseExpiryCtrl = TextEditingController();
+  String _idType           = '';
+
+  // ── Step 2 files ──────────────────────────────────────────────────────────
   File? _licenseFile;
   File? _validIdFile;
-  File? _selfieFile;
 
   final _picker = ImagePicker();
 
-  // ── Pick image from camera or gallery ─────────────────────────────────────
-  Future<File?> _pickImage({bool camera = false}) async {
-    final xFile = await _picker.pickImage(
-      source: camera ? ImageSource.camera : ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1920,
-    );
-    if (xFile == null) return null;
-    return File(xFile.path);
+  @override
+  void initState() {
+    super.initState();
+    _loadProvinces();
   }
 
-  // ── Show source picker bottom sheet ───────────────────────────────────────
-  Future<File?> _showSourcePicker(BuildContext context) async {
+  @override
+  void dispose() {
+    _birthdayCtrl.dispose();
+    _contactCtrl.dispose();
+    _licenseNumCtrl.dispose();
+    _licenseExpiryCtrl.dispose();
+    _mapCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── PSGC loaders (same as web) ────────────────────────────────────────────
+  Future<void> _loadProvinces() async {
+    setState(() => _loadingP = true);
+    try {
+      final items = await _psgcFetch('$_kPsgc/provinces/');
+      if (mounted) setState(() { _provinces = items; _loadingP = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingP = false);
+    }
+  }
+
+  Future<void> _onProvinceChanged(String code, String name) async {
+    setState(() {
+      _provinceCode = code; _provinceName = name;
+      _cityCode = ''; _cityName = '';
+      _barangayName = '';
+      _cities = []; _barangays = [];
+      _loadingC = true;
+    });
+    try {
+      final items = await _psgcFetch(
+          '$_kPsgc/provinces/$code/cities-municipalities/');
+      if (mounted) setState(() { _cities = items; _loadingC = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingC = false);
+    }
+  }
+
+  Future<void> _onCityChanged(String code, String name) async {
+    setState(() {
+      _cityCode = code; _cityName = name;
+      _barangayName = '';
+      _barangays = [];
+      _loadingB = true;
+    });
+    // Fly map to city
+    _flyToQuery('$name, Philippines', 13);
+    try {
+      final items = await _psgcFetch(
+          '$_kPsgc/cities-municipalities/$code/barangays/');
+      if (mounted) setState(() { _barangays = items; _loadingB = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingB = false);
+    }
+  }
+
+  Future<void> _flyToQuery(String query, double zoom) async {
+    try {
+      final res = await _psgcDio.get<List<dynamic>>(
+        'https://nominatim.openstreetmap.org/search',
+        queryParameters: {'q': '$query, Philippines', 'format': 'json', 'limit': 1},
+        options: Options(headers: {
+          'Accept-Language': 'en',
+          'User-Agent': 'SakyanApp/1.0'
+        }),
+      );
+      final body = res.data ?? [];
+      if (body.isNotEmpty && mounted) {
+        final lat = double.parse(body[0]['lat'] as String);
+        final lon = double.parse(body[0]['lon']  as String);
+        _mapCtrl.move(LatLng(lat, lon), zoom);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onMapTap(LatLng latlng) async {
+    setState(() {
+      _pin      = latlng;
+      _addrLat  = latlng.latitude;
+      _addrLng  = latlng.longitude;
+      _pinLabel = '${latlng.latitude.toStringAsFixed(5)}, '
+                  '${latlng.longitude.toStringAsFixed(5)}';
+      _reversing = true;
+    });
+    try {
+      final res = await _psgcDio.get<Map<String, dynamic>>(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'lat': latlng.latitude,
+          'lon': latlng.longitude,
+          'format': 'json',
+        },
+        options: Options(headers: {
+          'Accept-Language': 'en',
+          'User-Agent': 'SakyanApp/1.0'
+        }),
+      );
+      if (mounted) {
+        setState(() {
+          _pinLabel  = res.data?['display_name'] as String? ?? _pinLabel;
+          _reversing = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _reversing = false);
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  String get _fullAddress {
+    final parts = [_barangayName, _cityName, _provinceName]
+        .where((s) => s.isNotEmpty);
+    return parts.join(', ');
+  }
+
+  String? _validateStep0() {
+    if (_birthdayCtrl.text.isEmpty) return 'Please enter your birthday.';
+    if (_contactCtrl.text.trim().length < 10)
+      return 'Enter a valid phone number.';
+    if (_provinceCode.isEmpty || _cityCode.isEmpty)
+      return 'Please select your province and city / municipality.';
+    return null;
+  }
+
+  String? _validateStep1() {
+    if (_licenseNumCtrl.text.trim().isEmpty)
+      return 'Please enter your license number.';
+    if (_licenseExpiryCtrl.text.isEmpty)
+      return 'Please enter the license expiry date.';
+    if (_idType.isEmpty) return 'Please select a valid ID type.';
+    return null;
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppColors.error,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Future<File?> _pickImage() async {
     File? result;
     await showModalBottomSheet<void>(
       context: context,
@@ -45,47 +252,41 @@ class _KycVerificationScreenState
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
                   color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Select Source',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
-              Row(children: [
-                Expanded(
-                  child: _SourceButton(
-                    icon: Icons.camera_alt_rounded,
-                    label: 'Camera',
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      result = await _pickImage(camera: true);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _SourceButton(
-                    icon: Icons.photo_library_rounded,
-                    label: 'Gallery',
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      result = await _pickImage(camera: false);
-                    },
-                  ),
-                ),
-              ]),
-            ],
-          ),
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 16),
+            const Text('Select Source',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Row(children: [
+              Expanded(child: _SourceButton(
+                icon: Icons.camera_alt_rounded, label: 'Camera',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final xf = await _picker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 85, maxWidth: 1920);
+                  if (xf != null) result = File(xf.path);
+                },
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _SourceButton(
+                icon: Icons.photo_library_rounded, label: 'Gallery',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final xf = await _picker.pickImage(
+                      source: ImageSource.gallery,
+                      imageQuality: 85, maxWidth: 1920);
+                  if (xf != null) result = File(xf.path);
+                },
+              )),
+            ]),
+          ]),
         ),
       ),
     );
@@ -94,24 +295,26 @@ class _KycVerificationScreenState
 
   Future<void> _submit() async {
     final kyc = await ref.read(submitKycProvider.notifier).submit(
-          licenseFile: _licenseFile!,
-          validIdFile: _validIdFile!,
-          selfieFile:  _selfieFile!,
+          birthday:             _birthdayCtrl.text.trim(),
+          contactNumber:        _contactCtrl.text.trim(),
+          address:              _fullAddress,
+          addressLat:           _addrLat,
+          addressLng:           _addrLng,
+          driversLicenseNumber: _licenseNumCtrl.text.trim(),
+          licenseExpiry:        _licenseExpiryCtrl.text.trim(),
+          validIdType:          _idType,
+          licenseFile:          _licenseFile!,
+          validIdFile:          _validIdFile!,
         );
     if (!mounted) return;
     if (kyc != null) {
       context.go(AppRoutes.kycPending);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Submission failed. Please try again.'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showError('Submission failed. Please try again.');
     }
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final submitState = ref.watch(submitKycProvider);
@@ -123,10 +326,16 @@ class _KycVerificationScreenState
     final textPrim    = isDark ? AppColors.textPrimary   : AppColors.textPrimaryLight;
     final textSec     = isDark ? AppColors.textSecondary : AppColors.textSecondaryLight;
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
+    final inputFill   = isDark ? AppColors.bgElevated    : AppColors.bgElevatedLight;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('KYC Verification'),
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Identity Verification',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text('Required before you can book a car',
+              style: TextStyle(fontSize: 11, color: textMuted)),
+        ]),
         leading: _step > 0
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
@@ -134,626 +343,803 @@ class _KycVerificationScreenState
               )
             : null,
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 280),
-        child: KeyedSubtree(
-          key: ValueKey(_step),
-          child: _buildStep(
-            context,
-            isDark: isDark,
-            cardColor: cardColor,
-            borderColor: borderColor,
-            textPrim: textPrim,
-            textSec: textSec,
-            textMuted: textMuted,
-            submitState: submitState,
-          ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _StepProgress(current: _step, total: 3,
+                borderColor: borderColor, textMuted: textMuted),
+            const SizedBox(height: 24),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: KeyedSubtree(
+                key: ValueKey(_step),
+                child: _step == 0
+                    ? _buildStep0(isDark: isDark, cardColor: cardColor,
+                        borderColor: borderColor, textPrim: textPrim,
+                        textSec: textSec, textMuted: textMuted, inputFill: inputFill)
+                    : _step == 1
+                        ? _buildStep1(isDark: isDark, borderColor: borderColor,
+                            textPrim: textPrim, textSec: textSec, inputFill: inputFill)
+                        : _buildStep2(isDark: isDark, cardColor: cardColor,
+                            borderColor: borderColor, textPrim: textPrim,
+                            textSec: textSec, textMuted: textMuted,
+                            isLoading: submitState.isLoading),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildStep(
-    BuildContext context, {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 0 — Personal Information + Address + Map
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildStep0({
     required bool isDark,
-    required Color cardColor,
-    required Color borderColor,
-    required Color textPrim,
-    required Color textSec,
-    required Color textMuted,
-    required AsyncValue submitState,
+    required Color cardColor, required Color borderColor,
+    required Color textPrim, required Color textSec,
+    required Color textMuted, required Color inputFill,
   }) {
-    switch (_step) {
-      case 0:
-        return _IntroStep(
-          cardColor: cardColor,
-          borderColor: borderColor,
-          textPrim: textPrim,
-          textSec: textSec,
-          onNext: () => setState(() => _step = 1),
-        );
-      case 1:
-        return _DocumentStep(
-          title: "Driver's License",
-          subtitle: 'Upload a clear photo of your valid driver\'s license.',
-          icon: Icons.badge_rounded,
-          file: _licenseFile,
-          cardColor: cardColor,
-          borderColor: borderColor,
-          textPrim: textPrim,
-          textSec: textSec,
-          textMuted: textMuted,
-          stepNumber: 1,
-          totalSteps: 3,
-          onPickImage: () async {
-            final f = await _showSourcePicker(context);
-            if (f != null) setState(() => _licenseFile = f);
-          },
-          onNext: _licenseFile != null
-              ? () => setState(() => _step = 2)
-              : null,
-        );
-      case 2:
-        return _DocumentStep(
-          title: 'Valid Government ID',
-          subtitle: 'Upload any valid government-issued ID (passport, SSS, PhilHealth, etc.).',
-          icon: Icons.credit_card_rounded,
-          file: _validIdFile,
-          cardColor: cardColor,
-          borderColor: borderColor,
-          textPrim: textPrim,
-          textSec: textSec,
-          textMuted: textMuted,
-          stepNumber: 2,
-          totalSteps: 3,
-          onPickImage: () async {
-            final f = await _showSourcePicker(context);
-            if (f != null) setState(() => _validIdFile = f);
-          },
-          onNext: _validIdFile != null
-              ? () => setState(() => _step = 3)
-              : null,
-        );
-      case 3:
-        return _DocumentStep(
-          title: 'Selfie with ID',
-          subtitle: 'Take a selfie while holding your government ID next to your face.',
-          icon: Icons.face_rounded,
-          file: _selfieFile,
-          cardColor: cardColor,
-          borderColor: borderColor,
-          textPrim: textPrim,
-          textSec: textSec,
-          textMuted: textMuted,
-          stepNumber: 3,
-          totalSteps: 3,
-          preferCamera: true,
-          onPickImage: () async {
-            final f = await _showSourcePicker(context);
-            if (f != null) setState(() => _selfieFile = f);
-          },
-          onNext: _selfieFile != null
-              ? () => setState(() => _step = 4)
-              : null,
-        );
-      case 4:
-        return _ReviewStep(
-          licenseFile:  _licenseFile!,
-          validIdFile:  _validIdFile!,
-          selfieFile:   _selfieFile!,
-          cardColor:    cardColor,
-          borderColor:  borderColor,
-          textPrim:     textPrim,
-          textSec:      textSec,
-          textMuted:    textMuted,
-          isLoading:    submitState.isLoading,
-          onReplace: (index) => setState(() => _step = index + 1),
-          onSubmit:  _submit,
-        );
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-}
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Personal Information',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+              color: textPrim)),
+      const SizedBox(height: 4),
+      Text('Enter your contact details and home address.',
+          style: TextStyle(color: textSec, fontSize: 13)),
+      const SizedBox(height: 20),
 
-// ── Step 0 — Intro ─────────────────────────────────────────────────────────
-class _IntroStep extends StatelessWidget {
-  final Color cardColor, borderColor, textPrim, textSec;
-  final VoidCallback onNext;
-
-  const _IntroStep({
-    required this.cardColor,
-    required this.borderColor,
-    required this.textPrim,
-    required this.textSec,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Hero
-          Center(
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.primaryGlow,
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: AppColors.primary.withOpacity(0.3), width: 2),
-              ),
-              child: const Icon(Icons.verified_user_rounded,
-                  color: AppColors.primary, size: 56),
-            ),
-          ),
-          const SizedBox(height: 28),
-          Text('Verify Your Identity',
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: textPrim)),
-          const SizedBox(height: 10),
-          Text(
-            'KYC verification is required to make bookings on Sakyan. '
-            'It helps us keep the community safe and trusted.',
-            style: TextStyle(color: textSec, fontSize: 14, height: 1.6),
-          ),
-          const SizedBox(height: 28),
-          // Steps overview
-          _InfoCard(
-            icon: Icons.badge_rounded,
-            title: "Step 1 — Driver's License",
-            subtitle: 'A clear photo of your valid license',
-            cardColor: cardColor,
-            borderColor: borderColor,
-            textPrim: textPrim,
-            textSec: textSec,
-          ),
-          const SizedBox(height: 12),
-          _InfoCard(
-            icon: Icons.credit_card_rounded,
-            title: 'Step 2 — Government ID',
-            subtitle: 'Passport, SSS, PhilHealth, or any valid ID',
-            cardColor: cardColor,
-            borderColor: borderColor,
-            textPrim: textPrim,
-            textSec: textSec,
-          ),
-          const SizedBox(height: 12),
-          _InfoCard(
-            icon: Icons.face_rounded,
-            title: 'Step 3 — Selfie with ID',
-            subtitle: 'Hold your ID next to your face',
-            cardColor: cardColor,
-            borderColor: borderColor,
-            textPrim: textPrim,
-            textSec: textSec,
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.infoBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.info.withOpacity(0.3)),
-            ),
-            child: Row(children: [
-              const Icon(Icons.lock_rounded, color: AppColors.info, size: 16),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Your documents are encrypted and stored securely. They will only be used for verification.',
-                  style: TextStyle(
-                      color: AppColors.info, fontSize: 12, height: 1.5),
-                ),
-              ),
-            ]),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onNext,
-              child: const Text('Start Verification',
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  final IconData icon;
-  final String title, subtitle;
-  final Color cardColor, borderColor, textPrim, textSec;
-
-  const _InfoCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.cardColor,
-    required this.borderColor,
-    required this.textPrim,
-    required this.textSec,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.primaryGlow,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 20),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: textPrim)),
-              Text(subtitle,
-                  style: TextStyle(fontSize: 12, color: textSec)),
-            ],
-          ),
-        ),
+      // ── Birthday + Contact ──────────────────────────────────────────────
+      Row(children: [
+        Expanded(child: _Field(label: 'Birthday', child: _DateInput(
+          controller: _birthdayCtrl, hint: 'dd/mm/yyyy',
+          isDark: isDark, inputFill: inputFill, borderColor: borderColor,
+        ))),
+        const SizedBox(width: 12),
+        Expanded(child: _Field(label: 'Contact Number', child: _TextInput(
+          controller: _contactCtrl, hint: 'e.g. 09171234567',
+          keyboardType: TextInputType.phone,
+          isDark: isDark, inputFill: inputFill, borderColor: borderColor,
+          prefixIcon: const Icon(Icons.phone_outlined, size: 16),
+        ))),
       ]),
-    );
-  }
-}
+      const SizedBox(height: 16),
 
-// ── Document upload step ───────────────────────────────────────────────────
-class _DocumentStep extends StatelessWidget {
-  final String title, subtitle;
-  final IconData icon;
-  final File? file;
-  final Color cardColor, borderColor, textPrim, textSec, textMuted;
-  final int stepNumber, totalSteps;
-  final bool preferCamera;
-  final VoidCallback onPickImage;
-  final VoidCallback? onNext;
+      // ── Home Address — PSGC + Map (matches web) ─────────────────────────
+      _Field(
+        label: 'Home Address',
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: [
+            // Province
+            Container(
+              color: isDark ? AppColors.bgElevated : AppColors.bgElevatedLight,
+              child: Column(children: [
+                _PsgcDropdown(
+                  value: _provinceCode,
+                  items: _provinces,
+                  placeholder: _loadingP ? 'Loading…' : 'Select Province',
+                  loading: _loadingP,
+                  disabled: _loadingP,
+                  isDark: isDark,
+                  onChanged: (code) {
+                    final name =
+                        _provinces.firstWhere((p) => p.code == code).name;
+                    _onProvinceChanged(code, name);
+                  },
+                ),
+                Divider(height: 1, color: borderColor),
+                // City/Municipality
+                _PsgcDropdown(
+                  value: _cityCode,
+                  items: _cities,
+                  placeholder: _provinceCode.isEmpty
+                      ? '— Select Province first —'
+                      : (_loadingC ? 'Loading…' : 'Select City / Municipality'),
+                  loading: _loadingC,
+                  disabled: _provinceCode.isEmpty || _loadingC,
+                  isDark: isDark,
+                  onChanged: (code) {
+                    final name =
+                        _cities.firstWhere((c) => c.code == code).name;
+                    _onCityChanged(code, name);
+                  },
+                ),
+                Divider(height: 1, color: borderColor),
+                // Barangay
+                _PsgcDropdown(
+                  value: _barangays
+                          .any((b) => b.name == _barangayName)
+                      ? _barangays
+                          .firstWhere((b) => b.name == _barangayName)
+                          .code
+                      : '',
+                  items: _barangays,
+                  placeholder: _cityCode.isEmpty
+                      ? '— Select City first —'
+                      : (_loadingB ? 'Loading…' : 'Select Barangay'),
+                  loading: _loadingB,
+                  disabled: _cityCode.isEmpty || _loadingB,
+                  isDark: isDark,
+                  onChanged: (code) {
+                    final name =
+                        _barangays.firstWhere((b) => b.code == code).name;
+                    setState(() => _barangayName = name);
+                    _flyToQuery('$name, $_cityName, Philippines', 15);
+                  },
+                ),
+              ]),
+            ),
 
-  const _DocumentStep({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.file,
-    required this.cardColor,
-    required this.borderColor,
-    required this.textPrim,
-    required this.textSec,
-    required this.textMuted,
-    required this.stepNumber,
-    required this.totalSteps,
-    required this.onPickImage,
-    required this.onNext,
-    this.preferCamera = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Progress
-          Row(
-            children: List.generate(totalSteps, (i) {
-              final done = i < stepNumber;
-              final active = i == stepNumber - 1;
-              return Expanded(
-                child: Container(
-                  height: 4,
-                  margin: EdgeInsets.only(right: i < totalSteps - 1 ? 6 : 0),
-                  decoration: BoxDecoration(
-                    color: done || active
-                        ? AppColors.primary
-                        : borderColor,
-                    borderRadius: BorderRadius.circular(2),
+            // Address preview pill (shown when city is selected)
+            if (_cityName.isNotEmpty)
+              Container(
+                color: isDark
+                    ? AppColors.primaryGlow.withOpacity(0.15)
+                    : AppColors.primaryGlow,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(children: [
+                  const Icon(Icons.location_on_outlined,
+                      size: 13, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      [_barangayName, _cityName, _provinceName]
+                          .where((s) => s.isNotEmpty)
+                          .join(', '),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500),
+                    ),
                   ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 8),
-          Text('Step $stepNumber of $totalSteps',
-              style: TextStyle(color: textMuted, fontSize: 12)),
-          const SizedBox(height: 24),
-
-          Text(title,
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: textPrim)),
-          const SizedBox(height: 8),
-          Text(subtitle,
-              style: TextStyle(color: textSec, fontSize: 14, height: 1.6)),
-          const SizedBox(height: 28),
-
-          // Upload zone
-          GestureDetector(
-            onTap: onPickImage,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: double.infinity,
-              height: 220,
-              decoration: BoxDecoration(
-                color: file != null
-                    ? Colors.transparent
-                    : cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color:
-                      file != null ? AppColors.success : borderColor,
-                  width: file != null ? 2 : 1,
-                  style: file != null
-                      ? BorderStyle.solid
-                      : BorderStyle.solid,
-                ),
+                ]),
               ),
-              child: file != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.file(file!, fit: BoxFit.cover),
-                        ),
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: AppColors.success,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.check_rounded,
-                                color: Colors.white, size: 16),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 12,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text('Tap to replace',
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 12)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGlow,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            preferCamera
-                                ? Icons.camera_alt_rounded
-                                : icon,
-                            color: AppColors.primary,
-                            size: 32,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          preferCamera
-                              ? 'Tap to take a selfie'
-                              : 'Tap to upload',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: textPrim),
-                        ),
-                        const SizedBox(height: 4),
-                        Text('Camera or Gallery',
-                            style: TextStyle(
-                                fontSize: 12, color: textMuted)),
-                      ],
-                    ),
-            ),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onNext,
-              child: Text(
-                stepNumber == totalSteps ? 'Review & Submit' : 'Continue',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-// ── Review step ────────────────────────────────────────────────────────────
-class _ReviewStep extends StatelessWidget {
-  final File licenseFile, validIdFile, selfieFile;
-  final Color cardColor, borderColor, textPrim, textSec, textMuted;
-  final bool isLoading;
-  final void Function(int) onReplace;
-  final VoidCallback onSubmit;
-
-  const _ReviewStep({
-    required this.licenseFile,
-    required this.validIdFile,
-    required this.selfieFile,
-    required this.cardColor,
-    required this.borderColor,
-    required this.textPrim,
-    required this.textSec,
-    required this.textMuted,
-    required this.isLoading,
-    required this.onReplace,
-    required this.onSubmit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final docs = [
-      (file: licenseFile,  label: "Driver's License",  icon: Icons.badge_rounded),
-      (file: validIdFile,  label: 'Government ID',      icon: Icons.credit_card_rounded),
-      (file: selfieFile,   label: 'Selfie with ID',     icon: Icons.face_rounded),
-    ];
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Review Documents',
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: textPrim)),
-          const SizedBox(height: 8),
-          Text(
-            'Please review your uploaded documents before submitting.',
-            style: TextStyle(color: textSec, fontSize: 14, height: 1.6),
-          ),
-          const SizedBox(height: 24),
-          ...List.generate(docs.length, (i) {
-            final d = docs[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            // ── Interactive Map ──────────────────────────────────────────
+            Stack(children: [
+              SizedBox(
+                height: 220,
+                child: FlutterMap(
+                  mapController: _mapCtrl,
+                  options: MapOptions(
+                    initialCenter: _kPhCenter,
+                    initialZoom: 6,
+                    onTap: (_, latlng) => _onMapTap(latlng),
+                  ),
                   children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(14)),
-                      child: Image.file(
-                        d.file,
-                        width: double.infinity,
-                        height: 160,
-                        fit: BoxFit.cover,
-                      ),
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.sakyan.app',
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                      child: Row(children: [
-                        Icon(d.icon, color: AppColors.primary, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(d.label,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: textPrim,
-                                  fontSize: 13)),
-                        ),
-                        TextButton(
-                          onPressed: () => onReplace(i),
-                          child: const Text('Replace',
-                              style: TextStyle(
-                                  color: AppColors.primary, fontSize: 12)),
+                    if (_pin != null)
+                      MarkerLayer(markers: [
+                        Marker(
+                          point: _pin!,
+                          width: 36,
+                          height: 36,
+                          child: const Icon(Icons.location_pin,
+                              color: AppColors.primary, size: 36),
                         ),
                       ]),
-                    ),
                   ],
                 ),
               ),
-            );
-          }),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.warningBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.info_rounded,
-                    color: AppColors.warning, size: 16),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Once submitted, documents cannot be changed. '
-                    'Review admin approval typically takes 1–2 business days.',
-                    style: TextStyle(
-                        color: AppColors.warning,
-                        fontSize: 12,
-                        height: 1.5),
+              // Hint overlay
+              Positioned(
+                top: 8,
+                left: 0, right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 4)
+                      ],
+                    ),
+                    child: Text(
+                      _cityName.isEmpty
+                          ? 'Select a city to zoom the map'
+                          : 'Tap to pin your exact location',
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.black54),
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: isLoading ? null : onSubmit,
-              child: isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Submit for Review',
+              ),
+            ]),
+
+            // Pin address label (reverse geocoded)
+            if (_pin != null)
+              Container(
+                color: isDark
+                    ? AppColors.infoBg.withOpacity(0.3)
+                    : AppColors.infoBg,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  _reversing
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary))
+                      : const Icon(Icons.location_on_rounded,
+                          size: 14, color: AppColors.info),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _reversing ? 'Getting address…' : _pinLabel,
                       style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
+                          fontSize: 11,
+                          color: isDark
+                              ? AppColors.info
+                              : AppColors.info,
+                          height: 1.4),
+                    ),
+                  ),
+                ]),
+              ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 28),
+
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+          label: const Text('Continue',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          onPressed: () {
+            final err = _validateStep0();
+            if (err != null) { _showError(err); return; }
+            setState(() => _step = 1);
+          },
+        ),
+      ),
+      const SizedBox(height: 20),
+    ]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 1 — License & ID Details
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildStep1({
+    required bool isDark,
+    required Color borderColor,
+    required Color textPrim, required Color textSec, required Color inputFill,
+  }) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('License & ID Details',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+              color: textPrim)),
+      const SizedBox(height: 4),
+      Text(
+          "Enter your driver's license information and select your government "
+          'ID type.',
+          style: TextStyle(color: textSec, fontSize: 13)),
+      const SizedBox(height: 20),
+
+      Row(children: [
+        Expanded(child: _Field(
+          label: 'License Number',
+          child: _TextInput(
+            controller: _licenseNumCtrl,
+            hint: 'e.g. N01-23-456789',
+            isDark: isDark, inputFill: inputFill, borderColor: borderColor,
           ),
-        ],
+        )),
+        const SizedBox(width: 12),
+        Expanded(child: _Field(
+          label: 'License Expiry',
+          child: _DateInput(
+            controller: _licenseExpiryCtrl, hint: 'dd/mm/yyyy',
+            isDark: isDark, inputFill: inputFill, borderColor: borderColor,
+          ),
+        )),
+      ]),
+      const SizedBox(height: 16),
+
+      _Field(
+        label: 'Valid ID Type',
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+            color: inputFill,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: DropdownButton<String>(
+            value: _idType.isEmpty ? null : _idType,
+            hint: const Text('Select ID type',
+                style: TextStyle(fontSize: 13)),
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            items: _kIdTypes.map((t) => DropdownMenuItem(
+              value: t.$1,
+              child: Text(t.$2, style: const TextStyle(fontSize: 13)),
+            )).toList(),
+            onChanged: (v) => setState(() => _idType = v ?? ''),
+          ),
+        ),
+      ),
+      const SizedBox(height: 28),
+
+      Row(children: [
+        OutlinedButton.icon(
+          icon: const Icon(Icons.arrow_back_rounded, size: 16),
+          label: const Text('Back'),
+          onPressed: () => setState(() => _step = 0),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: ElevatedButton.icon(
+          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+          label: const Text('Continue',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          onPressed: () {
+            final err = _validateStep1();
+            if (err != null) { _showError(err); return; }
+            setState(() => _step = 2);
+          },
+        )),
+      ]),
+      const SizedBox(height: 20),
+    ]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 2 — Upload Documents
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildStep2({
+    required bool isDark,
+    required Color cardColor, required Color borderColor,
+    required Color textPrim, required Color textSec, required Color textMuted,
+    required bool isLoading,
+  }) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Upload Documents',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+              color: textPrim)),
+      const SizedBox(height: 4),
+      Text('Kept private. Used only for identity verification.',
+          style: TextStyle(color: textSec, fontSize: 13)),
+      const SizedBox(height: 20),
+
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: _UploadBox(
+          label: "Driver's License",
+          hint: 'Front side of your driver\'s license',
+          required: true,
+          file: _licenseFile,
+          textMuted: textMuted,
+          cardColor: cardColor,
+          borderColor: borderColor,
+          onTap: () async {
+            final f = await _pickImage();
+            if (f != null) setState(() => _licenseFile = f);
+          },
+          onClear: () => setState(() => _licenseFile = null),
+        )),
+        const SizedBox(width: 12),
+        Expanded(child: _UploadBox(
+          label: 'Valid Government ID',
+          hint: 'SSS, PhilHealth, UMID, Passport, etc.',
+          required: true,
+          file: _validIdFile,
+          textMuted: textMuted,
+          cardColor: cardColor,
+          borderColor: borderColor,
+          onTap: () async {
+            final f = await _pickImage();
+            if (f != null) setState(() => _validIdFile = f);
+          },
+          onClear: () => setState(() => _validIdFile = null),
+        )),
+      ]),
+      const SizedBox(height: 16),
+
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.infoBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.info.withOpacity(0.3)),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.info_outline_rounded,
+              color: AppColors.info, size: 16),
+          const SizedBox(width: 10),
+          Expanded(child: Text(
+            'Your documents will be reviewed by our team within 1–2 business '
+            "days. You'll be notified once verified.",
+            style: TextStyle(
+                color: AppColors.info, fontSize: 12, height: 1.5),
+          )),
+        ]),
+      ),
+      const SizedBox(height: 24),
+
+      Row(children: [
+        OutlinedButton.icon(
+          icon: const Icon(Icons.arrow_back_rounded, size: 16),
+          label: const Text('Back'),
+          onPressed: isLoading ? null : () => setState(() => _step = 1),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: ElevatedButton(
+          onPressed:
+              _licenseFile != null && _validIdFile != null && !isLoading
+                  ? _submit
+                  : null,
+          child: isLoading
+              ? const SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Text('Submit Verification →',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700)),
+        )),
+      ]),
+      const SizedBox(height: 20),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-WIDGETS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Step progress dots ────────────────────────────────────────────────────────
+class _StepProgress extends StatelessWidget {
+  final int current, total;
+  final Color borderColor, textMuted;
+  const _StepProgress({
+    required this.current, required this.total,
+    required this.borderColor, required this.textMuted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      ...List.generate(total, (i) => Expanded(
+        child: Container(
+          height: 4,
+          margin: EdgeInsets.only(right: i < total - 1 ? 6 : 0),
+          decoration: BoxDecoration(
+            color: i <= current ? AppColors.primary : borderColor,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      )),
+      const SizedBox(width: 8),
+      Text('Step ${current + 1} of $total',
+          style: TextStyle(color: textMuted, fontSize: 11)),
+    ]);
+  }
+}
+
+// ── Field label wrapper ───────────────────────────────────────────────────────
+class _Field extends StatelessWidget {
+  final String label;
+  final Widget child;
+  const _Field({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark
+                  ? AppColors.textSecondary
+                  : AppColors.textSecondaryLight)),
+      const SizedBox(height: 6),
+      child,
+    ]);
+  }
+}
+
+// ── PSGC dropdown ─────────────────────────────────────────────────────────────
+class _PsgcDropdown extends StatelessWidget {
+  final String value;
+  final List<_PsgcItem> items;
+  final String placeholder;
+  final bool loading, disabled, isDark;
+  final ValueChanged<String> onChanged;
+
+  const _PsgcDropdown({
+    required this.value, required this.items,
+    required this.placeholder, this.loading = false,
+    this.disabled = false, required this.isDark,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: DropdownButton<String>(
+        value: value.isEmpty ? null : value,
+        hint: Row(children: [
+          if (loading)
+            const SizedBox(
+              width: 12, height: 12,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.primary),
+            )
+          else
+            const SizedBox.shrink(),
+          if (loading) const SizedBox(width: 8),
+          Flexible(
+            child: Text(placeholder,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: disabled
+                        ? (isDark
+                            ? AppColors.textMuted
+                            : AppColors.textMutedLight)
+                        : null)),
+          ),
+        ]),
+        isExpanded: true,
+        underline: const SizedBox.shrink(),
+        disabledHint: Text(placeholder,
+            style: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? AppColors.textMuted
+                    : AppColors.textMutedLight)),
+        items: disabled
+            ? null
+            : items
+                .map((p) => DropdownMenuItem(
+                      value: p.code,
+                      child: Text(p.name,
+                          style: const TextStyle(fontSize: 13)),
+                    ))
+                .toList(),
+        onChanged: disabled ? null : (v) { if (v != null) onChanged(v); },
       ),
     );
   }
 }
 
-// ── Source button ──────────────────────────────────────────────────────────
+// ── Text input ────────────────────────────────────────────────────────────────
+class _TextInput extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final bool isDark;
+  final Color inputFill, borderColor;
+  final TextInputType? keyboardType;
+  final Widget? prefixIcon;
+  final bool enabled;
+  final ValueChanged<String>? onChanged;
+
+  const _TextInput({
+    required this.controller, required this.hint,
+    required this.isDark, required this.inputFill, required this.borderColor,
+    this.keyboardType, this.prefixIcon, this.enabled = true, this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      enabled: enabled,
+      onChanged: onChanged,
+      style: TextStyle(
+          fontSize: 13,
+          color: isDark ? AppColors.textPrimary : AppColors.textPrimaryLight),
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: prefixIcon,
+        filled: true,
+        fillColor: inputFill,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+        disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor)),
+      ),
+    );
+  }
+}
+
+// ── Date input (tap to open date picker) ──────────────────────────────────────
+class _DateInput extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final bool isDark;
+  final Color inputFill, borderColor;
+
+  const _DateInput({
+    required this.controller, required this.hint,
+    required this.isDark, required this.inputFill, required this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        DateTime initial = DateTime(2000);
+        if (controller.text.isNotEmpty) {
+          initial = DateTime.tryParse(controller.text) ?? DateTime(2000);
+        }
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: initial,
+          firstDate: DateTime(1940),
+          lastDate: DateTime(2060),
+        );
+        if (picked != null) {
+          controller.text =
+              '${picked.year.toString().padLeft(4, '0')}-'
+              '${picked.month.toString().padLeft(2, '0')}-'
+              '${picked.day.toString().padLeft(2, '0')}';
+        }
+      },
+      child: AbsorbPointer(
+        child: TextField(
+          controller: controller,
+          readOnly: true,
+          style: TextStyle(
+              fontSize: 13,
+              color: isDark
+                  ? AppColors.textPrimary
+                  : AppColors.textPrimaryLight),
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: const Icon(Icons.calendar_today_outlined, size: 16),
+            filled: true,
+            fillColor: inputFill,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: AppColors.primary, width: 2)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Upload box ────────────────────────────────────────────────────────────────
+class _UploadBox extends StatelessWidget {
+  final String label, hint;
+  final bool required;
+  final File? file;
+  final Color textMuted, cardColor, borderColor;
+  final VoidCallback onTap, onClear;
+
+  const _UploadBox({
+    required this.label, required this.hint, this.required = false,
+    required this.file,
+    required this.textMuted, required this.cardColor,
+    required this.borderColor, required this.onTap, required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600)),
+        if (required)
+          const Text(' *',
+              style: TextStyle(color: AppColors.error, fontSize: 13)),
+      ]),
+      const SizedBox(height: 4),
+      Text(hint, style: TextStyle(fontSize: 11, color: textMuted)),
+      const SizedBox(height: 8),
+      GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 160,
+          decoration: BoxDecoration(
+            color: file != null ? Colors.transparent : cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: file != null ? AppColors.success : borderColor,
+              width: file != null ? 2 : 1,
+            ),
+          ),
+          child: file != null
+              ? Stack(fit: StackFit.expand, children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.file(file!, fit: BoxFit.cover),
+                  ),
+                  Positioned(
+                    top: 6, right: 6,
+                    child: GestureDetector(
+                      onTap: onClear,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                            color: AppColors.error, shape: BoxShape.circle),
+                        child: const Icon(Icons.close_rounded,
+                            color: Colors.white, size: 12),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 6, left: 0, right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: const Text('Tap to replace',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 10)),
+                      ),
+                    ),
+                  ),
+                ])
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.upload_rounded,
+                        color: AppColors.primary, size: 28),
+                    const SizedBox(height: 8),
+                    const Text('Click to upload',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w500)),
+                    Text('JPG or PNG · Max 5 MB',
+                        style: TextStyle(fontSize: 10, color: textMuted)),
+                  ],
+                ),
+        ),
+      ),
+    ]);
+  }
+}
+
+// ── Source button (camera / gallery) ──────────────────────────────────────────
 class _SourceButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -770,7 +1156,8 @@ class _SourceButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.primaryGlow,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+          border:
+              Border.all(color: AppColors.primary.withOpacity(0.3)),
         ),
         child: Column(children: [
           Icon(icon, color: AppColors.primary, size: 28),
