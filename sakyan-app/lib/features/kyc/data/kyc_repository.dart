@@ -1,21 +1,42 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/constants/app_constants.dart';
 import '../models/kyc_model.dart';
 
 class KycRepository {
   const KycRepository();
 
   static final _storage = Supabase.instance.client.storage;
-  static const _bucket  = 'kyc-documents';
+  // Use the constant so bucket name is defined in one place only
+  static const _bucket  = AppConstants.bucketKycDocs; // 'kyc-documents'
   static const _uuid    = Uuid();
 
   // ── Upload a file to Supabase Storage and return the public URL ────────────
+  //
+  // Uses uploadBinary (Uint8List) instead of the File-based upload() API.
+  // Reasons:
+  //   • uploadBinary works consistently on both Android & iOS.
+  //   • upsert: true avoids 409 Conflict errors on re-submissions.
+  //   • Explicit contentType prevents Supabase from rejecting unknown MIME types.
+  //
   Future<String> _uploadFile(File file, String folder) async {
-    final ext      = file.path.split('.').last;
-    final fileName = '$folder/${_uuid.v4()}.$ext';
-    await _storage.from(_bucket).upload(fileName, file);
+    final bytes    = await file.readAsBytes();
+    final ext      = file.path.split('.').last.toLowerCase();
+    // Normalise to a known image type; default to jpeg for safety
+    final safeExt  = ['jpg', 'jpeg', 'png', 'webp', 'heic'].contains(ext) ? ext : 'jpg';
+    final mimeType = safeExt == 'png' ? 'image/png'
+                   : safeExt == 'webp' ? 'image/webp'
+                   : 'image/jpeg';
+    final fileName = '$folder/${_uuid.v4()}.$safeExt';
+
+    await _storage.from(_bucket).uploadBinary(
+      fileName,
+      bytes,
+      fileOptions: FileOptions(contentType: mimeType, upsert: true),
+    );
     return _storage.from(_bucket).getPublicUrl(fileName);
   }
 

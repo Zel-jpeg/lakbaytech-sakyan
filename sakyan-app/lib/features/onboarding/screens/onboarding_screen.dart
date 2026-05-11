@@ -511,7 +511,7 @@ class _FindRideIllustration extends StatelessWidget {
             right: 8,
             child: _FloatingChip(
                 icon: Icons.location_on_rounded,
-                label: 'Quezon City',
+                label: 'Davao City',
                 color: accent),
           ),
           Positioned(

@@ -16,10 +16,10 @@ class AppConstants {
       'eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtZ3Vkdnp1am94ZnZpbGlwamduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNDU4NzcsImV4cCI6MjA5MjkyMTg3N30.'
       '8K7szkdyOEMjCYR7IWXtiegqiWe5ne9qIbMvJlmq-4I';
 
-  // Supabase storage buckets
+  // Supabase storage buckets — must match exactly what exists in Supabase dashboard
   static const String bucketCarImages   = 'car-images';
-  static const String bucketKycDocs     = 'kyc-documents';
-  static const String bucketPartnerDocs = 'partner-documents';
+  static const String bucketKycDocs     = 'uploads';        // KYC & partner docs go here
+  static const String bucketPartnerDocs = 'uploads';        // same bucket as web app uses
   static const String bucketAvatars     = 'avatars';
   static const String bucketChatImages  = 'chat-images';
 

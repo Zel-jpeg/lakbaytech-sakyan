@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../features/booking/models/booking_model.dart';
 import '../../../features/cars/models/car_model.dart';
 import '../models/partner_model.dart';
@@ -147,16 +148,31 @@ class PartnerRepository {
   // ── Image upload ───────────────────────────────────────────────────────────
 
   Future<String> uploadCarImage(File file) async {
-    final ext      = file.path.split('.').last;
-    final fileName = 'car-images/${_uuid.v4()}.$ext';
-    await _storage.from('car-images').upload(fileName, file);
-    return _storage.from('car-images').getPublicUrl(fileName);
+    final bytes    = await file.readAsBytes();
+    final ext      = file.path.split('.').last.toLowerCase();
+    final safeExt  = ['jpg', 'jpeg', 'png', 'webp'].contains(ext) ? ext : 'jpg';
+    final mimeType = safeExt == 'png' ? 'image/png' : safeExt == 'webp' ? 'image/webp' : 'image/jpeg';
+    final fileName = '${_uuid.v4()}.$safeExt';
+    await _storage.from(AppConstants.bucketCarImages).uploadBinary(
+      fileName, bytes,
+      fileOptions: FileOptions(contentType: mimeType, upsert: true),
+    );
+    return _storage.from(AppConstants.bucketCarImages).getPublicUrl(fileName);
   }
 
   Future<String> uploadPartnerDoc(File file, String folder) async {
-    final ext      = file.path.split('.').last;
-    final fileName = '$folder/${_uuid.v4()}.$ext';
-    await _storage.from('partner-documents').upload(fileName, file);
-    return _storage.from('partner-documents').getPublicUrl(fileName);
+    final bytes    = await file.readAsBytes();
+    final ext      = file.path.split('.').last.toLowerCase();
+    final safeExt  = ['jpg', 'jpeg', 'png', 'webp', 'pdf'].contains(ext) ? ext : 'jpg';
+    final mimeType = safeExt == 'pdf'  ? 'application/pdf'
+                   : safeExt == 'png'  ? 'image/png'
+                   : safeExt == 'webp' ? 'image/webp'
+                   : 'image/jpeg';
+    final fileName = '$folder/${_uuid.v4()}.$safeExt';
+    await _storage.from(AppConstants.bucketPartnerDocs).uploadBinary(
+      fileName, bytes,
+      fileOptions: FileOptions(contentType: mimeType, upsert: true),
+    );
+    return _storage.from(AppConstants.bucketPartnerDocs).getPublicUrl(fileName);
   }
 }
