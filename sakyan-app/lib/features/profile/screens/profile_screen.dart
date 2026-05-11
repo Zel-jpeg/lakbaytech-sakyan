@@ -6,14 +6,16 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/models/user_model.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../kyc/providers/kyc_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user   = ref.watch(currentUserProvider);
-    final isDark = ref.watch(isDarkModeProvider);
+    final user      = ref.watch(currentUserProvider);
+    final isDark    = ref.watch(isDarkModeProvider);
+    final kycAsync  = ref.watch(kycStatusProvider);
 
     final bgSurface  = isDark ? AppColors.bgSurface     : AppColors.bgSurfaceLight;
     final bgElevated = isDark ? AppColors.bgElevated    : AppColors.bgElevatedLight;
@@ -143,21 +145,13 @@ class ProfileScreen extends ConsumerWidget {
           if (user?.isCustomer == true) ...[
             _SectionLabel(label: 'Verification', textSec: textSec),
             const SizedBox(height: 8),
-            _SettingsCard(
-              isDark: isDark,
-              bgSurface: bgSurface,
-              border: border,
-              children: [
-                _SettingsNavTile(
-                  icon: Icons.verified_user_rounded,
-                  label: 'KYC Verification',
-                  subtitle: 'Submit your ID for verification',
-                  isDark: isDark,
-                  textPrim: textPrim,
-                  textSec: textSec,
-                  onTap: () => context.push(AppRoutes.kycVerify),
-                ),
-              ],
+            _KycStatusCard(
+              kycAsync:   kycAsync,
+              isDark:     isDark,
+              bgSurface:  bgSurface,
+              border:     border,
+              textPrim:   textPrim,
+              textSec:    textSec,
             ),
             const SizedBox(height: 20),
           ],
@@ -661,4 +655,176 @@ class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       Divider(height: 1, thickness: 1, color: color, indent: 66);
+}
+
+// ── KYC status-aware card ─────────────────────────────────────────────────────
+//
+// Shows a different UI depending on the user's KYC status:
+//   approved     → green verified badge, no navigation (nothing to do)
+//   pending      → amber badge, taps to the pending/status screen
+//   rejected     → red badge, taps to the verify form to re-submit
+//   not_submitted → default, taps to the verify form to start
+//
+class _KycStatusCard extends StatelessWidget {
+  final AsyncValue<dynamic> kycAsync;
+  final bool isDark;
+  final Color bgSurface, border, textPrim, textSec;
+
+  const _KycStatusCard({
+    required this.kycAsync,
+    required this.isDark,
+    required this.bgSurface,
+    required this.border,
+    required this.textPrim,
+    required this.textSec,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return kycAsync.when(
+      loading: () => _buildShell(
+        context,
+        icon:     Icons.verified_user_rounded,
+        iconColor: AppColors.primary,
+        label:    'KYC Verification',
+        subtitle: 'Checking status…',
+        badgeText: null,
+        badgeColor: null,
+        onTap:    null,
+      ),
+      error: (_, __) => _buildShell(
+        context,
+        icon:      Icons.verified_user_rounded,
+        iconColor: AppColors.primary,
+        label:     'KYC Verification',
+        subtitle:  'Submit your ID for verification',
+        badgeText: null,
+        badgeColor: null,
+        onTap:     () => context.push(AppRoutes.kycVerify),
+      ),
+      data: (kyc) {
+        final status = kyc?.status ?? 'not_submitted';
+
+        switch (status) {
+          case 'approved':
+            return _buildShell(
+              context,
+              icon:       Icons.verified_rounded,
+              iconColor:  AppColors.success,
+              label:      'Identity Verified',
+              subtitle:   'Your account is fully verified',
+              badgeText:  'Verified',
+              badgeColor: AppColors.success,
+              onTap:      null, // nothing to do — already approved
+            );
+          case 'pending':
+            return _buildShell(
+              context,
+              icon:       Icons.hourglass_top_rounded,
+              iconColor:  AppColors.warning,
+              label:      'Verification Pending',
+              subtitle:   'Your documents are under review',
+              badgeText:  'Pending',
+              badgeColor: AppColors.warning,
+              onTap:      () => context.push(AppRoutes.kycPending),
+            );
+          case 'rejected':
+            return _buildShell(
+              context,
+              icon:       Icons.gpp_bad_rounded,
+              iconColor:  AppColors.error,
+              label:      'Verification Rejected',
+              subtitle:   'Tap to re-submit your documents',
+              badgeText:  'Rejected',
+              badgeColor: AppColors.error,
+              onTap:      () => context.push(AppRoutes.kycVerify),
+            );
+          default: // not_submitted
+            return _buildShell(
+              context,
+              icon:       Icons.verified_user_rounded,
+              iconColor:  AppColors.primary,
+              label:      'KYC Verification',
+              subtitle:   'Submit your ID to unlock bookings',
+              badgeText:  null,
+              badgeColor: null,
+              onTap:      () => context.push(AppRoutes.kycVerify),
+            );
+        }
+      },
+    );
+  }
+
+  Widget _buildShell(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String subtitle,
+    required String? badgeText,
+    required Color? badgeColor,
+    required VoidCallback? onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bgSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: textPrim)),
+                    Text(subtitle,
+                        style: TextStyle(fontSize: 12, color: textSec)),
+                  ],
+                ),
+              ),
+              if (badgeText != null && badgeColor != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: badgeColor.withOpacity(0.4)),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: TextStyle(
+                        color: badgeColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700),
+                  ),
+                )
+              else if (onTap != null)
+                Icon(Icons.chevron_right_rounded, color: textSec, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
