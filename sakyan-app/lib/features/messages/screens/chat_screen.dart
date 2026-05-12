@@ -12,6 +12,18 @@ import '../../auth/providers/auth_provider.dart';
 import '../models/message_model.dart';
 import '../providers/message_provider.dart';
 
+// ── Capitalise helper ─────────────────────────────────────────────────────────
+String _capitalise(String? s) {
+  if (s == null || s.trim().isEmpty) return '';
+  final t = s.trim();
+  return t[0].toUpperCase() + t.substring(1);
+}
+
+String _capitaliseFull(String? s) {
+  if (s == null || s.trim().isEmpty) return '';
+  return s.trim().split(' ').map(_capitalise).join(' ');
+}
+
 class ChatScreen extends ConsumerStatefulWidget {
   final String bookingId;
   final String? receiverId;
@@ -42,30 +54,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Uint8List? _pickedImageBytes;
 
   // ── Receiver resolution ────────────────────────────────────────────────────
-  //
-  // _resolvedReceiverId is populated from ACTUAL messages in the thread.
-  // Those IDs are guaranteed to be real User UUIDs (the backend created them).
-  //
-  // widget.receiverId may be a partner PROFILE UUID (not a User UUID) when
-  // coming from the booking/confirmation screen — that causes the
-  // "Invalid pk — object does not exist" error.  So we ALWAYS prefer the
-  // message-resolved ID once one is available, falling back to the widget
-  // value only for brand-new conversations with no messages yet.
-  //
   String? _resolvedReceiverId;
   String? _resolvedReceiverName;
 
-  // Prefer the ID we resolved from real messages; fall back to the widget param.
   String? get _receiverId =>
       (_resolvedReceiverId != null && _resolvedReceiverId!.isNotEmpty)
           ? _resolvedReceiverId
           : (widget.receiverId?.isNotEmpty == true ? widget.receiverId : null);
 
-  // Prefer the name that came with the resolved ID; fall back to widget param.
-  String? get _receiverName =>
-      (_resolvedReceiverName != null && _resolvedReceiverName!.isNotEmpty)
-          ? _resolvedReceiverName
-          : (widget.receiverName?.isNotEmpty == true ? widget.receiverName : null);
+  String? get _receiverName {
+    final raw = (_resolvedReceiverName != null && _resolvedReceiverName!.isNotEmpty)
+        ? _resolvedReceiverName
+        : (widget.receiverName?.isNotEmpty == true ? widget.receiverName : null);
+    return _capitaliseFull(raw);
+  }
 
   bool get _hasValidReceiver =>
       _receiverId != null && _receiverId!.isNotEmpty;
@@ -88,24 +90,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  // ── Resolve the real receiver UUID from message history ───────────────────
-  //
-  // IMPORTANT: we do NOT bail early when widget.receiverId is set.
-  // The widget value might be a partner profile UUID rather than a User UUID,
-  // so we always overwrite with a confirmed-valid ID from the message thread.
-  //
   void _tryResolveReceiver(
       List<MessageModel> messages, String? currentUserId) {
     if (currentUserId == null || messages.isEmpty) return;
 
     for (final m in messages) {
-      // The sender of a message that isn't "me" is the other participant.
       if (m.senderId.isNotEmpty && m.senderId != currentUserId) {
-        if (_resolvedReceiverId == m.senderId) return; // already correct
+        if (_resolvedReceiverId == m.senderId) return;
         if (mounted) {
           setState(() {
             _resolvedReceiverId = m.senderId;
-            // Keep the better name: resolved name > widget name
             if (m.senderName.isNotEmpty) {
               _resolvedReceiverName = m.senderName;
             }
@@ -113,7 +107,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         }
         return;
       }
-      // The receiver of MY message is also the other participant.
       if (m.receiverId.isNotEmpty && m.receiverId != currentUserId) {
         if (_resolvedReceiverId == m.receiverId) return;
         if (mounted) {
@@ -143,7 +136,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  // ── Pick image from gallery ────────────────────────────────────────────────
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
@@ -168,19 +160,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  // ── Upload image to Supabase, return public URL ────────────────────────────
-  //
-  // FIX: old path was  chat/{bookingId[:8]}/{timestamp}.jpg
-  //      which created an extra nested folder inside "chat/".
-  //      New path:       chat/{timestamp}.jpg
-  //      Structure in bucket:  chat-images / chat / 1778547728415.jpg
-  //
   Future<String?> _uploadImage() async {
     if (_pickedImage == null || _pickedImageBytes == null) return null;
     setState(() => _uploading = true);
     try {
       final fileName = 'chat/${DateTime.now().millisecondsSinceEpoch}.jpg';
-
       final url = await SupabaseService.uploadChatImage(
         fileName,
         _pickedImageBytes!,
@@ -205,7 +189,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ));
   }
 
-  // ── Send message (text + optional image) ──────────────────────────────────
   Future<void> _send() async {
     final text       = _msgCtrl.text.trim();
     final hasImage   = _pickedImage != null;
@@ -255,7 +238,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  // ── Fullscreen image viewer ────────────────────────────────────────────────
   void _showFullScreenImage(BuildContext ctx, String url) {
     showDialog(
       context: ctx,
@@ -309,7 +291,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  // ── Safe back navigation ───────────────────────────────────────────────────
   void _handleBack() {
     if (context.canPop()) {
       context.pop();
@@ -331,9 +312,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final textSec     = isDark ? AppColors.textSecondary : AppColors.textSecondaryLight;
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
 
-    // Always try to resolve from messages — overrides any wrong widget UUID.
     messagesAsync.whenData(
         (messages) => _tryResolveReceiver(messages, currentUser?.id));
+
+    // Display name: prefer resolved > widget param > fallback
+    final displayName = _receiverName?.isNotEmpty == true
+        ? _receiverName!
+        : 'Partner';
+
+    final avatarLetter = displayName[0].toUpperCase();
 
     return PopScope(
       canPop: false,
@@ -361,10 +348,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    (_receiverName?.isNotEmpty == true
-                            ? _receiverName!
-                            : 'U')[0]
-                        .toUpperCase(),
+                    avatarLetter,
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -377,7 +361,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _receiverName ?? 'Chat',
+                    displayName,
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -601,7 +585,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // Attachment button
                   GestureDetector(
                     onTap: (_sending || _uploading) ? null : _pickImage,
                     child: Container(
@@ -620,8 +603,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Text input
                   Expanded(
                     child: Container(
                       constraints: const BoxConstraints(maxHeight: 120),
@@ -652,8 +633,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Send button
                   GestureDetector(
                     onTap: (_sending || _uploading) ? null : _send,
                     child: AnimatedContainer(
@@ -723,6 +702,9 @@ class _MessageBubble extends StatelessWidget {
     final hasImage  = message.imageUrl != null && message.imageUrl!.isNotEmpty;
     final hasText   = message.content.trim().isNotEmpty;
 
+    // Sender name capitalised
+    final senderDisplay = _capitaliseFull(message.senderName);
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -732,6 +714,7 @@ class _MessageBubble extends StatelessWidget {
           right: isMe ? 0  : 56,
         ),
         decoration: BoxDecoration(
+          // When image-only, keep transparent so the image fills cleanly
           color: hasImage && !hasText ? Colors.transparent : bubbleBg,
           borderRadius: BorderRadius.only(
             topLeft:     Radius.circular(isMe ? 18 : 4),
@@ -755,11 +738,11 @@ class _MessageBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Sender name (for others only)
-            if (!isMe && message.senderName.isNotEmpty)
+            if (!isMe && senderDisplay.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8, left: 14, right: 14),
                 child: Text(
-                  message.senderName,
+                  senderDisplay,
                   style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.primary,
@@ -767,28 +750,43 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
 
-            // Image attachment
+            // ── Image attachment — proper aspect-ratio preview ────────────
+            // Uses AspectRatio + LayoutBuilder so the image always shows at
+            // its natural ratio (up to a max width), never cropped. Tapping
+            // opens the full-screen viewer. Matches Messenger-style behavior.
             if (hasImage)
               GestureDetector(
                 onTap: () => onImageTap(message.imageUrl!),
-                child: Hero(
-                  tag: '${message.id}_img',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.only(
-                      topLeft:     Radius.circular(isMe ? 18 : 4),
-                      topRight:    Radius.circular(isMe ? 4 : 18),
-                      bottomLeft:  Radius.circular(hasText ? 0 : 18),
-                      bottomRight: Radius.circular(hasText ? 0 : 18),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topLeft:     Radius.circular(isMe ? 18 : 4),
+                    topRight:    Radius.circular(isMe ? 4 : 18),
+                    bottomLeft:  Radius.circular(hasText ? 0 : 18),
+                    bottomRight: Radius.circular(hasText ? 0 : 18),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      // Max bubble width — mirrors the left/right margins above
+                      maxWidth: 260,
+                      // Minimum so tiny images still look intentional
+                      minWidth: 120,
+                      // Cap tall images so they don't dominate the screen
+                      maxHeight: 340,
                     ),
                     child: Image.network(
                       message.imageUrl!,
-                      width: 220, height: 165,
-                      fit: BoxFit.cover,
+                      // ── KEY CHANGE ──────────────────────────────────────
+                      // fit: BoxFit.contain  → never crops, preserves ratio
+                      // The image widget sizes itself to its intrinsic size
+                      // (bounded by the ConstrainedBox above).
+                      fit: BoxFit.contain,
                       loadingBuilder: (ctx, child, progress) {
                         if (progress == null) return child;
                         return Container(
                           width: 220, height: 165,
-                          color: AppColors.bgElevated,
+                          color: isDark
+                              ? AppColors.bgElevated
+                              : AppColors.bgElevatedLight,
                           child: const Center(
                             child: CircularProgressIndicator(
                                 strokeWidth: 2,
@@ -798,7 +796,9 @@ class _MessageBubble extends StatelessWidget {
                       },
                       errorBuilder: (_, __, ___) => Container(
                         width: 220, height: 80,
-                        color: AppColors.bgElevated,
+                        color: isDark
+                            ? AppColors.bgElevated
+                            : AppColors.bgElevatedLight,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -820,7 +820,7 @@ class _MessageBubble extends StatelessWidget {
             if (hasText)
               Padding(
                 padding: EdgeInsets.only(
-                  top: hasImage ? 6 : ((!isMe && message.senderName.isNotEmpty) ? 4 : 10),
+                  top: hasImage ? 6 : ((!isMe && senderDisplay.isNotEmpty) ? 4 : 10),
                   bottom: 4,
                   left: 14,
                   right: 14,
