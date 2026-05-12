@@ -41,20 +41,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   XFile?     _pickedImage;
   Uint8List? _pickedImageBytes;
 
+  // ── Receiver resolution ────────────────────────────────────────────────────
+  //
+  // _resolvedReceiverId is populated from ACTUAL messages in the thread.
+  // Those IDs are guaranteed to be real User UUIDs (the backend created them).
+  //
+  // widget.receiverId may be a partner PROFILE UUID (not a User UUID) when
+  // coming from the booking/confirmation screen — that causes the
+  // "Invalid pk — object does not exist" error.  So we ALWAYS prefer the
+  // message-resolved ID once one is available, falling back to the widget
+  // value only for brand-new conversations with no messages yet.
+  //
   String? _resolvedReceiverId;
   String? _resolvedReceiverName;
 
-  String? get _receiverId {
-    final wid = widget.receiverId;
-    if (wid != null && wid.isNotEmpty) return wid;
-    return _resolvedReceiverId;
-  }
+  // Prefer the ID we resolved from real messages; fall back to the widget param.
+  String? get _receiverId =>
+      (_resolvedReceiverId != null && _resolvedReceiverId!.isNotEmpty)
+          ? _resolvedReceiverId
+          : (widget.receiverId?.isNotEmpty == true ? widget.receiverId : null);
 
-  String? get _receiverName {
-    final wn = widget.receiverName;
-    if (wn != null && wn.isNotEmpty) return wn;
-    return _resolvedReceiverName;
-  }
+  // Prefer the name that came with the resolved ID; fall back to widget param.
+  String? get _receiverName =>
+      (_resolvedReceiverName != null && _resolvedReceiverName!.isNotEmpty)
+          ? _resolvedReceiverName
+          : (widget.receiverName?.isNotEmpty == true ? widget.receiverName : null);
 
   bool get _hasValidReceiver =>
       _receiverId != null && _receiverId!.isNotEmpty;
@@ -77,23 +88,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  // ── Resolve the real receiver UUID from message history ───────────────────
+  //
+  // IMPORTANT: we do NOT bail early when widget.receiverId is set.
+  // The widget value might be a partner profile UUID rather than a User UUID,
+  // so we always overwrite with a confirmed-valid ID from the message thread.
+  //
   void _tryResolveReceiver(
       List<MessageModel> messages, String? currentUserId) {
-    if (_hasValidReceiver) return;
-    if (currentUserId == null) return;
+    if (currentUserId == null || messages.isEmpty) return;
+
     for (final m in messages) {
+      // The sender of a message that isn't "me" is the other participant.
       if (m.senderId.isNotEmpty && m.senderId != currentUserId) {
-        if (mounted) setState(() {
-          _resolvedReceiverId   = m.senderId;
-          _resolvedReceiverName = m.senderName;
-        });
+        if (_resolvedReceiverId == m.senderId) return; // already correct
+        if (mounted) {
+          setState(() {
+            _resolvedReceiverId = m.senderId;
+            // Keep the better name: resolved name > widget name
+            if (m.senderName.isNotEmpty) {
+              _resolvedReceiverName = m.senderName;
+            }
+          });
+        }
         return;
       }
+      // The receiver of MY message is also the other participant.
       if (m.receiverId.isNotEmpty && m.receiverId != currentUserId) {
-        if (mounted) setState(() {
-          _resolvedReceiverId   = m.receiverId;
-          _resolvedReceiverName = m.receiverName;
-        });
+        if (_resolvedReceiverId == m.receiverId) return;
+        if (mounted) {
+          setState(() {
+            _resolvedReceiverId = m.receiverId;
+            if (m.receiverName.isNotEmpty) {
+              _resolvedReceiverName = m.receiverName;
+            }
+          });
+        }
         return;
       }
     }
@@ -117,18 +147,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        // Pick at full resolution — SupabaseService.uploadChatImage()
-        // compresses to 800 px / 75 % JPEG before hitting Supabase,
-        // so we don't double-compress here.
-      );
+      final picked = await picker.pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
-      if (mounted) setState(() {
-        _pickedImage      = picked;
-        _pickedImageBytes = bytes;
-      });
+      if (mounted) {
+        setState(() {
+          _pickedImage      = picked;
+          _pickedImageBytes = bytes;
+        });
+      }
     } catch (e) {
       if (mounted) _showError('Could not pick image: ${e.toString()}');
     }
@@ -143,25 +170,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   // ── Upload image to Supabase, return public URL ────────────────────────────
   //
-  // Delegates to SupabaseService.uploadChatImage which:
-  //   1. Compresses via flutter_image_compress → 800 px max, 75 % JPEG
-  //   2. Strips EXIF metadata (GPS, device info)
-  //   3. Uploads the compressed bytes to Supabase chat-images bucket
-  //   4. Returns the public URL — sent as a plain JSON string to the backend
-  //
-  // Typical saving: a 4 MB phone photo becomes ~150-300 KB.
+  // FIX: old path was  chat/{bookingId[:8]}/{timestamp}.jpg
+  //      which created an extra nested folder inside "chat/".
+  //      New path:       chat/{timestamp}.jpg
+  //      Structure in bucket:  chat-images / chat / 1778547728415.jpg
   //
   Future<String?> _uploadImage() async {
     if (_pickedImage == null || _pickedImageBytes == null) return null;
     setState(() => _uploading = true);
     try {
-      // Group by conversation so the bucket stays organised
-      final fileName =
-          'chat/${widget.bookingId.substring(0, 8)}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = 'chat/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
       final url = await SupabaseService.uploadChatImage(
         fileName,
-        _pickedImageBytes!,   // compressed inside uploadChatImage
+        _pickedImageBytes!,
       );
       return url;
     } catch (e) {
@@ -185,8 +207,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   // ── Send message (text + optional image) ──────────────────────────────────
   Future<void> _send() async {
-    final text     = _msgCtrl.text.trim();
-    final hasImage = _pickedImage != null;
+    final text       = _msgCtrl.text.trim();
+    final hasImage   = _pickedImage != null;
     final hasContent = text.isNotEmpty || hasImage;
 
     if (!hasContent || _sending || _uploading) return;
@@ -202,11 +224,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final savedText = text;
     _msgCtrl.clear();
 
-    // ── Upload image FIRST, then send the URL in JSON ─────────────────────
     String? imageUrl;
     if (hasImage) {
       imageUrl = await _uploadImage();
-      // If upload failed and there is no text, abort and restore
       if (imageUrl == null && savedText.isEmpty) {
         if (mounted) {
           _msgCtrl.text = savedText;
@@ -221,14 +241,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await ref.read(chatProvider(widget.bookingId).notifier).send(
             receiverId: _receiverId!,
             content:    savedText,
-            imageUrl:   imageUrl,  // URL string sent as JSON — no FK error
+            imageUrl:   imageUrl,
           );
       _scrollToBottom(animated: true);
     } catch (e) {
       if (mounted) {
         _showError(
             'Failed to send: ${e.toString().replaceFirst('Exception: ', '')}');
-        _msgCtrl.text = savedText; // restore unsent text
+        _msgCtrl.text = savedText;
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -311,6 +331,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final textSec     = isDark ? AppColors.textSecondary : AppColors.textSecondaryLight;
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
 
+    // Always try to resolve from messages — overrides any wrong widget UUID.
     messagesAsync.whenData(
         (messages) => _tryResolveReceiver(messages, currentUser?.id));
 
@@ -340,9 +361,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    (_receiverName ?? 'U').isNotEmpty
-                        ? (_receiverName ?? 'U')[0].toUpperCase()
-                        : 'U',
+                    (_receiverName?.isNotEmpty == true
+                            ? _receiverName!
+                            : 'U')[0]
+                        .toUpperCase(),
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -618,7 +640,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               ? (_pickedImage != null
                                   ? 'Add a caption (optional)…'
                                   : 'Type a message…')
-                              : 'Resolve recipient first…',
+                              : 'Loading recipient…',
                           hintStyle:
                               TextStyle(color: textMuted, fontSize: 14),
                           border: InputBorder.none,
@@ -699,7 +721,7 @@ class _MessageBubble extends StatelessWidget {
     final textColor = isMe ? Colors.white : textPrim;
     final timeColor = isMe ? Colors.white.withOpacity(0.65) : textMuted;
     final hasImage  = message.imageUrl != null && message.imageUrl!.isNotEmpty;
-    final hasText   = message.content.isNotEmpty;
+    final hasText   = message.content.trim().isNotEmpty;
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -745,7 +767,7 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
 
-            // Image attachment — tappable, fullscreen on tap
+            // Image attachment
             if (hasImage)
               GestureDetector(
                 onTap: () => onImageTap(message.imageUrl!),
