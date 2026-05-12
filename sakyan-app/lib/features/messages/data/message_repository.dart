@@ -35,19 +35,19 @@ class MessageRepository {
 
   // ── Send a message ─────────────────────────────────────────────────────────
   //
-  // FIX: Django REST Framework serialises ForeignKey write fields as
-  //      `<field>_id` by default (PrimaryKeyRelatedField).
-  //      The old payload used `'booking'` and `'receiver'` as plain
-  //      string UUIDs, which the DRF serializer rejects with a 400.
+  // FIX (image FK error):
+  //   Django REST Framework PrimaryKeyRelatedField serialises FK write fields
+  //   as `<field>_id` by default. Sending plain `'booking'` or `'receiver'`
+  //   UUIDs caused "does not exist" FK validation errors.
   //
-  //      Correct field names:
-  //        • booking_id  (UUID of the Booking FK)
-  //        • receiver_id (UUID of the User FK)
-  //        • content     (plain text — unchanged)
+  //   Additionally, when an image_url is included the backend must receive
+  //   it as a plain string — NOT a multipart upload. Supabase already gave
+  //   us the public URL; we just send that URL in the JSON payload.
   //
-  //      Both `booking_id` and `booking` are tried via the fallback so
-  //      the app works regardless of how the Django serializer is
-  //      configured (some devs rename the field in Meta.extra_kwargs).
+  //   Strategy:
+  //     1. Primary attempt: booking_id / receiver_id  (DRF PrimaryKeyRelatedField)
+  //     2. Fallback:        booking / receiver        (some serializers use source=)
+  //     3. Surface the cleanest Django validation error if both fail.
   // ──────────────────────────────────────────────────────────────────────────
   Future<MessageModel> sendMessage({
     required String bookingId,
@@ -63,40 +63,41 @@ class MessageRepository {
       throw Exception('Cannot send an empty message.');
     }
 
-    // Build payload — include image_url only when present
-    Map<String, dynamic> buildPayload({bool useSuffix = true}) => {
-      if (useSuffix) 'booking_id': bookingId else 'booking': bookingId,
-      if (useSuffix) 'receiver_id': receiverId else 'receiver': receiverId,
-      'content': content.trim(),
+    // ── Build payloads ────────────────────────────────────────────────────
+    // Try both FK naming conventions since Django setups vary.
+    // image_url is sent as a plain string (already uploaded to Supabase).
+    Map<String, dynamic> _payload({required bool suffix}) => {
+      if (suffix) 'booking_id': bookingId else 'booking': bookingId,
+      if (suffix) 'receiver_id': receiverId else 'receiver': receiverId,
+      'content': content.trim().isEmpty ? ' ' : content.trim(),
+      // ── Image fix: send as plain JSON string, NOT multipart ──
+      // The backend stores the Supabase public URL directly.
       if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
     };
 
+    // ── Attempt 1: _id suffix (standard DRF) ────────────────────────────
     try {
-      // Primary attempt: use the _id suffix that DRF PrimaryKeyRelatedField
-      // exposes for write operations.
-      final res = await ApiService.post('/messages/', data: buildPayload(useSuffix: true));
+      final res = await ApiService.post('/messages/', data: _payload(suffix: true));
       return MessageModel.fromJson(res.data as Map<String, dynamic>);
-    } on DioException catch (e) {
-      // ── Extract the actual Django validation error message ──────────────
-      final body = e.response?.data;
-      if (body is Map) {
-        // If primary attempt failed, retry with non-suffixed field names
-        // in case the serializer uses source= overrides.
-        if (e.response?.statusCode == 400) {
-          try {
-            final retry = await ApiService.post('/messages/', data: buildPayload(useSuffix: false));
-            return MessageModel.fromJson(retry.data as Map<String, dynamic>);
-          } on DioException catch (retryErr) {
-            // Both attempts failed — surface the cleanest error message.
-            final retryBody = retryErr.response?.data;
-            final msg = _extractDjangoError(retryBody) ?? _extractDjangoError(body);
-            throw Exception(msg ?? 'Failed to send message (400).');
-          }
-        }
-        final msg = _extractDjangoError(body);
+    } on DioException catch (e1) {
+      if (e1.response?.statusCode != 400) {
+        // Not a validation error — surface immediately
+        final msg = _extractDjangoError(e1.response?.data);
         if (msg != null) throw Exception(msg);
+        rethrow;
       }
-      rethrow;
+
+      // ── Attempt 2: no suffix fallback ───────────────────────────────
+      try {
+        final res = await ApiService.post('/messages/', data: _payload(suffix: false));
+        return MessageModel.fromJson(res.data as Map<String, dynamic>);
+      } on DioException catch (e2) {
+        // Both failed — surface the best error message
+        final msg = _extractDjangoError(e2.response?.data)
+            ?? _extractDjangoError(e1.response?.data)
+            ?? 'Failed to send message. Please try again.';
+        throw Exception(msg);
+      }
     }
   }
 
@@ -114,7 +115,8 @@ class MessageRepository {
         .toList();
   }
 
-  Future<MessageModel> sendSupportMessage(String content, {String? imageUrl}) async {
+  Future<MessageModel> sendSupportMessage(String content,
+      {String? imageUrl}) async {
     if (content.trim().isEmpty && (imageUrl == null || imageUrl.isEmpty)) {
       throw Exception('Cannot send an empty message.');
     }
@@ -134,18 +136,19 @@ class MessageRepository {
     }
   }
 
-  // ── Helper: turn a Django error response body into a human-readable string ─
+  // ── Helper: turn a Django error body into a human-readable string ──────────
   static String? _extractDjangoError(dynamic body) {
     if (body == null) return null;
     if (body is String && body.isNotEmpty) return body;
     if (body is Map) {
+      // Skip 'non_field_errors' wrapping if possible
       final parts = <String>[];
       for (final entry in body.entries) {
         final v = entry.value;
         if (v is List) {
-          parts.add(v.map((e) => e.toString()).join(' '));
+          parts.add('${entry.key}: ${v.map((e) => e.toString()).join(', ')}');
         } else if (v is String) {
-          parts.add(v);
+          parts.add('${entry.key}: $v');
         }
       }
       if (parts.isNotEmpty) return parts.join('\n');

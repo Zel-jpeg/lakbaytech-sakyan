@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/message_model.dart';
@@ -78,26 +77,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  void _tryResolveReceiver(List<MessageModel> messages, String? currentUserId) {
+  void _tryResolveReceiver(
+      List<MessageModel> messages, String? currentUserId) {
     if (_hasValidReceiver) return;
     if (currentUserId == null) return;
     for (final m in messages) {
       if (m.senderId.isNotEmpty && m.senderId != currentUserId) {
-        if (mounted) {
-          setState(() {
-            _resolvedReceiverId   = m.senderId;
-            _resolvedReceiverName = m.senderName;
-          });
-        }
+        if (mounted) setState(() {
+          _resolvedReceiverId   = m.senderId;
+          _resolvedReceiverName = m.senderName;
+        });
         return;
       }
       if (m.receiverId.isNotEmpty && m.receiverId != currentUserId) {
-        if (mounted) {
-          setState(() {
-            _resolvedReceiverId   = m.receiverId;
-            _resolvedReceiverName = m.receiverName;
-          });
-        }
+        if (mounted) setState(() {
+          _resolvedReceiverId   = m.receiverId;
+          _resolvedReceiverName = m.receiverName;
+        });
         return;
       }
     }
@@ -122,28 +118,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
-        source:       ImageSource.gallery,
-        maxWidth:     1280,
-        maxHeight:    1280,
-        imageQuality: 82,
+        source: ImageSource.gallery,
+        // Pick at full resolution — SupabaseService.uploadChatImage()
+        // compresses to 800 px / 75 % JPEG before hitting Supabase,
+        // so we don't double-compress here.
       );
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
-      if (mounted) {
-        setState(() {
-          _pickedImage      = picked;
-          _pickedImageBytes = bytes;
-        });
-      }
+      if (mounted) setState(() {
+        _pickedImage      = picked;
+        _pickedImageBytes = bytes;
+      });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not pick image: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (mounted) _showError('Could not pick image: ${e.toString()}');
     }
   }
 
@@ -154,58 +141,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  // ── Upload picked image to Supabase and return public URL ─────────────────
+  // ── Upload image to Supabase, return public URL ────────────────────────────
+  //
+  // Delegates to SupabaseService.uploadChatImage which:
+  //   1. Compresses via flutter_image_compress → 800 px max, 75 % JPEG
+  //   2. Strips EXIF metadata (GPS, device info)
+  //   3. Uploads the compressed bytes to Supabase chat-images bucket
+  //   4. Returns the public URL — sent as a plain JSON string to the backend
+  //
+  // Typical saving: a 4 MB phone photo becomes ~150-300 KB.
+  //
   Future<String?> _uploadImage() async {
     if (_pickedImage == null || _pickedImageBytes == null) return null;
     setState(() => _uploading = true);
     try {
-      final ext     = _pickedImage!.name.split('.').last.toLowerCase();
-      final safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)
-          ? ext
-          : 'jpg';
+      // Group by conversation so the bucket stays organised
       final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}-${widget.bookingId.substring(0, 8)}.$safeExt';
-      final url = await SupabaseService.uploadFile(
-        bucket:      AppConstants.bucketChatImages,
-        fileName:    fileName,
-        fileBytes:   _pickedImageBytes!,
-        contentType: 'image/$safeExt',
+          'chat/${widget.bookingId.substring(0, 8)}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      final url = await SupabaseService.uploadChatImage(
+        fileName,
+        _pickedImageBytes!,   // compressed inside uploadChatImage
       );
       return url;
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Image upload failed: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      if (mounted) _showError('Image upload failed: ${e.toString()}');
       return null;
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
   }
 
-  // ── Send message (with optional image) ────────────────────────────────────
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppColors.error,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    ));
+  }
+
+  // ── Send message (text + optional image) ──────────────────────────────────
   Future<void> _send() async {
-    final text       = _msgCtrl.text.trim();
-    final hasImage   = _pickedImage != null;
+    final text     = _msgCtrl.text.trim();
+    final hasImage = _pickedImage != null;
     final hasContent = text.isNotEmpty || hasImage;
 
     if (!hasContent || _sending || _uploading) return;
 
     if (!_hasValidReceiver) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Cannot determine recipient. Please go back and open the chat '
-            'from your booking details.',
-          ),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
+      _showError(
+        'Cannot determine recipient. Open this chat from your booking details.',
       );
       return;
     }
@@ -214,11 +202,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final savedText = text;
     _msgCtrl.clear();
 
-    // Upload image first if one is attached
+    // ── Upload image FIRST, then send the URL in JSON ─────────────────────
     String? imageUrl;
     if (hasImage) {
       imageUrl = await _uploadImage();
-      // If upload failed and there's no text either, abort and restore
+      // If upload failed and there is no text, abort and restore
       if (imageUrl == null && savedText.isEmpty) {
         if (mounted) {
           _msgCtrl.text = savedText;
@@ -233,19 +221,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await ref.read(chatProvider(widget.bookingId).notifier).send(
             receiverId: _receiverId!,
             content:    savedText,
-            imageUrl:   imageUrl,
+            imageUrl:   imageUrl,  // URL string sent as JSON — no FK error
           );
       _scrollToBottom(animated: true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Failed to send: ${e.toString().replaceFirst('Exception: ', '')}'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showError(
+            'Failed to send: ${e.toString().replaceFirst('Exception: ', '')}');
         _msgCtrl.text = savedText; // restore unsent text
       }
     } finally {
@@ -260,14 +242,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       barrierColor: Colors.black87,
       builder: (_) => Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(0),
+        insetPadding: EdgeInsets.zero,
         child: Stack(
           fit: StackFit.expand,
           children: [
             InteractiveViewer(
               panEnabled: true,
-              minScale:   0.5,
-              maxScale:   5.0,
+              minScale: 0.5,
+              maxScale: 5.0,
               child: Center(
                 child: Image.network(
                   url,
@@ -285,15 +267,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
             Positioned(
-              top: 40,
+              top: 48,
               right: 16,
               child: GestureDetector(
                 onTap: () => Navigator.of(ctx, rootNavigator: true).pop(),
                 child: Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(
-                    color:  Colors.black54,
-                    shape:  BoxShape.circle,
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
                     border: Border.all(color: Colors.white30),
                   ),
                   child: const Icon(Icons.close_rounded,
@@ -308,15 +290,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   // ── Safe back navigation ───────────────────────────────────────────────────
-  //
-  // FIX: Pressing the system back button or the in-app back button while
-  // the chat was pushed via context.push() from confirmation_screen caused
-  // a crash because GoRouter had no previous route to pop to (the
-  // confirmation screen itself was navigated away from with context.go()).
-  //
-  // Solution: use context.canPop() first. If we can pop safely, do it.
-  // Otherwise fall back to the bookings list which is always in the shell.
-  //
   void _handleBack() {
     if (context.canPop()) {
       context.pop();
@@ -337,25 +310,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final textPrim    = isDark ? AppColors.textPrimary   : AppColors.textPrimaryLight;
     final textSec     = isDark ? AppColors.textSecondary : AppColors.textSecondaryLight;
     final textMuted   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
-    final inputBg     = isDark ? AppColors.bgSurface     : AppColors.bgSurfaceLight;
 
     messagesAsync.whenData(
-      (messages) => _tryResolveReceiver(messages, currentUser?.id),
-    );
+        (messages) => _tryResolveReceiver(messages, currentUser?.id));
 
-    // ── PopScope: intercepts the system back gesture / button ─────────────
-    // Without this, pressing system back when there's nowhere to pop
-    // exits the app entirely instead of going to the bookings list.
     return PopScope(
-      canPop: false, // we handle it ourselves
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
         appBar: AppBar(
-          // ── Explicit back button ───────────────────────────────────────
-          // FIX: AppBar had no leading widget so there was no visible back
-          // button. Added one that uses _handleBack() for safe navigation.
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: _handleBack,
@@ -419,11 +384,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         body: Column(
           children: [
-            // ── Receiver-unknown warning banner ──────────────────────────────
+            // ── Receiver-unknown banner ──────────────────────────────────────
             if (!_hasValidReceiver && messagesAsync.hasValue)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 color: AppColors.warning.withOpacity(0.12),
                 child: Row(children: [
                   const Icon(Icons.warning_rounded,
@@ -431,8 +397,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Recipient info unavailable — send a message first '
-                      'or open this chat from your booking.',
+                      'Recipient info unavailable — '
+                      'open this chat from your booking.',
                       style: const TextStyle(
                           color: AppColors.warning, fontSize: 12),
                     ),
@@ -444,7 +410,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Expanded(
               child: messagesAsync.when(
                 loading: () => const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary)),
+                    child:
+                        CircularProgressIndicator(color: AppColors.primary)),
                 error: (e, st) => Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -456,20 +423,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               color: textMuted,
                               fontWeight: FontWeight.w600,
                               fontSize: 15)),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(
-                          e.toString().replaceFirst('Exception: ', ''),
-                          style: TextStyle(color: textMuted, fontSize: 12),
-                          textAlign: TextAlign.center,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        icon:
+                            const Icon(Icons.refresh_rounded, size: 16),
                         label: const Text('Retry'),
                         onPressed: () => ref
                             .read(chatProvider(widget.bookingId).notifier)
@@ -505,8 +462,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
                           Text('Send a message to get started!',
-                              style:
-                                  TextStyle(color: textMuted, fontSize: 13)),
+                              style: TextStyle(
+                                  color: textMuted, fontSize: 13)),
                         ],
                       ),
                     );
@@ -517,8 +474,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     itemCount: messages.length,
                     itemBuilder: (_, i) {
-                      final msg  = messages[i];
-                      final isMe = msg.senderId == currentUser?.id;
+                      final msg   = messages[i];
+                      final isMe  = msg.senderId == currentUser?.id;
                       final showTime = i == 0 ||
                           messages[i]
                                   .createdAt
@@ -530,7 +487,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         children: [
                           if (showTime)
                             _TimeDivider(
-                                time: msg.createdAt, textMuted: textMuted),
+                                time: msg.createdAt,
+                                textMuted: textMuted),
                           _MessageBubble(
                             message:   msg,
                             isMe:      isMe,
@@ -584,27 +542,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ],
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Image attached',
-                            style: TextStyle(
-                                color: textPrim,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 2),
-                        Text('Tap send to share',
-                            style: TextStyle(color: textMuted, fontSize: 11)),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Image attached',
+                              style: TextStyle(
+                                  color: textPrim,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          Text('Tap × to remove, send to share',
+                              style:
+                                  TextStyle(color: textMuted, fontSize: 11)),
+                        ],
+                      ),
                     ),
-                    if (_uploading) ...[
-                      const Spacer(),
+                    if (_uploading)
                       const SizedBox(
                         width: 20, height: 20,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: AppColors.primary),
                       ),
-                    ],
                   ],
                 ),
               ),
@@ -645,7 +604,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     child: Container(
                       constraints: const BoxConstraints(maxHeight: 120),
                       decoration: BoxDecoration(
-                        color:        inputBg,
+                        color:        cardColor,
                         borderRadius: BorderRadius.circular(22),
                         border:       Border.all(color: borderColor),
                       ),
@@ -686,7 +645,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         boxShadow: _hasValidReceiver
                             ? [
                                 BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.3),
+                                  color:
+                                      AppColors.primary.withOpacity(0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -698,7 +658,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               child: SizedBox(
                                 width: 20, height: 20,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
+                                    strokeWidth: 2,
+                                    color: Colors.white),
                               ),
                             )
                           : const Icon(Icons.send_rounded,
@@ -772,7 +733,7 @@ class _MessageBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Sender name (for others only)
-            if (!isMe && message.senderName.isNotEmpty && !hasImage)
+            if (!isMe && message.senderName.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8, left: 14, right: 14),
                 child: Text(
@@ -784,12 +745,12 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
 
-            // Image attachment
+            // Image attachment — tappable, fullscreen on tap
             if (hasImage)
               GestureDetector(
                 onTap: () => onImageTap(message.imageUrl!),
                 child: Hero(
-                  tag: message.imageUrl!,
+                  tag: '${message.id}_img',
                   child: ClipRRect(
                     borderRadius: BorderRadius.only(
                       topLeft:     Radius.circular(isMe ? 18 : 4),
@@ -837,12 +798,10 @@ class _MessageBubble extends StatelessWidget {
             if (hasText)
               Padding(
                 padding: EdgeInsets.only(
-                  top: hasImage
-                      ? 6
-                      : ((!isMe && message.senderName.isNotEmpty) ? 4 : 10),
+                  top: hasImage ? 6 : ((!isMe && message.senderName.isNotEmpty) ? 4 : 10),
                   bottom: 4,
-                  left:   14,
-                  right:  14,
+                  left: 14,
+                  right: 14,
                 ),
                 child: Text(
                   message.content,
@@ -851,7 +810,7 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
 
-            // Timestamp row
+            // Timestamp + read receipt
             Padding(
               padding: const EdgeInsets.only(
                   bottom: 8, left: 14, right: 14, top: 2),
@@ -862,7 +821,8 @@ class _MessageBubble extends StatelessWidget {
                     DateFormat('h:mm a').format(message.createdAt),
                     style: TextStyle(
                         fontSize: 10,
-                        color: hasImage && !hasText ? textMuted : timeColor),
+                        color:
+                            hasImage && !hasText ? textMuted : timeColor),
                   ),
                   if (isMe) ...[
                     const SizedBox(width: 4),

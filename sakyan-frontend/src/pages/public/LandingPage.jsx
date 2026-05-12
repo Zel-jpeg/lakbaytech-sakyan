@@ -419,7 +419,7 @@ export default function LandingPage() {
             {/* Subtitle */}
             <p className="text-sm sm:text-base lg:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto
                           leading-relaxed mb-6 sm:mb-8 animate-slide-up px-4" style={{ animationDelay: '0.1s' }}>
-              Rent from trusted local partners across the Philippines.
+              Rent from trusted local partners across Mindanao.
               Affordable, convenient, and tailored for the Filipino lifestyle.
             </p>
 
