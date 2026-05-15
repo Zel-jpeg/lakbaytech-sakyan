@@ -2,12 +2,13 @@ from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Count
 from django.utils import timezone
-from ..models import Partner, Booking, User, Car, PlatformSetting, CustomerProfile, PartnerSettlement
+from ..models import Partner, Booking, User, Car, PlatformSetting, CustomerProfile, PartnerSettlement, PartnerBoostRequest
 from ..serializers import (
     PartnerSerializer, BookingSerializer, UserSerializer,
-    PlatformSettingSerializer, KYCAdminSerializer, PartnerSettlementSerializer
+    PlatformSettingSerializer, KYCAdminSerializer, PartnerSettlementSerializer,
+    PartnerBoostRequestSerializer, CarListSerializer,
 )
 from ..permissions import IsAdmin
 from ..utils import push_notification
@@ -359,3 +360,195 @@ class AdminSettlementActionView(APIView):
         settlement.save()
 
         return Response(PartnerSettlementSerializer(settlement).data)
+
+
+# ─── Boost Request Admin Views ─────────────────────────────────────────────────
+
+class AdminBoostListView(generics.ListAPIView):
+    """GET /api/admin/boosts/?status=pending"""
+    serializer_class = PartnerBoostRequestSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        qs = PartnerBoostRequest.objects.select_related('partner', 'partner__user')
+        status = self.request.query_params.get('status')
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+
+class AdminBoostActionView(APIView):
+    """PATCH /api/admin/boosts/<pk>/<action>/
+    Actions: approve, decline, mark-paid
+    """
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk, action):
+        try:
+            boost = PartnerBoostRequest.objects.select_related('partner', 'partner__user').get(pk=pk)
+        except PartnerBoostRequest.DoesNotExist:
+            return Response({'error': 'Not found.'}, status=404)
+
+        now = timezone.now()
+
+        if action == 'approve':
+            boost.status     = 'approved'
+            boost.admin_notes = request.data.get('admin_notes', boost.admin_notes)
+            boost.save()
+            push_notification(
+                user_id=boost.partner.user_id,
+                title='Boost Request Approved! 🎉',
+                message=f'Your {boost.get_boost_type_display()} request has been approved. Please proceed with payment to activate it.',
+                notification_type='boost',
+                reference_id=boost.id,
+            )
+
+        elif action == 'decline':
+            reason = request.data.get('reason', '').strip()
+            boost.status      = 'declined'
+            boost.admin_notes = reason
+            boost.save()
+            push_notification(
+                user_id=boost.partner.user_id,
+                title='Boost Request Not Approved',
+                message=f'Your boost request was not approved. Reason: {reason or "See admin messages for details."}',
+                notification_type='boost',
+                reference_id=boost.id,
+            )
+
+        elif action == 'mark-paid':
+            from datetime import date
+            from dateutil.relativedelta import relativedelta
+            start = date.today()
+            end   = start + relativedelta(months=boost.duration_months)
+            boost.status     = 'paid'
+            boost.start_date = start
+            boost.end_date   = end
+            boost.admin_notes = request.data.get('admin_notes', boost.admin_notes)
+            boost.save()
+            push_notification(
+                user_id=boost.partner.user_id,
+                title='Boost Now Live! 🚀',
+                message=f'Your {boost.get_boost_type_display()} is now active until {end.strftime("%B %d, %Y")}.',
+                notification_type='boost',
+                reference_id=boost.id,
+            )
+
+        else:
+            return Response({'error': 'Invalid action. Use approve, decline, or mark-paid.'}, status=400)
+
+        return Response(PartnerBoostRequestSerializer(boost).data)
+
+
+# ─── Public Featured Endpoint ──────────────────────────────────────────────────
+
+class PublicFeaturedView(APIView):
+    """GET /api/public/featured/ — returns featured partner (paid boost) + auto-badge winners."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        today = timezone.now().date()
+
+        # 1. Featured partner (active paid boost)
+        featured_boost = (
+            PartnerBoostRequest.objects
+            .filter(status='paid', start_date__lte=today, end_date__gte=today)
+            .select_related('partner', 'partner__user')
+            .order_by('-start_date')
+            .first()
+        )
+        featured_partner = None
+        if featured_boost:
+            p = featured_boost.partner
+            car_count = p.cars.filter(status='active', is_available=True).count()
+            featured_partner = {
+                'id': str(p.id),
+                'business_name': p.business_name,
+                'partner_type': p.partner_type,
+                'car_count': car_count,
+                'boost_end_date': str(featured_boost.end_date),
+            }
+
+        # 2. Most cars listed partner (auto)
+        most_cars_partner = None
+        partner_car_counts = (
+            Car.objects
+            .filter(status='active', is_available=True)
+            .values('partner_id')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+            .first()
+        )
+        if partner_car_counts:
+            try:
+                p = Partner.objects.select_related('user').get(id=partner_car_counts['partner_id'])
+                most_cars_partner = {
+                    'id': str(p.id),
+                    'business_name': p.business_name,
+                    'partner_type': p.partner_type,
+                    'car_count': partner_car_counts['count'],
+                }
+            except Partner.DoesNotExist:
+                pass
+
+        # 3. Most rented partner (auto — by completed bookings)
+        most_rented_partner = None
+        partner_booking_counts = (
+            Booking.objects
+            .filter(booking_status='completed')
+            .values('partner_id')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+            .first()
+        )
+        if partner_booking_counts:
+            try:
+                p = Partner.objects.select_related('user').get(id=partner_booking_counts['partner_id'])
+                car_count = p.cars.filter(status='active', is_available=True).count()
+                most_rented_partner = {
+                    'id': str(p.id),
+                    'business_name': p.business_name,
+                    'partner_type': p.partner_type,
+                    'car_count': car_count,
+                    'booking_count': partner_booking_counts['count'],
+                }
+            except Partner.DoesNotExist:
+                pass
+
+        # 4. Top rented car (auto — by completed bookings)
+        top_car = None
+        top_car_data = (
+            Booking.objects
+            .filter(booking_status='completed')
+            .values('car_id')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+            .first()
+        )
+        if top_car_data:
+            try:
+                car = Car.objects.select_related('partner').prefetch_related('images').get(
+                    id=top_car_data['car_id'], status='active'
+                )
+                primary_img = car.images.filter(is_primary=True).first() or car.images.first()
+                top_car = {
+                    'id': str(car.id),
+                    'name': car.name,
+                    'brand': car.brand,
+                    'model': car.model,
+                    'year': car.year,
+                    'price_per_day': str(car.price_per_day),
+                    'location': car.location,
+                    'partner_name': car.partner.business_name,
+                    'primary_image': primary_img.image_url if primary_img else None,
+                    'booking_count': top_car_data['count'],
+                }
+            except Car.DoesNotExist:
+                pass
+
+        return Response({
+            'featured_partner':   featured_partner,
+            'most_cars_partner':  most_cars_partner,
+            'most_rented_partner': most_rented_partner,
+            'top_rented_car':     top_car,
+        })

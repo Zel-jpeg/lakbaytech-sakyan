@@ -10,13 +10,18 @@ from .views.booking_views import (
     BookingDetailView, UpdateBookingStatusView, UpdatePaymentStatusView,
     UpdateRentalTimesView, SaveKYCView
 )
-from .views.partner_views import PartnerApplyView, PartnerProfileView
+from .views.partner_views import (
+    PartnerApplyView, PartnerProfileView,
+    ApprovedPartnersView, PartnerBoostRequestView,
+)
 from .views.admin_views import (
     AdminPartnerListView, AdminPartnerActionView,
     AdminStatsView, PublicStatsView, AdminAllBookingsView, AdminUserListView,
     AdminSettingsView, AdminSettingUpdateView,
     AdminKYCListView, AdminKYCActionView,
     AdminSettlementListView, AdminCreateSettlementView, AdminSettlementActionView,
+    AdminBoostListView, AdminBoostActionView,
+    PublicFeaturedView,
 )
 from .views.message_views import MessageListView, SendMessageView, ConversationListView, SupportThreadView
 from .views.notification_views import NotificationListView, MarkNotificationReadView
@@ -34,8 +39,12 @@ urlpatterns = [
     path('cars/<uuid:pk>/', CarDetailView.as_view()),
     path('cars/<uuid:pk>/booked-dates/', CarBookedDatesView.as_view()),
 
-    # Public stats (landing page)
+    # Public stats & featured
     path('public/stats/', PublicStatsView.as_view()),
+    path('public/featured/', PublicFeaturedView.as_view()),
+
+    # Public: approved partners for Browse Cars filter
+    path('partners/approved/', ApprovedPartnersView.as_view()),
 
     # Cars (partner)
     path('partner/cars/', PartnerCarListCreateView.as_view()),
@@ -55,6 +64,9 @@ urlpatterns = [
     # Partner onboarding
     path('partner/apply/', PartnerApplyView.as_view()),
     path('partner/profile/', PartnerProfileView.as_view()),
+
+    # Partner boost requests
+    path('boosts/request/', PartnerBoostRequestView.as_view()),
 
     # Admin — Partners
     path('admin/partners/', AdminPartnerListView.as_view()),
@@ -77,6 +89,10 @@ urlpatterns = [
     path('admin/settlements/', AdminCreateSettlementView.as_view()),
     path('admin/settlements/list/', AdminSettlementListView.as_view()),
     path('admin/settlements/<uuid:pk>/settle/', AdminSettlementActionView.as_view()),
+
+    # Admin — Boost Requests
+    path('admin/boosts/', AdminBoostListView.as_view()),
+    path('admin/boosts/<uuid:pk>/<str:action>/', AdminBoostActionView.as_view()),
 
     # Customer KYC
     path('customer/kyc/', SaveKYCView.as_view()),

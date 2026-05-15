@@ -317,6 +317,219 @@ function FileUploadBox({ label, hint, url, onUploaded, onClear, required }) {
   )
 }
 
+// ── Rental Agreement Text ─────────────────────────────────────────────────────
+const RENTAL_AGREEMENT = `CAR RENTAL AGREEMENT — SAKYAN PLATFORM
+Effective upon KYC submission
+
+This Car Rental Agreement ("Agreement") is entered into between the Renter (the individual completing this KYC verification, hereinafter "Renter") and the Car Rental Partner listed on the Sakyan platform ("Partner"), facilitated by Sakyan ("Platform").
+
+By completing this KYC verification, the Renter agrees to be legally bound by the following terms and conditions for any car rental booked through the Sakyan platform.
+
+─────────────────────────────────────────────────────
+1. IDENTIFICATION OF PARTIES
+─────────────────────────────────────────────────────
+The Renter confirms that all identity documents submitted during KYC verification are authentic, valid, and belong to them. Any fraudulent submission is grounds for immediate account termination and legal action under applicable Philippine laws.
+
+─────────────────────────────────────────────────────
+2. PERMITTED VEHICLE USE
+─────────────────────────────────────────────────────
+The rented vehicle shall be used solely for lawful purposes within the Republic of the Philippines. The Renter agrees not to use the vehicle for any illegal activities, including but not limited to: drug trafficking, criminal transport, unauthorized racing, or any activity that violates Philippine law.
+
+─────────────────────────────────────────────────────
+3. DRIVER RESPONSIBILITY
+─────────────────────────────────────────────────────
+Only the Renter (whose name appears in the KYC verification) is authorized to operate the rented vehicle, unless a written authorization from the Partner is obtained prior to the rental. The Renter assumes full legal liability for any unauthorized use of the vehicle by a third party.
+
+─────────────────────────────────────────────────────
+4. DAMAGE LIABILITY
+─────────────────────────────────────────────────────
+The Renter is fully liable for any physical damage, mechanical damage, vandalism, theft, or loss of the vehicle that occurs during the rental period. This includes damage caused by weather events if proper precautions were not taken. The Renter agrees to compensate the Partner for the full cost of repair or replacement of the vehicle at fair market value. Documentation of the vehicle's condition before and after rental (photos/videos) as provided by the Partner shall serve as primary evidence.
+
+─────────────────────────────────────────────────────
+5. TRAFFIC VIOLATIONS AND PENALTIES
+─────────────────────────────────────────────────────
+The Renter is solely responsible for all traffic violations, fines, penalties, and fees incurred during the rental period, including but not limited to: speeding tickets, illegal parking fines, MMDA/LTO violations, and road toll charges. The Renter agrees to indemnify and hold the Partner harmless from any liability arising from such violations.
+
+─────────────────────────────────────────────────────
+6. FUEL POLICY
+─────────────────────────────────────────────────────
+The vehicle must be returned with the same fuel level as at the time of pickup, as documented by the Partner. Failure to return the vehicle with the same fuel level will result in a fuel reimbursement charge at the prevailing market rate plus an applicable service fee determined by the Partner.
+
+─────────────────────────────────────────────────────
+7. LATE RETURN POLICY
+─────────────────────────────────────────────────────
+The vehicle must be returned at the agreed date and time as specified in the booking confirmation. Late returns will be subject to additional charges at the Partner's daily rate, prorated per hour or per day depending on the Partner's policy. The Renter must notify the Partner at least 2 hours before the scheduled return time if an extension is needed.
+
+─────────────────────────────────────────────────────
+8. PROHIBITED USES
+─────────────────────────────────────────────────────
+The Renter is strictly prohibited from:
+(a) Subletting or re-renting the vehicle to any third party;
+(b) Using the vehicle for off-road or rough terrain driving unless explicitly permitted by the Partner;
+(c) Transporting hazardous, illegal, or prohibited goods;
+(d) Using the vehicle for paid driving services (e.g., Grab, Lalamove) without prior Partner consent;
+(e) Tampering with, modifying, or removing any part of the vehicle.
+
+─────────────────────────────────────────────────────
+9. INSURANCE ACKNOWLEDGMENT
+─────────────────────────────────────────────────────
+The Renter acknowledges that no comprehensive insurance coverage is included in the rental fee unless explicitly stated by the Partner in writing. The Renter is encouraged to secure personal accident insurance or comprehensive rental insurance at their own expense. The minimum CTPL (Compulsory Third Party Liability) insurance required by Philippine law shall be maintained by the Partner at their expense; however, any claim exceeding CTPL coverage due to the Renter's negligence shall be the Renter's sole responsibility.
+
+─────────────────────────────────────────────────────
+10. GOVERNING LAW AND DISPUTE RESOLUTION
+─────────────────────────────────────────────────────
+This Agreement shall be governed by the laws of the Republic of the Philippines. In the event of a dispute between the Renter and the Partner, both parties agree to first attempt resolution through good-faith negotiation. If unresolved within 15 days, disputes shall be referred to the Barangay Lupon ng Tagapamayapa for mediation before escalating to court proceedings, in accordance with the Katarungang Pambarangay Law (RA 7160).
+
+─────────────────────────────────────────────────────
+11. PLATFORM ROLE
+─────────────────────────────────────────────────────
+Sakyan acts solely as a technology platform connecting Renters and Partners. Sakyan is not a party to the rental transaction and is not liable for disputes arising from the rental. Sakyan reserves the right to suspend or terminate accounts that violate platform policies.
+
+─────────────────────────────────────────────────────
+12. AGREEMENT TO TERMS
+─────────────────────────────────────────────────────
+By typing your full legal name below and checking the acknowledgment box, you confirm that:
+• You have read, understood, and agree to all terms of this Agreement;
+• The information submitted in your KYC is accurate and authentic;
+• You understand that this constitutes a legally binding digital signature.`
+
+// ── Rental Agreement Step Component ──────────────────────────────────────────
+function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
+  const { user } = useAuthStore()
+  const [agreed, setAgreed] = useState(false)
+  const [signature, setSignature] = useState('')
+  const [hasScrolled, setHasScrolled] = useState(false)
+  const scrollRef = useRef(null)
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    if (atBottom) setHasScrolled(true)
+  }
+
+  const expectedName = user?.full_name?.toLowerCase().trim() || ''
+  const signatureMatch = signature.toLowerCase().trim() === expectedName
+  const canSubmit = agreed && signatureMatch && hasScrolled
+
+  return (
+    <div className="space-y-5">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Rental Agreement</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Read and sign the agreement before submitting your verification.
+        </p>
+      </div>
+
+      {/* Scrollable agreement */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="h-64 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-xl
+                   bg-gray-50 dark:bg-gray-800/50 p-4 text-xs text-gray-700 dark:text-gray-300
+                   leading-relaxed whitespace-pre-line font-mono scroll-smooth"
+      >
+        {RENTAL_AGREEMENT}
+      </div>
+
+      {!hasScrolled && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+          <Info size={12} /> Please scroll through the entire agreement to continue.
+        </p>
+      )}
+      {hasScrolled && (
+        <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1.5">
+          <CheckCircle2 size={12} /> You have read the full agreement.
+        </p>
+      )}
+
+      {/* Checkbox */}
+      <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${
+        agreed
+          ? 'border-brand-300 dark:border-brand-600 bg-brand-50 dark:bg-brand-900/20'
+          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
+      } ${!hasScrolled ? 'opacity-50 pointer-events-none' : ''}`}>
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={e => setAgreed(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-brand-500 shrink-0"
+        />
+        <span className="text-sm text-gray-700 dark:text-gray-300 leading-snug">
+          I have <span className="font-semibold">read, understood, and agree</span> to the Sakyan Rental Agreement. I understand this constitutes a legally binding agreement for all future car rentals made through the Sakyan platform.
+        </span>
+      </label>
+
+      {/* Digital Signature */}
+      <div className={!hasScrolled || !agreed ? 'opacity-50 pointer-events-none' : ''}>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          Digital Signature
+          <span className="text-xs text-gray-400 font-normal ml-1">(Type your full legal name exactly as registered)</span>
+        </label>
+        <div className="relative">
+          <FileText size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={signature}
+            onChange={e => setSignature(e.target.value)}
+            placeholder={user?.full_name || 'Your full legal name'}
+            className={`${inputCls} pl-9 font-medium ${
+              signature && !signatureMatch
+                ? 'border-red-300 dark:border-red-700 focus:ring-red-400'
+                : signature && signatureMatch
+                ? 'border-green-300 dark:border-green-700 focus:ring-green-400'
+                : ''
+            }`}
+          />
+          {signature && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              {signatureMatch
+                ? <CheckCircle2 size={16} className="text-green-500" />
+                : <X size={16} className="text-red-400" />}
+            </div>
+          )}
+        </div>
+        {signature && !signatureMatch && (
+          <p className="text-xs text-red-500 mt-1">
+            Name must match exactly: <strong>{user?.full_name}</strong>
+          </p>
+        )}
+        {signature && signatureMatch && (
+          <p className="text-xs text-green-600 dark:text-green-400 mt-1">✓ Signature matches your registered name.</p>
+        )}
+      </div>
+
+      {/* Legal note */}
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-300">
+        ⚖️ This agreement is legally binding under Philippine law. Your typed name serves as your digital signature and will be recorded with a timestamp upon submission. Rental partners can view that you have signed this agreement.
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3 pt-1">
+        <button type="button" onClick={onBack}
+          className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700
+                     rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400
+                     hover:border-brand-300 dark:hover:border-brand-600 transition">
+          <ArrowLeft size={15} /> Back
+        </button>
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!canSubmit || isSubmitting}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
+                      text-sm font-semibold transition ${
+            canSubmit && !isSubmitting
+              ? 'bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white shadow-md shadow-brand-500/20'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+          }`}>
+          {isSubmitting ? 'Submitting…' : 'Submit Verification'}
+          {!isSubmitting && canSubmit && <ArrowRight size={16} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Step Indicator ────────────────────────────────────────────────────────────
 function StepDots({ current, total }) {
   return (
@@ -380,15 +593,8 @@ export default function KYCVerificationPage() {
   const [step1Data, setStep1Data] = useState(null)
   const [step2Data, setStep2Data] = useState(null)
 
-  const onStep1Submit = (data) => {
-    setStep1Data(data)
-    setStep(1)
-  }
-
-  const onStep2Submit = (data) => {
-    setStep2Data(data)
-    setStep(2)
-  }
+  const onStep1Submit = (data) => { setStep1Data(data); setStep(1) }
+  const onStep2Submit = (data) => { setStep2Data(data); setStep(2) }
 
   const handleFinalSubmit = async () => {
     if (!licenseUrl) { toast.error("Please upload your Driver's License."); return }
@@ -396,7 +602,6 @@ export default function KYCVerificationPage() {
     if (!step1Data)  { setStep(0); return }
     if (!step2Data)  { setStep(1); return }
 
-    // Persist where they were trying to go so the pending page can redirect
     localStorage.setItem('kyc_return_to', destination)
 
     submitKYC.mutate({
@@ -410,6 +615,9 @@ export default function KYCVerificationPage() {
       valid_id_type:          step2Data.valid_id_type,
       drivers_license_url:    licenseUrl,
       valid_id_url:           validIdUrl,
+      agreement_accepted:     true,
+      agreement_signature:    user?.full_name,
+      agreement_signed_at:    new Date().toISOString(),
     }, {
       onSuccess: async () => {
         await refreshUser()
@@ -435,138 +643,78 @@ export default function KYCVerificationPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 sm:p-8">
-          <StepDots current={step} total={3} />
+          <StepDots current={step} total={4} />
 
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {/* ── STEP 0: Personal Information ───────────────────────────── */}
-          {/* ═══════════════════════════════════════════════════════════════ */}
+          {/* ── STEP 0: Personal Information ─── */}
           {step === 0 && (
             <form onSubmit={step1Form.handleSubmit(onStep1Submit)} className="space-y-5">
               <div className="mb-6">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">Personal Information</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Enter your contact details and home address.
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your contact details and home address.</p>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Birthday" error={step1Form.formState.errors.birthday?.message}>
                   <div className="relative">
                     <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="date"
-                      {...step1Form.register('birthday')}
-                      className={`${inputCls} pl-9`}
-                    />
+                    <input type="date" {...step1Form.register('birthday')} className={`${inputCls} pl-9`} />
                   </div>
                 </Field>
-
                 <Field label="Contact Number" error={step1Form.formState.errors.contact_number?.message}>
                   <div className="relative">
                     <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      {...step1Form.register('contact_number')}
-                      placeholder="e.g. 09171234567"
-                      className={`${inputCls} pl-9`}
-                    />
+                    <input {...step1Form.register('contact_number')} placeholder="e.g. 09171234567" className={`${inputCls} pl-9`} />
                   </div>
                 </Field>
               </div>
-
               <Field label="Home Address" error={step1Form.formState.errors.address?.message}>
-                <Controller
-                  name="address"
-                  control={step1Form.control}
-                  render={({ field }) => (
-                    <AddressPicker
-                      onChange={field.onChange}
-                      onCoordsChange={(lat, lng) => setCoords({ lat, lng })}
-                      error={step1Form.formState.errors.address?.message}
-                    />
-                  )}
-                />
+                <Controller name="address" control={step1Form.control} render={({ field }) => (
+                  <AddressPicker onChange={field.onChange} onCoordsChange={(lat, lng) => setCoords({ lat, lng })} error={step1Form.formState.errors.address?.message} />
+                )} />
               </Field>
-
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => navigate(-1)}
-                  className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700
-                             rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400
-                             hover:border-brand-300 dark:hover:border-brand-600 transition">
+                <button type="button" onClick={() => navigate(-1)} className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-brand-300 dark:hover:border-brand-600 transition">
                   <ArrowLeft size={15} /> Cancel
                 </button>
-                <button type="submit"
-                  className="flex-1 flex items-center justify-center gap-2 py-3
-                             bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
-                             text-white text-sm font-semibold rounded-xl transition shadow-md shadow-brand-500/20">
+                <button type="submit" className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-md shadow-brand-500/20">
                   Continue <ArrowRight size={16} />
                 </button>
               </div>
             </form>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {/* ── STEP 1: License & ID Details ───────────────────────────── */}
-          {/* ═══════════════════════════════════════════════════════════════ */}
+          {/* ── STEP 1: License & ID Details ─── */}
           {step === 1 && (
             <form onSubmit={step2Form.handleSubmit(onStep2Submit)} className="space-y-5">
               <div className="mb-6">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">License & ID Details</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Enter your driver's license information and select your government ID type.
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your driver's license information and select your government ID type.</p>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="License Number" error={step2Form.formState.errors.drivers_license_number?.message}>
-                  <input
-                    type="text"
-                    {...step2Form.register('drivers_license_number')}
-                    placeholder="e.g. N01-23-456789"
-                    className={inputCls}
-                  />
+                  <input type="text" {...step2Form.register('drivers_license_number')} placeholder="e.g. N01-23-456789" className={inputCls} />
                 </Field>
-
                 <Field label="License Expiry" error={step2Form.formState.errors.license_expiry?.message}>
-                  <input
-                    type="date"
-                    {...step2Form.register('license_expiry')}
-                    className={inputCls}
-                  />
+                  <input type="date" {...step2Form.register('license_expiry')} className={inputCls} />
                 </Field>
               </div>
-
               <Field label="Valid ID Type" error={step2Form.formState.errors.valid_id_type?.message}>
-                <select
-                  {...step2Form.register('valid_id_type')}
-                  className={`${inputCls} appearance-none`}
-                >
+                <select {...step2Form.register('valid_id_type')} className={`${inputCls} appearance-none`}>
                   <option value="">Select ID type</option>
-                  {ID_TYPE_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
+                  {ID_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </Field>
-
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setStep(0)}
-                  className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700
-                             rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400
-                             hover:border-brand-300 dark:hover:border-brand-600 transition">
+                <button type="button" onClick={() => setStep(0)} className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-brand-300 dark:hover:border-brand-600 transition">
                   <ArrowLeft size={15} /> Back
                 </button>
-                <button type="submit"
-                  className="flex-1 flex items-center justify-center gap-2 py-3
-                             bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700
-                             text-white text-sm font-semibold rounded-xl transition shadow-md shadow-brand-500/20">
+                <button type="submit" className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-md shadow-brand-500/20">
                   Continue <ArrowRight size={16} />
                 </button>
               </div>
             </form>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {/* ── STEP 2: Upload Documents ───────────────────────────────── */}
-          {/* ═══════════════════════════════════════════════════════════════ */}
+          {/* ── STEP 2: Upload Documents ─── */}
           {step === 2 && (
             <div className="space-y-5">
               <div className="mb-6">
@@ -585,7 +733,6 @@ export default function KYCVerificationPage() {
                   onClear={() => setLicenseUrl('')}
                   required
                 />
-
                 <FileUploadBox
                   label="Valid Government ID"
                   hint="SSS, PhilHealth, UMID, Passport, etc."
@@ -596,7 +743,6 @@ export default function KYCVerificationPage() {
                 />
               </div>
 
-              {/* Submission info */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800
                               rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300">
                 ℹ️ Your documents will be reviewed by our team within 1–2 business days.
@@ -612,19 +758,31 @@ export default function KYCVerificationPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleFinalSubmit}
-                  disabled={!licenseUrl || !validIdUrl || submitKYC.isPending}
+                  onClick={() => {
+                    if (!licenseUrl) { toast.error("Please upload your Driver's License."); return }
+                    if (!validIdUrl) { toast.error('Please upload a valid ID.'); return }
+                    setStep(3)
+                  }}
+                  disabled={!licenseUrl || !validIdUrl}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
                               text-sm font-semibold transition ${
-                    licenseUrl && validIdUrl && !submitKYC.isPending
+                    licenseUrl && validIdUrl
                       ? 'bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white shadow-md shadow-brand-500/20'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                   }`}>
-                  {submitKYC.isPending ? 'Submitting…' : 'Submit Verification'}
-                  {!submitKYC.isPending && <ArrowRight size={16} />}
+                  Continue <ArrowRight size={16} />
                 </button>
               </div>
             </div>
+          )}
+
+          {/* ── STEP 3: Rental Agreement ─── */}
+          {step === 3 && (
+            <RentalAgreementStep
+              onBack={() => setStep(2)}
+              onSubmit={handleFinalSubmit}
+              isSubmitting={submitKYC.isPending}
+            />
           )}
         </div>
       </div>

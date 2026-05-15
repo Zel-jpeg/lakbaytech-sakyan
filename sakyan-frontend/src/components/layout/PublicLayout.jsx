@@ -5,12 +5,13 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   Car, Menu, X, LogOut, LayoutDashboard, CalendarCheck,
   ChevronDown, User as UserIcon, Sun, Moon,
-  MapPin, Mail, Globe, MessageSquare, Camera,
+  MapPin, Mail, Globe, MessageSquare, Camera, MessageCircle,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import LogoutModal from '@/components/ui/LogoutModal'
 import ApprovalBanner from '@/components/common/ApprovalBanner'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useConversations } from '@/hooks/useMessages'
 
 export default function PublicLayout() {
   const { user } = useAuthStore()
@@ -30,6 +31,12 @@ export default function PublicLayout() {
     const list = notifData?.results || notifData || []
     return list.filter(n => !n.is_read && n.type === 'booking').length
   })()
+
+  // ── Unread message count ─────────────────────────────────────────────────────
+  const { data: conversations } = useConversations({ enabled: !!user })
+  const unreadMsgCount = user
+    ? (conversations?.results || conversations || []).reduce((s, c) => s + (c.unread_count || 0), 0)
+    : 0
 
   // Scroll detection for header background
   useEffect(() => {
@@ -117,6 +124,24 @@ export default function PublicLayout() {
               </>
             ) : (
               <>
+                {/* Messages icon with badge */}
+                {(user.role === 'customer' || user.role === 'partner') && (
+                  <Link
+                    to="/messages"
+                    className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-brand-500 dark:hover:text-brand-400
+                               hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition"
+                    aria-label="Messages"
+                  >
+                    <MessageCircle size={20} />
+                    {unreadMsgCount > 0 && (
+                      <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[9px]
+                                       font-bold rounded-full flex items-center justify-center animate-pulse">
+                        {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
+
                 {/* Profile Dropdown */}
                 <div className="relative ml-1 pl-3 border-l border-gray-200 dark:border-gray-700" ref={dropdownRef}>
                   <button
@@ -161,6 +186,22 @@ export default function PublicLayout() {
                             <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center
                                              bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
                               {unreadBookings > 9 ? '9+' : unreadBookings}
+                            </span>
+                          )}
+                        </Link>
+                      )}
+
+                      {/* Messages link in dropdown */}
+                      {(user.role === 'customer' || user.role === 'partner') && (
+                        <Link to="/messages" onClick={() => setDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300
+                                     hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                          <MessageCircle size={15} className="text-gray-400" />
+                          <span className="flex-1">Messages</span>
+                          {unreadMsgCount > 0 && (
+                            <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center
+                                             bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                              {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
                             </span>
                           )}
                         </Link>
@@ -272,6 +313,22 @@ export default function PublicLayout() {
                       <span className="min-w-[18px] h-[18px] flex items-center justify-center
                                        bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
                         {unreadBookings > 9 ? '9+' : unreadBookings}
+                      </span>
+                    )}
+                  </Link>
+                )}
+
+                {/* Messages link in mobile menu */}
+                {(user.role === 'customer' || user.role === 'partner') && (
+                  <Link to="/messages" onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+                               hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                    <MessageCircle size={16} className="text-gray-400 shrink-0" />
+                    <span className="flex-1">Messages</span>
+                    {unreadMsgCount > 0 && (
+                      <span className="min-w-[18px] h-[18px] flex items-center justify-center
+                                       bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                        {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
                       </span>
                     )}
                   </Link>

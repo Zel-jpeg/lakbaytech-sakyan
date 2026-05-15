@@ -162,6 +162,37 @@ function KYCModal({ profile, onClose }) {
               <ShieldCheck size={16} /> Verified — customer can book cars
             </div>
           )}
+
+          {/* Rental Agreement */}
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Rental Agreement</p>
+            {profile.agreement_accepted ? (
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 space-y-1.5">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold text-sm">
+                  <CheckCircle2 size={16} /> Agreement Signed ✅
+                </div>
+                <div className="text-xs text-emerald-600 dark:text-emerald-400">
+                  <span className="font-medium">Digital Signature:</span>{' '}
+                  <span className="font-mono bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded">
+                    {profile.agreement_signature}
+                  </span>
+                </div>
+                {profile.agreement_signed_at && (
+                  <div className="text-xs text-emerald-600/80 dark:text-emerald-400/60">
+                    Signed on {new Date(profile.agreement_signed_at).toLocaleDateString('en-PH', {
+                      month: 'long', day: 'numeric', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit'
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <XCircle size={15} className="text-gray-400" /> No rental agreement on file
+                <span className="text-xs ml-1 text-gray-400">(Submitted before agreement feature)</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Actions */}

@@ -24,6 +24,10 @@ class CarListView(generics.ListAPIView):
         transmission = self.request.query_params.get('transmission')
         fuel_type    = self.request.query_params.get('fuel_type')
         seats        = self.request.query_params.get('seats')
+        partner_id   = self.request.query_params.get('partner_id')
+        min_year     = self.request.query_params.get('min_year')
+        max_year     = self.request.query_params.get('max_year')
+        brand        = self.request.query_params.get('brand')
 
         if location:     qs = qs.filter(location__icontains=location)
         if max_price:    qs = qs.filter(price_per_day__lte=max_price)
@@ -31,6 +35,10 @@ class CarListView(generics.ListAPIView):
         if transmission: qs = qs.filter(transmission=transmission)
         if fuel_type:    qs = qs.filter(fuel_type=fuel_type)
         if seats:        qs = qs.filter(seats__gte=seats)
+        if partner_id:   qs = qs.filter(partner_id=partner_id)
+        if min_year:     qs = qs.filter(year__gte=min_year)
+        if max_year:     qs = qs.filter(year__lte=max_year)
+        if brand:        qs = qs.filter(brand__icontains=brand)
         return qs
 
 

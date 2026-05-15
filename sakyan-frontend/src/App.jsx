@@ -48,6 +48,7 @@ import AdminKYCPage from '@/pages/admin/AdminKYCPage'
 import AdminSettlementPage from '@/pages/admin/AdminSettlementPage'
 import AdminRefundQueuePage from '@/pages/admin/AdminRefundQueuePage'
 import AdminInboxPage from '@/pages/admin/AdminInboxPage'
+import AdminBoostRequestsPage from '@/pages/admin/AdminBoostRequestsPage'
 
 // KYC
 import KYCVerificationPage from '@/pages/kyc/KYCVerificationPage'
@@ -157,6 +158,7 @@ export default function App() {
         <Route path="refunds"     element={<AdminRefundQueuePage />} />
         <Route path="reports"     element={<AdminReportsPage />} />
         <Route path="settings"    element={<AdminSettingsPage />} />
+        <Route path="boosts"      element={<AdminBoostRequestsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="messages"      element={<AdminInboxPage />} />
       </Route>

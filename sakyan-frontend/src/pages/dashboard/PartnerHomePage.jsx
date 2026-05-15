@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useMyPartnerCars } from '@/hooks/useCars'
 import { usePartnerBookings } from '@/hooks/useBookings'
 import { useAuthStore } from '@/store/authStore'
-import { Car, CalendarCheck, DollarSign, Clock, ArrowUpRight } from 'lucide-react'
+import { Car, CalendarCheck, DollarSign, Clock, ArrowUpRight, Zap, Star, Sparkles, X, ChevronDown, Loader2, CheckCircle2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/utils/formatters'
 import { format, startOfWeek, getISOWeek } from 'date-fns'
@@ -11,6 +11,9 @@ import {
   PieChart, Pie, Cell, Legend, BarChart, Bar, LineChart, Line,
 } from 'recharts'
 import { useUIStore } from '@/store/uiStore'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import api from '@/config/axios'
+import toast from 'react-hot-toast'
 
 // ─── Period config ────────────────────────────────────────────────────────────
 const PERIODS = [
@@ -162,6 +165,127 @@ function Empty({ message }) {
   )
 }
 
+// ─── Boost Modal ──────────────────────────────────────────────────────────────
+const BOOST_TYPES = [
+  { value: 'featured',  label: 'Featured Listing',   desc: 'Your company shown in the Browse Cars carousel banner' },
+  { value: 'spotlight', label: 'Spotlight Banner',    desc: 'Premium full-width spotlight at the top of the car catalogue' },
+]
+const DURATIONS = [1, 3, 6, 12]
+
+function BoostModal({ onClose }) {
+  const [boostType, setBoostType]         = useState('featured')
+  const [durationMonths, setDuration]     = useState(1)
+  const [submitted, setSubmitted]         = useState(false)
+  const { user }                          = useAuthStore()
+  const partnerName = user?.partner_status !== undefined ? (user?.full_name || 'your company') : 'your company'
+
+  const autoMessage = `Hello Sakyan Admin! I would like to request a "${
+    BOOST_TYPES.find(b => b.value === boostType)?.label
+  }" for my business. Preferred duration: ${durationMonths} month${durationMonths > 1 ? 's' : ''}. Please let me know the next steps for payment and activation. Thank you!`
+
+  const mutation = useMutation({
+    mutationFn: () => api.post('/boosts/request/', { boost_type: boostType, duration_months: durationMonths }),
+    onSuccess: () => setSubmitted(true),
+    onError:   () => toast.error('Failed to send boost request. Please try again.'),
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in">
+        {submitted ? (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={32} className="text-emerald-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Request Sent! 🎉</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+              Your boost request has been sent to the Sakyan admin. Check your messages for their reply.
+            </p>
+            <button onClick={onClose} className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition">
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <Zap size={15} className="text-white" />
+                </div>
+                <h3 className="font-bold text-gray-900 dark:text-white">Boost Your Listing</h3>
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                <X size={16} className="text-gray-400" />
+              </button>
+            </div>
+
+            {/* Boost type */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Boost Type</label>
+              <div className="space-y-2">
+                {BOOST_TYPES.map(bt => (
+                  <label key={bt.value} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                    boostType === bt.value
+                      ? 'border-violet-400 bg-violet-50 dark:bg-violet-900/20 dark:border-violet-600'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}>
+                    <input type="radio" name="boost_type" value={bt.value} checked={boostType === bt.value}
+                      onChange={() => setBoostType(bt.value)} className="mt-0.5 accent-violet-500" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{bt.label}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{bt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Duration</label>
+              <div className="flex gap-2">
+                {DURATIONS.map(d => (
+                  <button key={d} onClick={() => setDuration(d)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition ${
+                      durationMonths === d
+                        ? 'bg-violet-500 text-white border-violet-500 shadow-sm'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}>
+                    {d === 1 ? '1 Mo' : `${d} Mo`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Auto message preview */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 mb-5">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Message that will be sent to admin:</p>
+              <p className="text-xs text-gray-700 dark:text-gray-300 italic leading-relaxed">"{autoMessage}"</p>
+            </div>
+
+            {/* Pricing note */}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3 mb-5 text-xs text-amber-700 dark:text-amber-300">
+              💡 Pricing is discussed with the admin after approval. You'll be notified via messages with payment details.
+            </div>
+
+            <button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+              className="w-full py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700
+                         text-white text-sm font-semibold rounded-xl transition shadow-md shadow-violet-500/20
+                         flex items-center justify-center gap-2"
+            >
+              {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+              {mutation.isPending ? 'Sending Request…' : 'Send Boost Request'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PartnerHomePage() {
   const { user }               = useAuthStore()
@@ -172,6 +296,18 @@ export default function PartnerHomePage() {
 
   // Default period: monthly
   const [period, setPeriod] = useState('monthly')
+  const [showBoostModal, setShowBoostModal] = useState(false)
+
+  // Fetch partner's existing boost request
+  const { data: boostData } = useQuery({
+    queryKey: ['my-boost-requests'],
+    queryFn: () => api.get('/boosts/request/').then(r => r.data),
+    staleTime: 60000,
+  })
+  const boosts = boostData?.results || boostData || []
+  const latestBoost = boosts[0]  // most recent
+  const hasPendingOrApproved = latestBoost && ['pending', 'approved'].includes(latestBoost.status)
+  const isLive = latestBoost?.status === 'paid'
 
   const cars     = carsData?.results     || carsData     || []
   const bookings = bookingsData?.results || bookingsData || []
@@ -273,8 +409,10 @@ export default function PartnerHomePage() {
 
   return (
     <div>
+      {showBoostModal && <BoostModal onClose={() => setShowBoostModal(false)} />}
+
       {/* Welcome */}
-      <div className="mb-7">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Welcome back, {user?.full_name?.split(' ')[0]} 👋
         </h1>
@@ -282,6 +420,63 @@ export default function PartnerHomePage() {
           Here's what's happening with your fleet today.
         </p>
       </div>
+
+      {/* ── Boost Banner ──────────────────────────────────────────────────── */}
+      {isLive ? (
+        <div className="mb-5 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-4 flex items-center gap-4 shadow-md shadow-emerald-500/20">
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+            <Sparkles size={20} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-white text-sm">🚀 Your boost is Live!</p>
+            <p className="text-white/80 text-xs mt-0.5">
+              Your {latestBoost?.boost_type === 'featured' ? 'Featured Listing' : 'Spotlight Banner'} is active
+              {latestBoost?.end_date && <> until <span className="font-medium">{new Date(latestBoost.end_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</span></>}.
+            </p>
+          </div>
+        </div>
+      ) : hasPendingOrApproved ? (
+        <div className="mb-5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20
+                       border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+            <Zap size={18} className="text-amber-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">
+              Boost Request: <span className="capitalize">{latestBoost.status}</span>
+            </p>
+            <p className="text-amber-600 dark:text-amber-400 text-xs mt-0.5">
+              {latestBoost.status === 'pending'
+                ? 'Your request is being reviewed by the admin. Check your messages for updates.'
+                : 'Your request is approved! Please coordinate payment via messages to activate.'}
+            </p>
+          </div>
+          <Link to="/dashboard/messages" className="shrink-0 px-3 py-1.5 text-xs font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/60 transition">
+            Messages
+          </Link>
+        </div>
+      ) : (
+        <div className="mb-5 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20
+                       border border-violet-100 dark:border-violet-800 rounded-2xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-md shadow-violet-500/20">
+            <Star size={18} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-violet-900 dark:text-violet-200 text-sm">Boost Your Listing</p>
+            <p className="text-violet-600 dark:text-violet-400 text-xs mt-0.5">
+              Get featured on the Browse Cars page and attract more renters.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowBoostModal(true)}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600
+                       hover:from-violet-600 hover:to-purple-700 text-white text-xs font-semibold rounded-xl transition
+                       shadow-sm shadow-violet-500/20"
+          >
+            <Zap size={13} /> Get Featured
+          </button>
+        </div>
+      )}
 
       {/* ── Stat cards ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">

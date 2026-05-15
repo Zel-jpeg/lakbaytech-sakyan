@@ -4,8 +4,9 @@ import { useCars } from '@/hooks/useCars'
 import CarCard from '@/components/cars/CarCard'
 import CarSkeleton from '@/components/cars/CarSkeleton'
 import CarFilters from '@/components/cars/CarFilters'
+import FeaturedBanner from '@/components/cars/FeaturedBanner'
 import { useDebounce } from '@/hooks/useDebounce'
-import { SlidersHorizontal, X, Car, Search, ArrowUpDown, LayoutGrid } from 'lucide-react'
+import { SlidersHorizontal, X, Car, Search, ArrowUpDown } from 'lucide-react'
 
 const SORT_OPTIONS = [
   { value: '-created_at',    label: 'Newest First' },
@@ -20,8 +21,9 @@ export default function CarsPage() {
   const [sort, setSort] = useState('-created_at')
 
   const [filters, setFilters] = useState({
-    location:     searchParams.get('location') || '',
-    search:       searchParams.get('search')   || '',
+    location:     searchParams.get('location')   || '',
+    search:       searchParams.get('search')     || '',
+    partner_id:   searchParams.get('partner_id') || '',
     min_price:    '',
     max_price:    '',
     transmission: '',
@@ -39,13 +41,14 @@ export default function CarsPage() {
   // Sync to URL
   useEffect(() => {
     const params = {}
-    if (filters.location) params.location = filters.location
-    if (filters.search)   params.search   = filters.search
+    if (filters.location)   params.location   = filters.location
+    if (filters.search)     params.search     = filters.search
+    if (filters.partner_id) params.partner_id = filters.partner_id
     setSearchParams(params, { replace: true })
-  }, [filters.location, filters.search])
+  }, [filters.location, filters.search, filters.partner_id])
 
   const clearFilters = () => setFilters({
-    location: '', search: '', min_price: '', max_price: '',
+    location: '', search: '', partner_id: '', min_price: '', max_price: '',
     transmission: '', fuel_type: '', seats: '',
     min_year: '', max_year: '', brand: '',
   })
@@ -62,6 +65,9 @@ export default function CarsPage() {
           Explore cars you might like!
         </p>
       </div>
+
+      {/* Featured Banner Carousel */}
+      <FeaturedBanner />
 
       {/* Top bar: search + sort + filter toggle */}
       <div className="space-y-3 mb-5">

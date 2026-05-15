@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Car, CalendarCheck, DollarSign,
-         Users, ClipboardList, LogOut, Menu, X, Bell, Home, BarChart, Sun, Moon, Settings, ShieldCheck, Wallet, MessageCircle } from 'lucide-react'
+         Users, ClipboardList, LogOut, Menu, X, Bell, Home, BarChart, Sun, Moon, Settings, ShieldCheck, Wallet, MessageCircle, Zap } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -23,6 +23,7 @@ const ADMIN_NAV = [
   { to: '/admin/settlements',  label: 'Commissions',     icon: Wallet },
   { to: '/admin/bookings',     label: 'Bookings',        icon: ClipboardList },
   { to: '/admin/users',        label: 'Platform Users',  icon: Users },
+  { to: '/admin/boosts',       label: 'Boost Requests',  icon: Zap },
   { to: '/admin/reports',      label: 'Reports',         icon: BarChart },
   { to: '/admin/settings',     label: 'Settings',        icon: Settings },
   { to: '/admin/messages',     label: 'Messages',        icon: MessageCircle },

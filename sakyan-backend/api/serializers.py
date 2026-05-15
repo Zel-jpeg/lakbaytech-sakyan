@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Message, Notification, PlatformSetting, PartnerSettlement
+from .models import User, Partner, Car, CarImage, CustomerProfile, Booking, Message, Notification, PlatformSetting, PartnerSettlement, PartnerBoostRequest
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
@@ -18,6 +18,7 @@ class KYCSubmitSerializer(serializers.ModelSerializer):
             'birthday', 'contact_number', 'address', 'address_lat', 'address_lng',
             'drivers_license_number', 'license_expiry', 'valid_id_type',
             'drivers_license_url', 'valid_id_url',
+            'agreement_accepted', 'agreement_signature', 'agreement_signed_at',
         ]
 
 
@@ -36,6 +37,7 @@ class KYCAdminSerializer(serializers.ModelSerializer):
             'kyc_status', 'kyc_rejection_reason',
             'kyc_submitted_at', 'kyc_reviewed_at',
             'is_verified',
+            'agreement_accepted', 'agreement_signature', 'agreement_signed_at',
         ]
         read_only_fields = ['id', 'user_id', 'full_name', 'email']
 
@@ -167,12 +169,29 @@ class CarWriteSerializer(serializers.ModelSerializer):
 
 
 class PartnerSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user      = UserSerializer(read_only=True)
+    car_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Partner
         fields = '__all__'
         read_only_fields = ['id', 'status', 'approved_at', 'approved_by', 'created_at']
+
+    def get_car_count(self, obj):
+        return obj.cars.filter(status='active').count()
+
+
+class ApprovedPartnerSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for public partner filter on Browse Cars."""
+    car_count       = serializers.SerializerMethodField()
+    user_full_name  = serializers.CharField(source='user.full_name', read_only=True)
+
+    class Meta:
+        model = Partner
+        fields = ['id', 'business_name', 'partner_type', 'car_count', 'user_full_name', 'contact_person']
+
+    def get_car_count(self, obj):
+        return obj.cars.filter(status='active', is_available=True).count()
 
 
 class PartnerApplySerializer(serializers.ModelSerializer):
@@ -322,4 +341,19 @@ class PartnerSettlementSerializer(serializers.ModelSerializer):
             booking_status='completed',
             start_date__gte=obj.period_start,
             end_date__lte=obj.period_end,
-        ).count()
+        ).count()
+
+
+class PartnerBoostRequestSerializer(serializers.ModelSerializer):
+    partner_name         = serializers.CharField(source='partner.business_name', read_only=True)
+    partner_id           = serializers.UUIDField(source='partner.id', read_only=True)
+    partner_type         = serializers.CharField(source='partner.partner_type', read_only=True)
+    partner_user_id      = serializers.UUIDField(source='partner.user.id', read_only=True)
+    boost_type_display   = serializers.CharField(source='get_boost_type_display', read_only=True)
+    status_display       = serializers.CharField(source='get_status_display', read_only=True)
+    duration_display     = serializers.CharField(source='get_duration_months_display', read_only=True)
+
+    class Meta:
+        model = PartnerBoostRequest
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'updated_at']

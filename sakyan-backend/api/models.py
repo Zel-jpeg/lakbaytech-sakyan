@@ -41,7 +41,7 @@ class Partner(models.Model):
     government_id_url   = models.TextField()
     contact_person      = models.CharField(max_length=255, blank=True)
     contact_phone       = models.CharField(max_length=20, blank=True)
-    commission_rate     = models.DecimalField(max_digits=4, decimal_places=2, default=10.00)
+    commission_rate     = models.DecimalField(max_digits=5, decimal_places=2, default=5.00)
     status              = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     rejection_reason    = models.TextField(blank=True)
     approved_at         = models.DateTimeField(null=True, blank=True)
@@ -140,6 +140,10 @@ class CustomerProfile(models.Model):
         db_column='kyc_reviewed_by'
     )
     is_verified             = models.BooleanField(default=False)
+    # Rental Agreement (signed at KYC Step 4)
+    agreement_accepted      = models.BooleanField(default=False)
+    agreement_signature     = models.CharField(max_length=255, blank=True)  # typed full name
+    agreement_signed_at     = models.DateTimeField(null=True, blank=True)
     created_at              = models.DateTimeField(auto_now_add=True)
     updated_at              = models.DateTimeField(auto_now=True)
 
@@ -281,4 +285,40 @@ class PartnerSettlement(models.Model):
 
     class Meta:
         db_table = 'partner_settlements'
+        ordering = ['-created_at']
+
+
+class PartnerBoostRequest(models.Model):
+    BOOST_TYPE_CHOICES = [
+        ('featured',  'Featured Listing'),
+        ('spotlight', 'Spotlight Banner'),
+    ]
+    STATUS_CHOICES = [
+        ('pending',  'Pending Review'),
+        ('approved', 'Approved'),
+        ('paid',     'Paid & Active'),
+        ('declined', 'Declined'),
+        ('expired',  'Expired'),
+    ]
+    DURATION_CHOICES = [
+        (1,  '1 Month'),
+        (3,  '3 Months'),
+        (6,  '6 Months'),
+        (12, '12 Months'),
+    ]
+
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    partner          = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='boost_requests')
+    boost_type       = models.CharField(max_length=20, choices=BOOST_TYPE_CHOICES, default='featured')
+    status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    duration_months  = models.IntegerField(choices=DURATION_CHOICES, default=1)
+    start_date       = models.DateField(null=True, blank=True)
+    end_date         = models.DateField(null=True, blank=True)
+    partner_message  = models.TextField(blank=True)  # auto-generated message from partner
+    admin_notes      = models.TextField(blank=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    updated_at       = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'partner_boost_requests'
         ordering = ['-created_at']
