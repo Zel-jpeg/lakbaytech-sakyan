@@ -9,35 +9,57 @@ import '../../../core/services/api_service.dart';
 import '../providers/cars_provider.dart';
 
 // ── Data model ────────────────────────────────────────────────────────────────
+class _TopCarPreview {
+  final String id;
+  final String name;
+  final String imageUrl;
+  const _TopCarPreview({required this.id, required this.name, required this.imageUrl});
+}
+
 class _FeaturedData {
   final String? featuredPartnerName;
   final String? featuredPartnerLogoUrl;
   final String? featuredPartnerId;
+  final int? featuredCarCount;
+  final List<_TopCarPreview> featuredTopCars;
+
   final String? mostCarsPartnerName;
   final String? mostCarsPartnerId;
   final int?    mostCarCount;
+  final List<_TopCarPreview> mostCarsTopCars;
+
   final String? mostRentedPartnerName;
   final String? mostRentedPartnerId;
   final int?    mostRentedCount;
+  final List<_TopCarPreview> mostRentedTopCars;
+
   final String? topCarName;
   final String? topCarImageUrl;
   final String? topCarId;
   final int?    topCarRentals;
+  final String? topCarBrand;
+  final String? topCarPartnerName;
 
   const _FeaturedData({
     this.featuredPartnerName,
     this.featuredPartnerLogoUrl,
     this.featuredPartnerId,
+    this.featuredCarCount,
+    this.featuredTopCars = const [],
     this.mostCarsPartnerName,
     this.mostCarsPartnerId,
     this.mostCarCount,
+    this.mostCarsTopCars = const [],
     this.mostRentedPartnerName,
     this.mostRentedPartnerId,
     this.mostRentedCount,
+    this.mostRentedTopCars = const [],
     this.topCarName,
     this.topCarImageUrl,
     this.topCarId,
     this.topCarRentals,
+    this.topCarBrand,
+    this.topCarPartnerName,
   });
 }
 
@@ -50,25 +72,48 @@ final _featuredDataProvider = FutureProvider<_FeaturedData>((ref) async {
     String? _s(dynamic v) => v?.toString().isNotEmpty == true ? v.toString() : null;
     int?    _i(dynamic v) => v is num ? v.toInt() : int.tryParse(v?.toString() ?? '');
 
+    List<_TopCarPreview> _parseCars(dynamic list) {
+      if (list is! List) return [];
+      return list
+          .where((c) => c is Map && c['image'] != null)
+          .map((c) => _TopCarPreview(
+                id: c['id']?.toString() ?? '',
+                name: c['name']?.toString() ?? '',
+                imageUrl: c['image'].toString(),
+              ))
+          .toList();
+    }
+
     return _FeaturedData(
       featuredPartnerName:    _s(d['featured_partner']?['business_name'] ??
                                  d['featured_partner']?['contact_person']),
       featuredPartnerLogoUrl: _s(d['featured_partner']?['logo_url'] ??
                                  d['featured_partner']?['logo']),
       featuredPartnerId:      _s(d['featured_partner']?['id']),
+      featuredCarCount:       _i(d['featured_partner']?['car_count']),
+      featuredTopCars:        _parseCars(d['featured_partner']?['top_cars']),
+
       mostCarsPartnerName:    _s(d['most_cars_partner']?['business_name'] ??
                                  d['most_cars_partner']?['contact_person']),
       mostCarsPartnerId:      _s(d['most_cars_partner']?['id']),
       mostCarCount:           _i(d['most_cars_partner']?['car_count']),
+      mostCarsTopCars:        _parseCars(d['most_cars_partner']?['top_cars']),
+
       mostRentedPartnerName:  _s(d['most_rented_partner']?['business_name'] ??
                                  d['most_rented_partner']?['contact_person']),
       mostRentedPartnerId:    _s(d['most_rented_partner']?['id']),
       mostRentedCount:        _i(d['most_rented_partner']?['booking_count']),
+      mostRentedTopCars:      _parseCars(d['most_rented_partner']?['top_cars']),
+
       topCarName:             _s(d['top_rented_car']?['name']),
-      topCarImageUrl:         _s(d['top_rented_car']?['primary_image_url'] ??
+      topCarImageUrl:         _s(d['top_rented_car']?['primary_image'] ??
+                                 d['top_rented_car']?['primary_image_url'] ??
                                  d['top_rented_car']?['image_url']),
       topCarId:               _s(d['top_rented_car']?['id']),
-      topCarRentals:          _i(d['top_rented_car']?['rental_count']),
+      topCarRentals:          _i(d['top_rented_car']?['booking_count'] ??
+                                 d['top_rented_car']?['rental_count']),
+      topCarBrand:            _s(d['top_rented_car']?['brand']),
+      topCarPartnerName:      _s(d['top_rented_car']?['partner_name']),
     );
   } catch (_) {
     return const _FeaturedData();
@@ -238,7 +283,7 @@ class _FeaturedPartnerSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ProfessionalBanner(
+    return _PartnerBannerWithImage(
       isDark: isDark,
       gradientColors: isDark
           ? [const Color(0xFF0F2044), const Color(0xFF1A3A6A)]
@@ -249,10 +294,10 @@ class _FeaturedPartnerSlide extends StatelessWidget {
       onTap: onTap,
       title: d.featuredPartnerName!,
       subtitle: 'Featured Rental Partner',
-      subInfo: 'Trusted by Sakyan users',
+      subInfo: '${d.featuredCarCount ?? 0} cars available',
       ctaLabel: 'Browse Cars',
       logoUrl: d.featuredPartnerLogoUrl,
-      carColor: const Color(0xFF4DA6FF),
+      carImageUrl: d.featuredTopCars.isNotEmpty ? d.featuredTopCars.first.imageUrl : null,
     );
   }
 }
@@ -266,7 +311,7 @@ class _MostCarsPartnerSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ProfessionalBanner(
+    return _PartnerBannerWithImage(
       isDark: isDark,
       gradientColors: isDark
           ? [const Color(0xFF0A2A1A), const Color(0xFF0F4A2A)]
@@ -279,7 +324,7 @@ class _MostCarsPartnerSlide extends StatelessWidget {
       subtitle: 'Largest Fleet on Sakyan',
       subInfo: '${d.mostCarCount ?? 0} cars available',
       ctaLabel: 'Browse Cars',
-      carColor: const Color(0xFF4ADE80),
+      carImageUrl: d.mostCarsTopCars.isNotEmpty ? d.mostCarsTopCars.first.imageUrl : null,
     );
   }
 }
@@ -293,7 +338,7 @@ class _MostRentedPartnerSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ProfessionalBanner(
+    return _PartnerBannerWithImage(
       isDark: isDark,
       gradientColors: isDark
           ? [const Color(0xFF2A1500), const Color(0xFF4A2500)]
@@ -306,13 +351,13 @@ class _MostRentedPartnerSlide extends StatelessWidget {
       subtitle: 'Top Rated Partner',
       subInfo: '${d.mostRentedCount ?? 0} successful bookings',
       ctaLabel: 'Browse Cars',
-      carColor: const Color(0xFFFBBF24),
+      carImageUrl: d.mostRentedTopCars.isNotEmpty ? d.mostRentedTopCars.first.imageUrl : null,
     );
   }
 }
 
-// ── Reusable professional banner with car on right ────────────────────────────
-class _ProfessionalBanner extends StatelessWidget {
+// ── Partner banner with real car image on the right ───────────────────────────
+class _PartnerBannerWithImage extends StatelessWidget {
   final bool isDark;
   final List<Color> gradientColors;
   final Color badgeColor;
@@ -324,9 +369,9 @@ class _ProfessionalBanner extends StatelessWidget {
   final String subInfo;
   final String ctaLabel;
   final String? logoUrl;
-  final Color carColor;
+  final String? carImageUrl;
 
-  const _ProfessionalBanner({
+  const _PartnerBannerWithImage({
     required this.isDark,
     required this.gradientColors,
     required this.badgeColor,
@@ -336,9 +381,9 @@ class _ProfessionalBanner extends StatelessWidget {
     required this.subtitle,
     required this.subInfo,
     required this.ctaLabel,
-    required this.carColor,
     this.onTap,
     this.logoUrl,
+    this.carImageUrl,
   });
 
   @override
@@ -364,23 +409,55 @@ class _ProfessionalBanner extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // ── Subtle background pattern ──
+            // ── Real car image on the right side ──
+            if (carImageUrl != null)
+              Positioned(
+                right: -10,
+                top: 0,
+                bottom: 0,
+                width: 160,
+                child: ShaderMask(
+                  shaderCallback: (bounds) => LinearGradient(
+                    begin: Alignment.centerRight,
+                    end: Alignment.centerLeft,
+                    colors: [
+                      Colors.white,
+                      Colors.white.withOpacity(0.8),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ).createShader(bounds),
+                  blendMode: BlendMode.dstIn,
+                  child: CachedNetworkImage(
+                    imageUrl: carImageUrl!,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+
+            // ── Fallback: subtle car icon if no real image ──
+            if (carImageUrl == null)
+              Positioned(
+                right: 10,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Icon(
+                    Icons.directions_car_rounded,
+                    size: 72,
+                    color: accentColor.withOpacity(0.15),
+                  ),
+                ),
+              ),
+
+            // ── Subtle background circles ──
             Positioned(
               top: -20, right: -20,
               child: Container(
                 width: 140, height: 140,
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.04),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -30, right: 60,
-              child: Container(
-                width: 100, height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -495,31 +572,15 @@ class _ProfessionalBanner extends StatelessWidget {
                     ),
                   ),
 
-                  // Right: car illustration
+                  // Right: logo overlay (on top of car image)
                   SizedBox(
                     width: 110,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Glow behind car
-                        Positioned(
-                          bottom: 8,
-                          child: Container(
-                            width: 90, height: 20,
-                            decoration: BoxDecoration(
-                              color: carColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(40),
-                            ),
-                          ),
-                        ),
-                        // Car icon
-                        _CarIllustration(color: carColor),
-                        // Logo overlay (if available)
-                        if (logoUrl != null)
-                          Positioned(
-                            top: 0, right: 4,
+                    child: logoUrl != null
+                        ? Align(
+                            alignment: Alignment.topRight,
                             child: Container(
-                              width: 30, height: 30,
+                              width: 32, height: 32,
+                              margin: const EdgeInsets.only(right: 8, top: 2),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
@@ -541,9 +602,8 @@ class _ProfessionalBanner extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
+                          )
+                        : const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -551,49 +611,6 @@ class _ProfessionalBanner extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Car illustration using Flutter icons ──────────────────────────────────────
-class _CarIllustration extends StatelessWidget {
-  final Color color;
-  const _CarIllustration({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Body shadow
-        Positioned(
-          bottom: 12,
-          child: Container(
-            width: 80, height: 30,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(60),
-            ),
-          ),
-        ),
-        // Car icon — large
-        Icon(
-          Icons.directions_car_rounded,
-          size: 72,
-          color: color.withOpacity(0.9),
-        ),
-        // Shine on car
-        Positioned(
-          top: 10, left: 20,
-          child: Container(
-            width: 18, height: 5,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.25),
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -607,11 +624,12 @@ class _TopCarSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = d.topCarImageUrl != null && d.topCarImageUrl!.isNotEmpty;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? AppColors.bgSurface : AppColors.bgSurfaceLight,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
@@ -625,28 +643,37 @@ class _TopCarSlide extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Background car image
-            if (d.topCarImageUrl != null)
+            // Background — real car image or styled fallback
+            if (hasImage)
               CachedNetworkImage(
                 imageUrl: d.topCarImageUrl!,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                    color: isDark
-                        ? AppColors.bgElevated
-                        : AppColors.bgElevatedLight),
-              ),
-            // Multi-stop gradient overlay for readability
+                placeholder: (_, __) => Container(
+                  color: isDark ? AppColors.bgSurface : AppColors.bgSurfaceLight,
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => _TopCarFallbackBg(isDark: isDark),
+              )
+            else
+              _TopCarFallbackBg(isDark: isDark),
+
+            // Gradient overlay for readability
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xCC000000)],
-                  stops: [0.25, 1.0],
+                  colors: [
+                    Colors.black.withOpacity(hasImage ? 0.15 : 0.0),
+                    Colors.black.withOpacity(hasImage ? 0.75 : 0.6),
+                  ],
+                  stops: const [0.25, 1.0],
                 ),
               ),
             ),
-            // Top-left gradient for badge area
+            // Top gradient for badge
             Positioned(
               top: 0, left: 0, right: 0,
               height: 60,
@@ -656,13 +683,14 @@ class _TopCarSlide extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.45),
+                      Colors.black.withOpacity(hasImage ? 0.45 : 0.2),
                       Colors.transparent,
                     ],
                   ),
                 ),
               ),
             ),
+
             // Badge
             Positioned(
               top: 12, left: 14,
@@ -699,6 +727,37 @@ class _TopCarSlide extends StatelessWidget {
                 ),
               ),
             ),
+
+            // Partner name badge (top right)
+            if (d.topCarPartnerName != null)
+              Positioned(
+                top: 12, right: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.store_rounded,
+                          size: 10, color: Colors.white70),
+                      const SizedBox(width: 4),
+                      Text(
+                        d.topCarPartnerName!,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // Bottom info
             Positioned(
               bottom: 14, left: 14, right: 14,
@@ -727,7 +786,7 @@ class _TopCarSlide extends StatelessWidget {
                                   size: 11, color: Colors.white60),
                               const SizedBox(width: 4),
                               Text(
-                                '${d.topCarRentals} rentals this month',
+                                '${d.topCarRentals} rentals',
                                 style: const TextStyle(
                                   color: Colors.white60,
                                   fontSize: 11,
@@ -767,6 +826,34 @@ class _TopCarSlide extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Fallback background for Top Car when no image is available ────────────────
+class _TopCarFallbackBg extends StatelessWidget {
+  final bool isDark;
+  const _TopCarFallbackBg({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [const Color(0xFF1A1A2E), const Color(0xFF16213E)]
+              : [const Color(0xFF667eea), const Color(0xFF764ba2)],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.directions_car_rounded,
+          size: 64,
+          color: Colors.white.withOpacity(0.15),
         ),
       ),
     );
