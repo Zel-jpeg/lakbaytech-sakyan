@@ -6,6 +6,7 @@ import {
   Car, Menu, X, LogOut, LayoutDashboard, CalendarCheck,
   ChevronDown, User as UserIcon, Sun, Moon,
   MapPin, Mail, Globe, MessageSquare, Camera, MessageCircle,
+  Home, Search, LogIn, UserPlus,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import LogoutModal from '@/components/ui/LogoutModal'
@@ -275,39 +276,45 @@ export default function PublicLayout() {
           <div className="sm:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900
                           px-4 py-3 space-y-1 animate-fade-in">
             <Link to="/" onClick={() => setMobileOpen(false)}
-              className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+              className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                          hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+              <Home size={16} className="text-gray-400 shrink-0" />
               Home
             </Link>
             <Link to="/cars" onClick={() => setMobileOpen(false)}
-              className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+              className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                          hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+              <Search size={16} className="text-gray-400 shrink-0" />
               Browse Cars
             </Link>
             {!user ? (
               <>
                 <Link to="/login" onClick={() => setMobileOpen(false)}
-                  className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                              hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                  <LogIn size={16} className="text-gray-400 shrink-0" />
                   Log in
                 </Link>
                 <Link to="/register" onClick={() => setMobileOpen(false)}
-                  className="block px-3 py-2.5 text-sm font-semibold text-brand-600 dark:text-brand-400
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold text-brand-600 dark:text-brand-400
                              rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20 transition">
+                  <UserPlus size={16} className="shrink-0" />
                   Sign up
                 </Link>
               </>
             ) : (
               <>
                 <Link to="/profile" onClick={() => setMobileOpen(false)}
-                  className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                              hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                  <UserIcon size={16} className="text-gray-400 shrink-0" />
                   My Profile
                 </Link>
                 {(user.role === 'customer' || user.role === 'partner') && (
                   <Link to="/booking/my-bookings" onClick={() => setMobileOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                                hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                    <CalendarCheck size={16} className="text-gray-400 shrink-0" />
                     <span className="flex-1">My Bookings</span>
                     {unreadBookings > 0 && (
                       <span className="min-w-[18px] h-[18px] flex items-center justify-center
@@ -341,22 +348,32 @@ export default function PublicLayout() {
                       '/onboarding/step1'
                     }
                     onClick={() => setMobileOpen(false)}
-                    className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                                hover:bg-gray-50 dark:hover:bg-gray-800 transition"
                   >
-                    {user.partner_status === 'pending' ? 'Application Pending ⏳' : 'Start Listing'}
+                    <Car size={16} className="text-gray-400 shrink-0" />
+                    <span className="flex-1">
+                      {user.partner_status === 'pending' ? 'Application Pending' : 'Start Listing'}
+                    </span>
+                    {user.partner_status === 'pending' && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-medium">
+                        Waiting
+                      </span>
+                    )}
                   </Link>
                 )}
                 {(user.role === 'partner' || user.role === 'admin') && (
                   <Link to={dashboardPath} onClick={() => setMobileOpen(false)}
-                    className="block px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 rounded-xl
                                hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                    <LayoutDashboard size={16} className="text-gray-400 shrink-0" />
                     {user.role === 'admin' ? 'Admin Panel' : 'Partner Dashboard'}
                   </Link>
                 )}
                 <button onClick={() => { setShowLogout(true); setMobileOpen(false) }}
-                  className="w-full text-left px-3 py-2.5 text-sm text-red-500 dark:text-red-400
+                  className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm text-red-500 dark:text-red-400
                              rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                  <LogOut size={16} className="shrink-0" />
                   Log out
                 </button>
               </>

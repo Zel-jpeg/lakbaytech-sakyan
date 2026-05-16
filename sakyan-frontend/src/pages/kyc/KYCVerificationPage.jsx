@@ -395,7 +395,7 @@ const AGREEMENT_SECTIONS = [
 ]
 
 // ── Rental Agreement Step Component (Modern UI) ─────────────────────────────
-function RentalAgreementStep({ onBack, onSubmit, isSubmitting, onCancel }) {
+function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
   const { user } = useAuthStore()
   const [agreed, setAgreed] = useState(false)
   const [signature, setSignature] = useState('')
@@ -571,12 +571,6 @@ function RentalAgreementStep({ onBack, onSubmit, isSubmitting, onCancel }) {
 
       {/* Actions */}
       <div className="flex gap-3 pt-1">
-        <button type="button" onClick={onCancel}
-          className="flex items-center gap-1.5 px-5 py-3 border border-red-200 dark:border-red-800
-                     rounded-xl text-sm font-medium text-red-500 dark:text-red-400
-                     hover:bg-red-50 dark:hover:bg-red-900/20 transition">
-          <X size={15} /> Cancel
-        </button>
         <button type="button" onClick={onBack}
           className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700
                      rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400
@@ -698,22 +692,35 @@ export default function KYCVerificationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] flex items-start justify-center py-12 px-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] flex items-start justify-center py-6 sm:py-12 px-4">
       <div className="w-full max-w-xl">
 
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600
-                          flex items-center justify-center shadow-md shadow-brand-500/20">
-            <ShieldCheck size={20} className="text-white" />
+        {/* Header with cancel */}
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600
+                            flex items-center justify-center shadow-md shadow-brand-500/20">
+              <ShieldCheck size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Identity Verification</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Required before you can book a car</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Identity Verification</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Required before you can book a car</p>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2 border border-gray-200 dark:border-gray-700
+                       rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400
+                       hover:border-red-300 hover:text-red-500 dark:hover:border-red-700 dark:hover:text-red-400
+                       hover:bg-red-50 dark:hover:bg-red-900/20 transition group"
+          >
+            <X size={15} className="group-hover:text-red-500 dark:group-hover:text-red-400 transition" />
+            <span className="hidden sm:inline">Cancel</span>
+          </button>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 sm:p-8">
+        <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 sm:p-8">
           <StepDots current={step} total={4} />
 
           {/* ── STEP 0: Personal Information ─── */}
@@ -743,9 +750,6 @@ export default function KYCVerificationPage() {
                 )} />
               </Field>
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => navigate(-1)} className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-brand-300 dark:hover:border-brand-600 transition">
-                  <ArrowLeft size={15} /> Cancel
-                </button>
                 <button type="submit" className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-md shadow-brand-500/20">
                   Continue <ArrowRight size={16} />
                 </button>
@@ -775,12 +779,6 @@ export default function KYCVerificationPage() {
                 </select>
               </Field>
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => navigate(-1)}
-                  className="flex items-center gap-1.5 px-5 py-3 border border-red-200 dark:border-red-800
-                             rounded-xl text-sm font-medium text-red-500 dark:text-red-400
-                             hover:bg-red-50 dark:hover:bg-red-900/20 transition">
-                  <X size={15} /> Cancel
-                </button>
                 <button type="button" onClick={() => setStep(0)} className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-brand-300 dark:hover:border-brand-600 transition">
                   <ArrowLeft size={15} /> Back
                 </button>
@@ -827,12 +825,6 @@ export default function KYCVerificationPage() {
               </div>
 
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => navigate(-1)}
-                  className="flex items-center gap-1.5 px-5 py-3 border border-red-200 dark:border-red-800
-                             rounded-xl text-sm font-medium text-red-500 dark:text-red-400
-                             hover:bg-red-50 dark:hover:bg-red-900/20 transition">
-                  <X size={15} /> Cancel
-                </button>
                 <button type="button" onClick={() => setStep(1)}
                   className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700
                              rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400
@@ -863,7 +855,6 @@ export default function KYCVerificationPage() {
           {step === 3 && (
             <RentalAgreementStep
               onBack={() => setStep(2)}
-              onCancel={() => navigate(-1)}
               onSubmit={handleFinalSubmit}
               isSubmitting={submitKYC.isPending}
             />
