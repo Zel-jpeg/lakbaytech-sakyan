@@ -63,9 +63,9 @@ function CarThumbnails({ cars = [] }) {
       <div className="relative w-full max-w-[280px] sm:max-w-[320px] h-full">
         {cars.map((car, i) => {
           const transforms = [
-            'rotate-[-6deg] translate-x-[-10%] translate-y-[4%] z-10',
-            'rotate-[0deg] translate-x-[5%] translate-y-[-6%] z-20',
-            'rotate-[6deg] translate-x-[20%] translate-y-[4%] z-10',
+            'rotate-[-6deg] translate-x-[-10%] translate-y-[-8%] z-10',
+            'rotate-[0deg] translate-x-[5%] translate-y-[-18%] z-20',
+            'rotate-[6deg] translate-x-[20%] translate-y-[-8%] z-10',
           ]
           return (
             <div key={car.id}
