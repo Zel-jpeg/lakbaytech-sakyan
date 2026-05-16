@@ -156,7 +156,7 @@ function CarLocationMap({ lat, lng, locationStr }) {
   if (!coords) return null
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 mt-3">
+    <div className="relative z-0 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 mt-3">
       <MapContainer
         center={[coords.lat, coords.lng]}
         zoom={15}

@@ -404,12 +404,11 @@ function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
   return (
     <div className="space-y-5">
       <div className="mb-4">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-sm shadow-md">📜</span>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">
           Rental Agreement
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Read and sign the agreement before submitting your verification.
+          Please read the agreement carefully and sign below to proceed.
         </p>
       </div>
 
@@ -422,10 +421,13 @@ function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
                    scroll-smooth"
       >
         {/* Agreement Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-brand-500 to-brand-600
-                        px-5 py-4 text-white">
-          <h3 className="text-base font-bold tracking-tight">Car Rental Agreement</h3>
-          <p className="text-xs text-brand-100 mt-0.5">Sakyan Platform · Effective upon KYC submission</p>
+        <div className="sticky top-0 z-10 bg-white dark:bg-gray-900
+                        border-b border-gray-200 dark:border-gray-700
+                        px-5 py-4">
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white tracking-tight uppercase">
+            Car Rental Agreement
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Sakyan Platform &middot; Effective upon KYC submission</p>
         </div>
 
         <div className="px-5 py-4">
@@ -449,13 +451,13 @@ function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
                            hover:border-brand-200 dark:hover:border-brand-700/50
                            hover:shadow-sm">
                 <div className="flex items-start gap-3">
-                  <span className="shrink-0 w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-700/60
-                                   flex items-center justify-center text-sm">
-                    {section.icon}
+                  <span className="shrink-0 w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-700/60
+                                   flex items-center justify-center text-[11px] font-bold
+                                   text-gray-500 dark:text-gray-400">
+                    {section.num}
                   </span>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      <span className="text-brand-500 mr-1.5">{section.num}.</span>
                       {section.title}
                     </h4>
                     {section.body && (
@@ -553,8 +555,11 @@ function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
       </div>
 
       {/* Legal note */}
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-300">
-        ⚖️ This agreement is legally binding under Philippine law. Your typed name serves as your digital signature and will be recorded with a timestamp upon submission. Rental partners can view that you have signed this agreement.
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3 flex items-start gap-2">
+        <ShieldCheck size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+          This agreement is legally binding under Philippine law. Your typed name serves as your digital signature and will be recorded with a timestamp upon submission. Rental partners can view that you have signed this agreement.
+        </p>
       </div>
 
       {/* Actions */}
