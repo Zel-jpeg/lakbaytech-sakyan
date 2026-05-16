@@ -522,13 +522,20 @@ class PublicFeaturedView(APIView):
         featured_partner = None
         if featured_boost:
             p = featured_boost.partner
-            car_count = p.cars.filter(status='active', is_available=True).count()
+            active_cars = p.cars.filter(status='active', is_available=True)
+            car_count = active_cars.count()
+            top_cars = []
+            for c in active_cars.prefetch_related('images')[:3]:
+                img = c.images.filter(is_primary=True).first() or c.images.first()
+                if img:
+                    top_cars.append({'id': str(c.id), 'name': c.name, 'image': img.image_url})
             featured_partner = {
                 'id': str(p.id),
                 'business_name': p.business_name,
                 'partner_type': p.partner_type,
                 'car_count': car_count,
                 'boost_end_date': str(featured_boost.end_date),
+                'top_cars': top_cars,
             }
 
         # 2. Most cars listed partner (auto)
@@ -544,11 +551,18 @@ class PublicFeaturedView(APIView):
         if partner_car_counts:
             try:
                 p = Partner.objects.select_related('user').get(id=partner_car_counts['partner_id'])
+                active_cars = p.cars.filter(status='active', is_available=True)
+                top_cars = []
+                for c in active_cars.prefetch_related('images')[:3]:
+                    img = c.images.filter(is_primary=True).first() or c.images.first()
+                    if img:
+                        top_cars.append({'id': str(c.id), 'name': c.name, 'image': img.image_url})
                 most_cars_partner = {
                     'id': str(p.id),
                     'business_name': p.business_name,
                     'partner_type': p.partner_type,
                     'car_count': partner_car_counts['count'],
+                    'top_cars': top_cars,
                 }
             except Partner.DoesNotExist:
                 pass
@@ -566,13 +580,20 @@ class PublicFeaturedView(APIView):
         if partner_booking_counts:
             try:
                 p = Partner.objects.select_related('user').get(id=partner_booking_counts['partner_id'])
-                car_count = p.cars.filter(status='active', is_available=True).count()
+                active_cars = p.cars.filter(status='active', is_available=True)
+                car_count = active_cars.count()
+                top_cars = []
+                for c in active_cars.prefetch_related('images')[:3]:
+                    img = c.images.filter(is_primary=True).first() or c.images.first()
+                    if img:
+                        top_cars.append({'id': str(c.id), 'name': c.name, 'image': img.image_url})
                 most_rented_partner = {
                     'id': str(p.id),
                     'business_name': p.business_name,
                     'partner_type': p.partner_type,
                     'car_count': car_count,
                     'booking_count': partner_booking_counts['count'],
+                    'top_cars': top_cars,
                 }
             except Partner.DoesNotExist:
                 pass

@@ -66,10 +66,10 @@ export default function CarsPage() {
   const activeFilterCount = Object.values(filters).filter(v => v !== '').length
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-8">
 
       {/* Page header */}
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Car Catalogue</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Explore cars you might like!
