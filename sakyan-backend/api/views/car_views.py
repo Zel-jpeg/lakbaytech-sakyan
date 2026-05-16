@@ -2,8 +2,9 @@ from rest_framework import generics, filters, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from django.db.models import Case, When, IntegerField
 from django.utils import timezone
-from ..models import Car, Booking
+from ..models import Car, Booking, PartnerBoostRequest
 from ..serializers import CarListSerializer, CarDetailSerializer, CarWriteSerializer
 from ..permissions import IsPartner
 
@@ -13,11 +14,42 @@ class CarListView(generics.ListAPIView):
     permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'brand', 'model', 'location']
-    ordering_fields = ['price_per_day', 'created_at', 'year']
-    ordering = ['-created_at']
+    ordering_fields = ['price_per_day', 'created_at', 'year', 'is_featured']
+    ordering = ['-is_featured', '-created_at']
+
+    def filter_queryset(self, queryset):
+        """Always prepend -is_featured so featured partner cars appear first."""
+        qs = super().filter_queryset(queryset)
+        # If the user chose a custom ordering, DRF already applied it.
+        # We re-apply with -is_featured prepended.
+        current_ordering = qs.query.order_by
+        if current_ordering and '-is_featured' not in current_ordering:
+            qs = qs.order_by('-is_featured', *current_ordering)
+        return qs
 
     def get_queryset(self):
-        qs = Car.objects.filter(status='active', is_available=True).select_related('partner')
+        today = timezone.now().date()
+
+        # Find partner IDs with an active paid boost
+        featured_partner_ids = list(
+            PartnerBoostRequest.objects.filter(
+                status='paid', start_date__lte=today, end_date__gte=today
+            ).values_list('partner_id', flat=True)
+        )
+
+        qs = (
+            Car.objects
+            .filter(status='active', is_available=True)
+            .select_related('partner')
+            .annotate(
+                is_featured=Case(
+                    When(partner_id__in=featured_partner_ids, then=1),
+                    default=0,
+                    output_field=IntegerField(),
+                )
+            )
+        )
+
         location     = self.request.query_params.get('location')
         max_price    = self.request.query_params.get('max_price')
         min_price    = self.request.query_params.get('min_price')

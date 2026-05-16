@@ -5,6 +5,7 @@ import CarCard from '@/components/cars/CarCard'
 import CarSkeleton from '@/components/cars/CarSkeleton'
 import CarFilters from '@/components/cars/CarFilters'
 import FeaturedBanner from '@/components/cars/FeaturedBanner'
+import PartnerStrip from '@/components/cars/PartnerStrip'
 import { useDebounce } from '@/hooks/useDebounce'
 import { SlidersHorizontal, X, Car, Search, ArrowUpDown } from 'lucide-react'
 
@@ -39,16 +40,15 @@ export default function CarsPage() {
   const cars = data?.results || data || []
 
   // Sync URL → filters when navigating to /cars?partner_id=xxx
-  // (e.g. clicking FeaturedBanner while already on this page)
   useEffect(() => {
     const urlPartnerId = searchParams.get('partner_id') || ''
     if (urlPartnerId !== filters.partner_id) {
       setFilters(f => ({ ...f, partner_id: urlPartnerId }))
-      if (urlPartnerId) setShowFilters(true)   // auto-open filters so user sees the active company
+      if (urlPartnerId) setShowFilters(true)
     }
   }, [searchParams.get('partner_id')])
 
-  // Sync filters → URL (one-way, only location/search/partner_id in URL)
+  // Sync filters → URL
   useEffect(() => {
     const params = {}
     if (filters.location)   params.location   = filters.location
@@ -79,35 +79,32 @@ export default function CarsPage() {
       {/* Featured Banner Carousel */}
       <FeaturedBanner />
 
-      {/* Top bar: search + sort + filter toggle */}
-      <div className="space-y-3 mb-5">
-        {/* Search — full width */}
-        <div className="relative">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-          <input
-            value={filters.search}
-            onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-            placeholder="Search brand, model, location…"
-            className="input-modern pl-10"
-          />
-        </div>
+      {/* Partner Strip */}
+      <PartnerStrip
+        selectedId={filters.partner_id}
+        onSelect={(id) => setFilters(f => ({ ...f, partner_id: id }))}
+      />
 
-        {/* Sort + Filter — inline */}
-        <div className="flex gap-2 sm:gap-3">
-          <div className="relative flex-1 sm:flex-none">
+      {/* ── Toolbar: Sort | Filters | Search ── */}
+      <div className="mb-5">
+        {/* Desktop: single row —  Sort | Filters | Search */}
+        <div className="hidden sm:flex gap-2.5 items-center">
+          {/* Sort */}
+          <div className="relative shrink-0">
             <ArrowUpDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
             <select
               value={sort}
               onChange={e => setSort(e.target.value)}
-              className="select-modern pl-8 w-full sm:w-48 text-xs sm:text-sm"
+              className="select-modern pl-8 w-48 text-sm"
             >
               {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
 
+          {/* Filters button */}
           <button
             onClick={() => setShowFilters(f => !f)}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold
+            className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold
                         border transition-all duration-200 shrink-0 ${
               showFilters || activeFilterCount > 0
                 ? 'bg-brand-500 text-white border-brand-500 shadow-md shadow-brand-500/20'
@@ -117,12 +114,70 @@ export default function CarsPage() {
             <SlidersHorizontal size={14} />
             <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white text-brand-600 text-[9px] sm:text-[10px]
+              <span className="w-5 h-5 rounded-full bg-white text-brand-600 text-[10px]
                                font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
           </button>
+
+          {/* Search — flex-1 takes remaining space */}
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+            <input
+              value={filters.search}
+              onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+              placeholder="Search brand, model, location…"
+              className="input-modern pl-10"
+            />
+          </div>
+        </div>
+
+        {/* Mobile: stacked — Search on top, Sort + Filters below */}
+        <div className="sm:hidden space-y-2.5">
+          {/* Search */}
+          <div className="relative">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+            <input
+              value={filters.search}
+              onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+              placeholder="Search brand, model, location…"
+              className="input-modern pl-10"
+            />
+          </div>
+
+          {/* Sort + Filters */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <ArrowUpDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value)}
+                className="select-modern pl-8 w-full text-xs"
+              >
+                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            <button
+              onClick={() => setShowFilters(f => !f)}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold
+                          border transition-all duration-200 shrink-0 ${
+                showFilters || activeFilterCount > 0
+                  ? 'bg-brand-500 text-white border-brand-500 shadow-md shadow-brand-500/20'
+                  : 'bg-white dark:bg-[#1a1d2e] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
+              }`}
+            >
+              <SlidersHorizontal size={14} />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-white text-brand-600 text-[9px]
+                                 font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

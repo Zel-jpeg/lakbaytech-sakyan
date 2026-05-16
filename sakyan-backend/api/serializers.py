@@ -185,10 +185,11 @@ class ApprovedPartnerSerializer(serializers.ModelSerializer):
     """Lightweight serializer for public partner filter on Browse Cars."""
     car_count       = serializers.SerializerMethodField()
     user_full_name  = serializers.CharField(source='user.full_name', read_only=True)
+    logo_url        = serializers.CharField(source='user.avatar_url', read_only=True)
 
     class Meta:
         model = Partner
-        fields = ['id', 'business_name', 'partner_type', 'car_count', 'user_full_name', 'contact_person']
+        fields = ['id', 'business_name', 'partner_type', 'car_count', 'user_full_name', 'contact_person', 'logo_url']
 
     def get_car_count(self, obj):
         return obj.cars.filter(status='active', is_available=True).count()
