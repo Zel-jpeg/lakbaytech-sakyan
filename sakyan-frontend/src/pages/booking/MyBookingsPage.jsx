@@ -4,9 +4,9 @@ import { format } from 'date-fns'
 import {
   CalendarDays, MapPin, CreditCard, Banknote, ClipboardList,
   Truck, Building2, MessageCircle, CheckCircle2, X, Timer,
-  ChevronRight, Clock, Flag, LayoutGrid, List,
+  ChevronRight, Clock, Flag, LayoutGrid, List, XCircle,
 } from 'lucide-react'
-import { useMyBookings } from '@/hooks/useBookings'
+import { useMyBookings, useUpdateBookingStatus } from '@/hooks/useBookings'
 import { useResponsiveView } from '@/hooks/useResponsiveView'
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications'
 
@@ -69,7 +69,17 @@ function StatusBadge({ status }) {
 
 function BookingDetailModal({ booking, onClose }) {
   const navigate = useNavigate()
+  const updateStatus = useUpdateBookingStatus()
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const canMessage = ['pending_review', 'approved', 'active'].includes(booking.booking_status)
+  const canCancel = booking.booking_status === 'pending_review'
+
+  const handleCancel = () => {
+    updateStatus.mutate(
+      { id: booking.id, action: 'cancel' },
+      { onSuccess: () => onClose() }
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
@@ -242,20 +252,67 @@ function BookingDetailModal({ booking, onClose }) {
         </div>
 
         {/* Footer */}
-        {canMessage && (
-          <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 shrink-0">
-            <button
-              onClick={() => navigate(`/messages?booking=${booking.id}`)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm
-                         bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700
-                         text-white transition shadow-md shadow-brand-500/20"
-            >
-              <MessageCircle size={16} />
-              {booking.booking_status === 'approved'
-                ? (booking.fulfillment_type === 'delivery' ? 'Chat to confirm delivery' : 'Chat for pickup details')
-                : booking.booking_status === 'active' ? 'Message partner'
-                : 'Chat with partner'}
-            </button>
+        {(canMessage || canCancel) && (
+          <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 shrink-0 space-y-2">
+            {canMessage && (
+              <button
+                onClick={() => navigate(`/messages?booking=${booking.id}`)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm
+                           bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700
+                           text-white transition shadow-md shadow-brand-500/20"
+              >
+                <MessageCircle size={16} />
+                {booking.booking_status === 'approved'
+                  ? (booking.fulfillment_type === 'delivery' ? 'Chat to confirm delivery' : 'Chat for pickup details')
+                  : booking.booking_status === 'active' ? 'Message partner'
+                  : 'Chat with partner'}
+              </button>
+            )}
+
+            {/* Cancel booking */}
+            {canCancel && (
+              <>
+                {showCancelConfirm ? (
+                  <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-2xl p-4 space-y-3">
+                    <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                      Are you sure you want to cancel this booking?
+                    </p>
+                    <p className="text-xs text-red-600 dark:text-red-400/80">
+                      This action cannot be undone. The partner will be notified.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleCancel}
+                        disabled={updateStatus.isPending}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50
+                                   text-white text-sm font-bold rounded-xl transition"
+                      >
+                        <XCircle size={15} />
+                        {updateStatus.isPending ? 'Cancelling…' : 'Yes, Cancel Booking'}
+                      </button>
+                      <button
+                        onClick={() => setShowCancelConfirm(false)}
+                        className="px-5 py-2.5 border border-gray-200 dark:border-gray-700 text-sm font-medium
+                                   text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 rounded-xl
+                                   hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                      >
+                        No, keep it
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowCancelConfirm(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold
+                               border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400
+                               hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                  >
+                    <XCircle size={15} />
+                    Cancel Booking
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

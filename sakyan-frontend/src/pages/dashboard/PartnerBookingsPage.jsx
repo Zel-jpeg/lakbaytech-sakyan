@@ -18,6 +18,7 @@ const STATUS_TABS = [
   { value: 'active',         label: 'Active' },
   { value: 'completed',      label: 'Completed' },
   { value: 'rejected',       label: 'Rejected' },
+  { value: 'cancelled',      label: 'Cancelled' },
 ]
 
 const BOOKING_STATUS_STYLES = {

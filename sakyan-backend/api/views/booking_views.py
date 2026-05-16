@@ -135,6 +135,10 @@ class UpdateBookingStatusView(APIView):
         if booking.booking_status != from_status and request.user.role != 'admin':
             return Response({'error': f'Can only {action} bookings in {from_status} status'}, status=400)
 
+        # Enforce role: only the correct role can perform each action (admins bypass)
+        if request.user.role != 'admin' and request.user.role != required_role:
+            return Response({'error': f'Only a {required_role} can {action} a booking'}, status=403)
+
         booking.booking_status = to_status
         if action == 'reject':
             booking.admin_notes = request.data.get('reason', '')
@@ -170,6 +174,17 @@ class UpdateBookingStatusView(APIView):
                     user_id=booking.customer_id,
                     title='Booking Not Approved 📋',
                     message=f'Your booking {booking.booking_code} was not approved by the partner.',
+                    notification_type='booking',
+                    reference_id=booking.id
+                )
+            except Exception:
+                pass
+        elif action == 'cancel':
+            try:
+                push_notification(
+                    user_id=booking.partner.user_id,
+                    title='Booking Cancelled',
+                    message=f'{booking.customer.full_name} cancelled booking {booking.booking_code} for {booking.car.name}.',
                     notification_type='booking',
                     reference_id=booking.id
                 )
