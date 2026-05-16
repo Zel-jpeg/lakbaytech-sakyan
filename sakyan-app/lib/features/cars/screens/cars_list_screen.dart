@@ -100,307 +100,314 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // ── Featured Partner Banner ────────────────────────────────────────
-          const FeaturedBannerWidget(),
-          // ── Search + Filter bar ──────────────────────────────────────────
-          Container(
-            color: scaffoldBg,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Row: search + filter button
-                Row(
-                  children: [
-                    // Search field
-                    Expanded(
-                      child: TextField(
-                        controller: _searchCtrl,
-                        onChanged: (v) =>
-                            _updateFilter((f) => f.copyWith(search: v)),
-                        style: TextStyle(color: textPrim, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: 'Search by name, brand, location…',
-                          prefixIcon:
-                              Icon(Icons.search_rounded, color: textMuted, size: 20),
-                          suffixIcon: _searchCtrl.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.close_rounded,
-                                      color: textMuted, size: 18),
-                                  onPressed: () {
-                                    _searchCtrl.clear();
-                                    _updateFilter((f) => f.copyWith(search: ''));
-                                  },
-                                )
-                              : null,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          isDense: true,
+      // ── NestedScrollView: banner scrolls away; filter bar + cars stay ──────
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          // ── Featured Partner Banner — scrolls away with the page ───────────
+          const SliverToBoxAdapter(
+            child: FeaturedBannerWidget(),
+          ),
+        ],
+        body: Column(
+          children: [
+            // ── Search + Filter bar — sticks to top once banner scrolls off ──
+            Container(
+              color: scaffoldBg,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row: search + filter button
+                  Row(
+                    children: [
+                      // Search field
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          onChanged: (v) =>
+                              _updateFilter((f) => f.copyWith(search: v)),
+                          style: TextStyle(color: textPrim, fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: 'Search by name, brand, location…',
+                            prefixIcon:
+                                Icon(Icons.search_rounded, color: textMuted, size: 20),
+                            suffixIcon: _searchCtrl.text.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(Icons.close_rounded,
+                                        color: textMuted, size: 18),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      _updateFilter((f) => f.copyWith(search: ''));
+                                    },
+                                  )
+                                : null,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            isDense: true,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
+                      const SizedBox(width: 10),
 
-                    // Filter button with badge
-                    GestureDetector(
-                      onTap: () => _openFilterSheet(context, filters, isDark),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 46, height: 46,
-                            decoration: BoxDecoration(
-                              color: activeCount > 0
-                                  ? AppColors.primary
-                                  : (isDark
-                                      ? AppColors.bgSurface
-                                      : AppColors.bgSurfaceLight),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
+                      // Filter button with badge
+                      GestureDetector(
+                        onTap: () => _openFilterSheet(context, filters, isDark),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 46, height: 46,
+                              decoration: BoxDecoration(
                                 color: activeCount > 0
                                     ? AppColors.primary
-                                    : borderColor,
+                                    : (isDark
+                                        ? AppColors.bgSurface
+                                        : AppColors.bgSurfaceLight),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: activeCount > 0
+                                      ? AppColors.primary
+                                      : borderColor,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.tune_rounded,
+                                color: activeCount > 0
+                                    ? Colors.white
+                                    : textSec,
+                                size: 22,
                               ),
                             ),
-                            child: Icon(
-                              Icons.tune_rounded,
-                              color: activeCount > 0
-                                  ? Colors.white
-                                  : textSec,
-                              size: 22,
-                            ),
-                          ),
-                          if (activeCount > 0)
-                            Positioned(
-                              top: -5, right: -5,
-                              child: Container(
-                                width: 18, height: 18,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.error,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '$activeCount',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
+                            if (activeCount > 0)
+                              Positioned(
+                                top: -5, right: -5,
+                                child: Container(
+                                  width: 18, height: 18,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '$activeCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
+                    ],
+                  ),
+
+                  // ── Quick pills row ─────────────────────────────────────────
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // Available only toggle
+                        _QuickPill(
+                          icon: Icons.check_circle_rounded,
+                          label: 'Available',
+                          active: filters.availableOnly,
+                          isDark: isDark,
+                          onTap: () => _updateFilter(
+                              (f) => f.copyWith(availableOnly: !f.availableOnly)),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Sort pill — shows current sort
+                        _QuickPill(
+                          icon: Icons.sort_rounded,
+                          label: filters.sortBy == CarSortBy.recommended
+                              ? 'Sort'
+                              : filters.sortBy.label,
+                          active: filters.sortBy != CarSortBy.recommended,
+                          isDark: isDark,
+                          onTap: () => _showSortPicker(context, filters, isDark),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Transmission quick pills
+                        _QuickPill(
+                          icon: Icons.settings_rounded,
+                          label: 'Manual',
+                          active: filters.transmission == 'manual',
+                          isDark: isDark,
+                          onTap: () => _updateFilter((f) => f.copyWith(
+                                transmission:
+                                    f.transmission == 'manual' ? null : 'manual',
+                              )),
+                        ),
+                        const SizedBox(width: 8),
+                        _QuickPill(
+                          icon: Icons.auto_mode_rounded,
+                          label: 'Automatic',
+                          active: filters.transmission == 'automatic',
+                          isDark: isDark,
+                          onTap: () => _updateFilter((f) => f.copyWith(
+                                transmission: f.transmission == 'automatic'
+                                    ? null
+                                    : 'automatic',
+                              )),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Price cap pills
+                        _QuickPill(
+                          icon: Icons.currency_exchange_rounded,
+                          label: '≤ ₱1,500',
+                          active: filters.maxPrice == 1500,
+                          isDark: isDark,
+                          onTap: () => _updateFilter((f) => f.copyWith(
+                                maxPrice: f.maxPrice == 1500 ? null : 1500.0,
+                              )),
+                        ),
+                        const SizedBox(width: 8),
+                        _QuickPill(
+                          icon: Icons.currency_exchange_rounded,
+                          label: '≤ ₱3,000',
+                          active: filters.maxPrice == 3000,
+                          isDark: isDark,
+                          onTap: () => _updateFilter((f) => f.copyWith(
+                                maxPrice: f.maxPrice == 3000 ? null : 3000.0,
+                              )),
+                        ),
+
+                        if (filters.hasActiveFilters) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: _clearFilters,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: AppColors.error.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.close_rounded,
+                                      size: 13, color: AppColors.error),
+                                  SizedBox(width: 4),
+                                  Text('Clear',
+                                      style: TextStyle(
+                                          color: AppColors.error,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  // ── Partner pills row ────────────────────────────────────────
+                  const SizedBox(height: 10),
+                  _PartnerPillsRow(
+                    selectedPartnerId: filters.partnerId,
+                    isDark: isDark,
+                    onSelect: (id) => _updateFilter(
+                      (f) => f.copyWith(partnerId: id == f.partnerId ? null : id),
+                    ),
+                  ),
+
+                  // ── Result count ────────────────────────────────────────────
+                  if (resultCount != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          '$resultCount car${resultCount == 1 ? '' : 's'} found',
+                          style: TextStyle(
+                              color: textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500),
+                        ),
+                        if (filters.hasActiveFilters) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Filtered',
+                              style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
-                ),
-
-                // ── Quick pills row ─────────────────────────────────────────
-                const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      // Available only toggle
-                      _QuickPill(
-                        icon: Icons.check_circle_rounded,
-                        label: 'Available',
-                        active: filters.availableOnly,
-                        isDark: isDark,
-                        onTap: () => _updateFilter(
-                            (f) => f.copyWith(availableOnly: !f.availableOnly)),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // Sort pill — shows current sort
-                      _QuickPill(
-                        icon: Icons.sort_rounded,
-                        label: filters.sortBy == CarSortBy.recommended
-                            ? 'Sort'
-                            : filters.sortBy.label,
-                        active: filters.sortBy != CarSortBy.recommended,
-                        isDark: isDark,
-                        onTap: () => _showSortPicker(context, filters, isDark),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // Transmission quick pills
-                      _QuickPill(
-                        icon: Icons.settings_rounded,
-                        label: 'Manual',
-                        active: filters.transmission == 'manual',
-                        isDark: isDark,
-                        onTap: () => _updateFilter((f) => f.copyWith(
-                              transmission:
-                                  f.transmission == 'manual' ? null : 'manual',
-                            )),
-                      ),
-                      const SizedBox(width: 8),
-                      _QuickPill(
-                        icon: Icons.auto_mode_rounded,
-                        label: 'Automatic',
-                        active: filters.transmission == 'automatic',
-                        isDark: isDark,
-                        onTap: () => _updateFilter((f) => f.copyWith(
-                              transmission: f.transmission == 'automatic'
-                                  ? null
-                                  : 'automatic',
-                            )),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // Price cap pills
-                      _QuickPill(
-                        icon: Icons.currency_exchange_rounded,
-                        label: '≤ ₱1,500',
-                        active: filters.maxPrice == 1500,
-                        isDark: isDark,
-                        onTap: () => _updateFilter((f) => f.copyWith(
-                              maxPrice: f.maxPrice == 1500 ? null : 1500.0,
-                            )),
-                      ),
-                      const SizedBox(width: 8),
-                      _QuickPill(
-                        icon: Icons.currency_exchange_rounded,
-                        label: '≤ ₱3,000',
-                        active: filters.maxPrice == 3000,
-                        isDark: isDark,
-                        onTap: () => _updateFilter((f) => f.copyWith(
-                              maxPrice: f.maxPrice == 3000 ? null : 3000.0,
-                            )),
-                      ),
-
-                      if (filters.hasActiveFilters) ...[
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _clearFilters,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: AppColors.error.withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.close_rounded,
-                                    size: 13, color: AppColors.error),
-                                SizedBox(width: 4),
-                                Text('Clear',
-                                    style: TextStyle(
-                                        color: AppColors.error,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                // ── Partner pills row ────────────────────────────────────────
-                const SizedBox(height: 10),
-                _PartnerPillsRow(
-                  selectedPartnerId: filters.partnerId,
-                  isDark: isDark,
-                  onSelect: (id) => _updateFilter(
-                    (f) => f.copyWith(partnerId: id == f.partnerId ? null : id),
-                  ),
-                ),
-
-                // ── Result count ────────────────────────────────────────────
-                if (resultCount != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        '$resultCount car${resultCount == 1 ? '' : 's'} found',
-                        style: TextStyle(
-                            color: textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500),
-                      ),
-                      if (filters.hasActiveFilters) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Filtered',
-                            style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
                 ],
-              ],
-            ),
-          ),
-
-          Divider(height: 1, color: borderColor),
-
-          // ── Cars List / Grid ─────────────────────────────────────────────
-          Expanded(
-            child: carsAsync.when(
-              loading: () => _viewMode == _ViewMode.grid
-                  ? _ShimmerGrid(shimBase: shimBase, shimHigh: shimHigh)
-                  : _ShimmerList(shimBase: shimBase, shimHigh: shimHigh),
-              error: (e, _) => _ErrorView(
-                textMuted: textMuted,
-                onRetry: () => ref.invalidate(carsListProvider),
               ),
-              data: (cars) {
-                if (cars.isEmpty) {
-                  return _EmptyView(
-                    hasFilters: filters.hasActiveFilters,
-                    textMuted: textMuted,
-                    onClear: _clearFilters,
-                  );
-                }
-                return _viewMode == _ViewMode.grid
-                    ? _CarsGrid(
-                        cars: cars,
-                        cardColor: cardColor,
-                        borderColor: borderColor,
-                        textPrim: textPrim,
-                        textMuted: textMuted,
-                        textSec: textSec,
-                        shimBase: shimBase,
-                        elevBg: elevBg,
-                        isDark: isDark,
-                      )
-                    : _CarsList(
-                        cars: cars,
-                        cardColor: cardColor,
-                        borderColor: borderColor,
-                        textPrim: textPrim,
-                        textMuted: textMuted,
-                        textSec: textSec,
-                        shimBase: shimBase,
-                        isDark: isDark,
-                      );
-              },
             ),
-          ),
-        ],
+
+            Divider(height: 1, color: borderColor),
+
+            // ── Cars List / Grid ─────────────────────────────────────────────
+            Expanded(
+              child: carsAsync.when(
+                loading: () => _viewMode == _ViewMode.grid
+                    ? _ShimmerGrid(shimBase: shimBase, shimHigh: shimHigh)
+                    : _ShimmerList(shimBase: shimBase, shimHigh: shimHigh),
+                error: (e, _) => _ErrorView(
+                  textMuted: textMuted,
+                  onRetry: () => ref.invalidate(carsListProvider),
+                ),
+                data: (cars) {
+                  if (cars.isEmpty) {
+                    return _EmptyView(
+                      hasFilters: filters.hasActiveFilters,
+                      textMuted: textMuted,
+                      onClear: _clearFilters,
+                    );
+                  }
+                  return _viewMode == _ViewMode.grid
+                      ? _CarsGrid(
+                          cars: cars,
+                          cardColor: cardColor,
+                          borderColor: borderColor,
+                          textPrim: textPrim,
+                          textMuted: textMuted,
+                          textSec: textSec,
+                          shimBase: shimBase,
+                          elevBg: elevBg,
+                          isDark: isDark,
+                        )
+                      : _CarsList(
+                          cars: cars,
+                          cardColor: cardColor,
+                          borderColor: borderColor,
+                          textPrim: textPrim,
+                          textMuted: textMuted,
+                          textSec: textSec,
+                          shimBase: shimBase,
+                          isDark: isDark,
+                        );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
