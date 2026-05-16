@@ -3,6 +3,15 @@ import { usePartnerBookings } from '@/hooks/useBookings'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import { DollarSign, TrendingUp, CalendarCheck, Percent, ArrowUpDown, CreditCard, List, X } from 'lucide-react'
 
+// Derive actual commission % from stored amounts (handles historical 10% bookings
+// and new 3–5% bookings correctly without hardcoding)
+function commissionPct(booking) {
+  const sub = parseFloat(booking.subtotal || booking.total_amount || 0)
+  const comm = parseFloat(booking.commission_amount || 0)
+  if (!sub || !comm) return null
+  return Math.round((comm / sub) * 100 * 10) / 10  // one decimal place
+}
+
 function EarningStatCard({ icon: Icon, label, value, sub, color }) {
   return (
     <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm hover:shadow-md dark:hover:shadow-dark-card transition">
@@ -66,7 +75,7 @@ function TransactionModal({ booking, onClose }) {
             </div>
             <div className="pl-4 space-y-2 border-l-2 border-red-100 dark:border-red-900/30">
               <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                <span>Platform Commission (10%)</span>
+                <span>Platform Commission{commissionPct(booking) !== null ? ` (${commissionPct(booking)}%)` : ''}</span>
                 <span>-{formatCurrency(booking.commission_amount || 0)}</span>
               </div>
               <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -246,7 +255,7 @@ export default function EarningsPage() {
                                 -{formatCurrency(totalDeductions)}
                               </div>
                               <div className="text-[10px] text-gray-400 dark:text-gray-500 flex flex-col items-end leading-tight whitespace-nowrap">
-                                <span>Comm (10%): -{formatCurrency(b.commission_amount || 0)}</span>
+                                <span>Comm{commissionPct(b) !== null ? ` (${commissionPct(b)}%)` : ''}: -{formatCurrency(b.commission_amount || 0)}</span>
                                 <span>Booking Fee: -{formatCurrency(b.booking_fee || 0)}</span>
                               </div>
                             </div>
