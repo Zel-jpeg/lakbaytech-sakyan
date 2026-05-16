@@ -44,6 +44,7 @@ export default {
         'slide-up': 'slideUp 0.4s ease-out',
         'float': 'float 6s ease-in-out infinite',
         'spin-slow': 'spin 12s linear infinite',
+        'shine': 'shine 8s ease-in-out infinite',
       },
       keyframes: {
         shimmer: {
@@ -61,6 +62,11 @@ export default {
         float: {
           '0%, 100%': { transform: 'translateY(0px)' },
           '50%':      { transform: 'translateY(-10px)' },
+        },
+        shine: {
+          '0%':   { transform: 'translateX(-100%) skewX(-20deg)' },
+          '40%':  { transform: 'translateX(200%) skewX(-20deg)' },
+          '100%': { transform: 'translateX(200%) skewX(-20deg)' },
         },
       },
     },
