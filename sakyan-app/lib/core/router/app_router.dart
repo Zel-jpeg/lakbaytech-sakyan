@@ -24,6 +24,7 @@ import '../../features/notifications/screens/notifications_screen.dart';
 
 import '../../features/messages/screens/inbox_screen.dart';
 import '../../features/messages/screens/chat_screen.dart';
+import '../../features/messages/screens/support_chat_screen.dart';
 
 import '../../features/profile/screens/profile_screen.dart';
 
@@ -323,6 +324,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.inbox,
         builder: (_, __) => const InboxScreen(),
+      ),
+
+      GoRoute(
+        path: '/support-chat',
+        builder: (_, __) => const SupportChatScreen(),
       ),
 
       GoRoute(

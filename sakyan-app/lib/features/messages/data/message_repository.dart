@@ -7,16 +7,60 @@ class MessageRepository {
 
   // ── Conversations list ─────────────────────────────────────────────────────
   Future<List<ConversationModel>> getConversations() async {
-    final res = await ApiService.get('/messages/conversations/');
-    final raw = res.data;
+    // Run both requests in parallel
+    final futures = await Future.wait<dynamic>([
+      ApiService.get('/messages/conversations/'),
+      ApiService.get('/messages/support/').catchError((_) => null),
+    ]);
+
+    final res = futures[0];
+    final raw = res?.data;
     List list = raw is List
         ? raw
         : (raw is Map && raw['results'] is List
             ? raw['results'] as List
             : []);
-    return list
+    final conversations = list
         .map((e) => ConversationModel.fromJson(e as Map<String, dynamic>))
         .toList();
+
+    // ── Prepend synthetic Sakyan Support conversation ──────────────────────
+    // Parse last support message for preview
+    String lastSupportMsg = 'Tap to contact Sakyan Support';
+    DateTime lastSupportAt = DateTime.now();
+    int supportUnread = 0;
+    try {
+      final supportRes = futures[1];
+      if (supportRes != null) {
+        final sRaw = supportRes.data;
+        List sList = sRaw is List
+            ? sRaw
+            : (sRaw is Map && sRaw['results'] is List
+                ? sRaw['results'] as List
+                : []);
+        if (sList.isNotEmpty) {
+          final last = sList.last as Map<String, dynamic>;
+          lastSupportMsg = last['content']?.toString() ?? lastSupportMsg;
+          final ts = last['created_at']?.toString();
+          if (ts != null && ts.isNotEmpty) {
+            lastSupportAt = DateTime.tryParse(ts) ?? lastSupportAt;
+          }
+        }
+      }
+    } catch (_) {}
+
+    final supportConv = ConversationModel(
+      bookingId:     '',  // empty = isSupport
+      bookingCode:   '',
+      otherUserId:   '',
+      otherUserName: 'Sakyan Support',
+      lastMessage:   lastSupportMsg,
+      lastMessageAt: lastSupportAt,
+      unreadCount:   supportUnread,
+      carName:       '',
+    );
+
+    return [supportConv, ...conversations];
   }
 
   // ── Messages for a booking ─────────────────────────────────────────────────

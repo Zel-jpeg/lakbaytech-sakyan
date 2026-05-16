@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/cars_repository.dart';
 import '../models/car_model.dart';
+import '../models/partner_model.dart';
 
 // ── Repository provider ────────────────────────────────────────────────────
 final carsRepositoryProvider =
@@ -35,6 +36,7 @@ class CarFilters {
   final int?    minSeats;
   final bool    availableOnly;
   final CarSortBy sortBy;
+  final String? partnerId;      // approved partner UUID | null = any
 
   const CarFilters({
     this.search        = '',
@@ -45,6 +47,7 @@ class CarFilters {
     this.minSeats,
     this.availableOnly = false,
     this.sortBy        = CarSortBy.recommended,
+    this.partnerId,
   });
 
   CarFilters copyWith({
@@ -54,6 +57,7 @@ class CarFilters {
     Object?  maxPrice      = _sentinel,
     Object?  minPrice      = _sentinel,
     Object?  minSeats      = _sentinel,
+    Object?  partnerId     = _sentinel,
     bool?    availableOnly,
     CarSortBy? sortBy,
   }) =>
@@ -64,6 +68,7 @@ class CarFilters {
         maxPrice:      maxPrice      == _sentinel ? this.maxPrice      : maxPrice      as double?,
         minPrice:      minPrice      == _sentinel ? this.minPrice      : minPrice      as double?,
         minSeats:      minSeats      == _sentinel ? this.minSeats      : minSeats      as int?,
+        partnerId:     partnerId     == _sentinel ? this.partnerId     : partnerId     as String?,
         availableOnly: availableOnly ?? this.availableOnly,
         sortBy:        sortBy        ?? this.sortBy,
       );
@@ -77,6 +82,7 @@ class CarFilters {
     if (minPrice != null)       n++;
     if (minSeats != null)       n++;
     if (availableOnly)          n++;
+    if (partnerId != null)      n++;
     if (sortBy != CarSortBy.recommended) n++;
     return n;
   }
@@ -98,6 +104,7 @@ final carsListProvider = FutureProvider<List<CarModel>>((ref) async {
     fuelType:     filters.fuelType,
     maxPrice:     filters.maxPrice,
     minSeats:     filters.minSeats,
+    partnerId:    filters.partnerId,
   );
 
   // Client-side filters not supported by the backend
@@ -138,4 +145,10 @@ final carDetailProvider =
 final bookedDatesProvider =
     FutureProvider.family<List<Map<String, String>>, String>((ref, carId) async {
   return ref.read(carsRepositoryProvider).getBookedDates(carId);
+});
+
+// ── Approved partners provider (for filter sheet) ──────────────────────────
+final approvedPartnersProvider =
+    FutureProvider<List<ApprovedPartnerModel>>((ref) async {
+  return ref.read(carsRepositoryProvider).getApprovedPartners();
 });

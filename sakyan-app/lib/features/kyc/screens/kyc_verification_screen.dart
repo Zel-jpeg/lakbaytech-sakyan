@@ -17,10 +17,6 @@ final _psgcDio = Dio(BaseOptions(
   receiveTimeout: const Duration(seconds: 15),
 ));
 
-// ── FIX (map zoom): keep lat/lng from the PSGC response so we don't need a
-//   separate Nominatim geocoding round-trip for every dropdown change.
-//   psgc.cloud returns `latitude` and `longitude` on province and
-//   cities-municipalities endpoints. ────────────────────────────────────────
 class _PsgcItem {
   final String code, name;
   final double? lat, lng;
@@ -37,7 +33,6 @@ Future<List<_PsgcItem>> _psgcFetch(String url) async {
   final raw = res.data ?? [];
   final items = raw.map((e) {
     final m = e as Map<String, dynamic>;
-    // PSGC cloud includes latitude/longitude on most endpoints
     final lat = (m['latitude']  as num?)?.toDouble();
     final lng = (m['longitude'] as num?)?.toDouble();
     return _PsgcItem(
@@ -53,6 +48,7 @@ Future<List<_PsgcItem>> _psgcFetch(String url) async {
 
 // ── Valid ID options ──────────────────────────────────────────────────────────
 const _kIdTypes = [
+  ('national_id', 'National ID (PhilSys)'),
   ('passport',   'Passport'),
   ('sss',        'SSS ID'),
   ('philhealth', 'PhilHealth ID'),
@@ -78,7 +74,8 @@ class KycVerificationScreen extends ConsumerStatefulWidget {
 
 class _KycVerificationScreenState
     extends ConsumerState<KycVerificationScreen> {
-  int _step = 0; // 0=Personal Info, 1=License & ID, 2=Upload Docs
+  // 0=Personal Info, 1=License & ID, 2=Upload Docs, 3=Rental Agreement
+  int _step = 0;
 
   // ── Step 0 ────────────────────────────────────────────────────────────────
   final _birthdayCtrl = TextEditingController();
@@ -93,16 +90,14 @@ class _KycVerificationScreenState
   String _cityCode     = '', _cityName     = '';
   String _barangayName = '';
 
-  // Map
-  final _mapCtrl  = MapController();
-  bool   _mapReady = false;          // true once FlutterMap fires onMapReady
-  LatLng? _pendingCenter;            // move queued before the map was ready
+  final _mapCtrl   = MapController();
+  bool   _mapReady  = false;
+  LatLng? _pendingCenter;
   double? _pendingZoom;
   LatLng? _pin;
   String  _pinLabel  = '';
   bool    _reversing = false;
 
-  // Coords to submit
   double? _addrLat, _addrLng;
 
   // ── Step 1 ────────────────────────────────────────────────────────────────
@@ -113,8 +108,13 @@ class _KycVerificationScreenState
   // ── Step 2 ────────────────────────────────────────────────────────────────
   File? _licenseFile;
   File? _validIdFile;
-
   final _picker = ImagePicker();
+
+  // ── Step 3 (Rental Agreement) ─────────────────────────────────────────────
+  final _signatureCtrl   = TextEditingController();
+  final _agreementScroll = ScrollController();
+  bool  _agreementRead    = false;
+  bool  _agreementChecked = false;
 
   @override
   void initState() {
@@ -128,6 +128,8 @@ class _KycVerificationScreenState
     _contactCtrl.dispose();
     _licenseNumCtrl.dispose();
     _licenseExpiryCtrl.dispose();
+    _signatureCtrl.dispose();
+    _agreementScroll.dispose();
     _mapCtrl.dispose();
     super.dispose();
   }
@@ -151,6 +153,13 @@ class _KycVerificationScreenState
       _cities = []; _barangays = [];
       _loadingC = true;
     });
+    // Fly to province on map (zoom 10)
+    final prov = _provinces.where((p) => p.code == code).firstOrNull;
+    if (prov?.lat != null && prov?.lng != null) {
+      _moveMap(LatLng(prov!.lat!, prov.lng!), 10);
+    } else {
+      _flyToQuery('$name, Philippines', 10);
+    }
     try {
       final items = await _psgcFetch(
           '$_kPsgc/provinces/$code/cities-municipalities/');
@@ -167,16 +176,12 @@ class _KycVerificationScreenState
       _barangays = [];
       _loadingB = true;
     });
-
-    // ── FIX (map zoom): use coordinates embedded in the PSGC item if present;
-    //   fall back to Nominatim geocoding only when they are missing. ─────────
     final city = _cities.where((c) => c.code == code).firstOrNull;
     if (city?.lat != null && city?.lng != null) {
       _moveMap(LatLng(city!.lat!, city.lng!), 13);
     } else {
       _flyToQuery('$name, Philippines', 13);
     }
-
     try {
       final items = await _psgcFetch(
           '$_kPsgc/cities-municipalities/$code/barangays/');
@@ -186,56 +191,40 @@ class _KycVerificationScreenState
     }
   }
 
-  // ── Map zoom: called whenever province / city / barangay changes ─────────
-  //
-  // Problem: FlutterMap attaches its controller asynchronously. If _moveMap
-  // is called before `onMapReady` fires the controller is not yet live and
-  // the call silently does nothing — which was why the map never zoomed.
-  //
-  // Fix:
-  //   • Track whether the map is ready via _mapReady.
-  //   • Store the last requested center+zoom as _pendingCenter/_pendingZoom.
-  //   • Apply the pending move the moment onMapReady fires.
-  //   • If the map IS ready, call move() directly (still wrapped in a
-  //     post-frame callback so we never call it mid-build).
-  // ──────────────────────────────────────────────────────────────────────────
   void _moveMap(LatLng center, double zoom) {
     _pendingCenter = center;
     _pendingZoom   = zoom;
-    if (!_mapReady) return; // will be applied in onMapReady
+    if (!_mapReady) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_mapReady) return;
-      try {
-        _mapCtrl.move(center, zoom);
-      } catch (_) {
-        // controller detached during a rebuild — ignore
-      }
+      try { _mapCtrl.move(center, zoom); } catch (_) {}
     });
   }
 
   void _onMapReady() {
     if (!mounted) return;
     setState(() => _mapReady = true);
-    // Apply any move that was requested before the map finished loading
     if (_pendingCenter != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        try {
-          _mapCtrl.move(_pendingCenter!, _pendingZoom ?? 6);
-        } catch (_) {}
+        try { _mapCtrl.move(_pendingCenter!, _pendingZoom ?? 6); } catch (_) {}
       });
     }
   }
 
-  // ── Nominatim fallback (used only when PSGC has no coordinates) ───────────
   Future<void> _flyToQuery(String query, double zoom) async {
+    // Don't double-append Philippines if already included
+    final q = query.toLowerCase().contains('philippines')
+        ? query
+        : '$query, Philippines';
     try {
       final res = await _psgcDio.get<List<dynamic>>(
         'https://nominatim.openstreetmap.org/search',
         queryParameters: {
-          'q':      '$query, Philippines',
-          'format': 'json',
-          'limit':  1,
+          'q':            q,
+          'format':       'json',
+          'limit':        1,
+          'countrycodes': 'ph',
         },
         options: Options(headers: {
           'Accept-Language': 'en',
@@ -246,13 +235,9 @@ class _KycVerificationScreenState
       if (body.isNotEmpty && mounted) {
         final lat = double.tryParse(body[0]['lat']?.toString() ?? '') ?? 0;
         final lon = double.tryParse(body[0]['lon']?.toString() ?? '') ?? 0;
-        if (lat != 0 && lon != 0) {
-          _moveMap(LatLng(lat, lon), zoom);
-        }
+        if (lat != 0 && lon != 0) _moveMap(LatLng(lat, lon), zoom);
       }
-    } catch (_) {
-      // Nominatim unavailable — map stays at current position
-    }
+    } catch (_) {}
   }
 
   Future<void> _onMapTap(LatLng latlng) async {
@@ -317,16 +302,8 @@ class _KycVerificationScreenState
     return null;
   }
 
-  // ── Step navigation ───────────────────────────────────────────────────────
-  // Reset map-ready flag whenever the map widget is removed from the tree
-  // (i.e. whenever the user leaves step 0). This prevents _moveMap from
-  // calling _mapCtrl.move() on a detached controller after coming back.
   void _goToStep(int step) {
-    if (step != 0) {
-      // Map is no longer in the tree — mark it as not ready so pending moves
-      // are queued rather than sent to a detached controller.
-      _mapReady = false;
-    }
+    if (step != 0) _mapReady = false;
     setState(() => _step = step);
   }
 
@@ -338,20 +315,7 @@ class _KycVerificationScreenState
     ));
   }
 
-  // ── Image picker ──────────────────────────────────────────────────────────
-  //
-  // FIX: The old implementation called Navigator.pop(ctx) and then awaited
-  // _picker.pickImage() INSIDE the sheet builder's onTap.  The problem is
-  // that showModalBottomSheet's outer `await` resolves the moment the sheet
-  // is dismissed, so `result` was always null when we returned it.
-  //
-  // Correct pattern:
-  //   1. Show a sheet that returns an ImageSource value (camera / gallery).
-  //   2. Await the sheet — which closes as soon as the user taps an option.
-  //   3. Then call the picker OUTSIDE the sheet with the returned source.
-  // ──────────────────────────────────────────────────────────────────────────
   Future<File?> _pickImage() async {
-    // Step 1: ask the user which source they want
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -360,7 +324,6 @@ class _KycVerificationScreenState
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            // drag handle
             Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
@@ -375,7 +338,6 @@ class _KycVerificationScreenState
               Expanded(child: _SourceButton(
                 icon:  Icons.camera_alt_rounded,
                 label: 'Camera',
-                // pop with the chosen source — no picker call here
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               )),
               const SizedBox(width: 12),
@@ -389,11 +351,7 @@ class _KycVerificationScreenState
         ),
       ),
     );
-
-    // Step 2: user cancelled (tapped outside the sheet)
     if (source == null || !mounted) return null;
-
-    // Step 3: now that the sheet is fully gone, launch the picker
     try {
       final xf = await _picker.pickImage(
         source:       source,
@@ -414,15 +372,11 @@ class _KycVerificationScreenState
   }
 
   Future<void> _submit() async {
-    // Guard: don't double-submit while a request is already in flight
     if (ref.read(submitKycProvider).isLoading) return;
-    // Safety: both files must exist (the button is already disabled if not,
-    // but guard defensively in case of a race condition)
     if (_licenseFile == null || _validIdFile == null) {
       _showError('Please upload both documents before submitting.');
       return;
     }
-
     try {
       final kyc = await ref.read(submitKycProvider.notifier).submit(
             birthday:             _birthdayCtrl.text.trim(),
@@ -436,14 +390,10 @@ class _KycVerificationScreenState
             licenseFile:          _licenseFile!,
             validIdFile:          _validIdFile!,
           );
-
       if (!mounted) return;
-
       if (kyc != null) {
-        // Success — navigate to pending screen
         context.go(AppRoutes.kycPending);
       } else {
-        // Provider returned null → check for an error stored in state
         final providerState = ref.read(submitKycProvider);
         final rawErr = providerState.error?.toString() ?? '';
         final msg = rawErr.isNotEmpty
@@ -452,10 +402,7 @@ class _KycVerificationScreenState
         _showError(msg);
       }
     } catch (e) {
-      // Unexpected exception that bypassed AsyncValue.guard
-      if (mounted) {
-        _showError(e.toString().replaceFirst('Exception: ', ''));
-      }
+      if (mounted) _showError(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -495,7 +442,7 @@ class _KycVerificationScreenState
           children: [
             _StepProgress(
                 current:     _step,
-                total:       3,
+                total:       4,
                 borderColor: borderColor,
                 textMuted:   textMuted),
             const SizedBox(height: 24),
@@ -519,14 +466,21 @@ class _KycVerificationScreenState
                             textPrim:    textPrim,
                             textSec:     textSec,
                             inputFill:   inputFill)
-                        : _buildStep2(
-                            isDark:      isDark,
-                            cardColor:   cardColor,
-                            borderColor: borderColor,
-                            textPrim:    textPrim,
-                            textSec:     textSec,
-                            textMuted:   textMuted,
-                            isLoading:   submitState.isLoading),
+                        : _step == 2
+                            ? _buildStep2(
+                                isDark:      isDark,
+                                cardColor:   cardColor,
+                                borderColor: borderColor,
+                                textPrim:    textPrim,
+                                textSec:     textSec,
+                                textMuted:   textMuted)
+                            : _buildStep3(
+                                isDark:      isDark,
+                                borderColor: borderColor,
+                                textPrim:    textPrim,
+                                textSec:     textSec,
+                                textMuted:   textMuted,
+                                isLoading:   submitState.isLoading),
               ),
             ),
           ],
@@ -556,7 +510,6 @@ class _KycVerificationScreenState
           style: TextStyle(color: textSec, fontSize: 13)),
       const SizedBox(height: 20),
 
-      // ── Birthday + Contact ──────────────────────────────────────────────
       Row(children: [
         Expanded(child: _Field(
           label: 'Birthday',
@@ -581,7 +534,6 @@ class _KycVerificationScreenState
       ]),
       const SizedBox(height: 16),
 
-      // ── Home Address — PSGC + Map ───────────────────────────────────────
       _Field(
         label: 'Home Address',
         child: Container(
@@ -591,12 +543,9 @@ class _KycVerificationScreenState
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(children: [
-
-            // Dropdowns
             Container(
               color: isDark ? AppColors.bgElevated : AppColors.bgElevatedLight,
               child: Column(children: [
-                // Province
                 _PsgcDropdown(
                   value:       _provinceCode,
                   items:       _provinces,
@@ -611,7 +560,6 @@ class _KycVerificationScreenState
                   },
                 ),
                 Divider(height: 1, color: borderColor),
-                // City / Municipality
                 _PsgcDropdown(
                   value: _cityCode,
                   items: _cities,
@@ -628,7 +576,6 @@ class _KycVerificationScreenState
                   },
                 ),
                 Divider(height: 1, color: borderColor),
-                // Barangay
                 _PsgcDropdown(
                   value: _barangays.any((b) => b.name == _barangayName)
                       ? _barangays
@@ -645,19 +592,16 @@ class _KycVerificationScreenState
                   onChanged: (code) {
                     final item = _barangays.firstWhere((b) => b.code == code);
                     setState(() => _barangayName = item.name);
-                    // Use PSGC coordinates if available, else Nominatim
                     if (item.lat != null && item.lng != null) {
                       _moveMap(LatLng(item.lat!, item.lng!), 15);
                     } else {
-                      _flyToQuery(
-                          '${item.name}, $_cityName, Philippines', 15);
+                      _flyToQuery('${item.name}, $_cityName, Philippines', 15);
                     }
                   },
                 ),
               ]),
             ),
 
-            // Address preview pill
             if (_cityName.isNotEmpty)
               Container(
                 color: isDark
@@ -682,7 +626,6 @@ class _KycVerificationScreenState
                 ]),
               ),
 
-            // ── Interactive Map ──────────────────────────────────────────
             Stack(children: [
               SizedBox(
                 height: 220,
@@ -713,7 +656,6 @@ class _KycVerificationScreenState
                   ],
                 ),
               ),
-              // Hint overlay
               Positioned(
                 top: 8, left: 0, right: 0,
                 child: Center(
@@ -741,7 +683,6 @@ class _KycVerificationScreenState
               ),
             ]),
 
-            // Pin label (reverse-geocoded)
             if (_pin != null)
               Container(
                 color: isDark
@@ -865,18 +806,13 @@ class _KycVerificationScreenState
       ),
       const SizedBox(height: 28),
 
-      // ── FIX (white screen): wrap Back button in Expanded and override
-      //   minimumSize. The global outlinedButtonTheme sets
-      //   minimumSize: Size(double.infinity, 52) which causes a
-      //   RenderFlex overflow — and a white screen — when OutlinedButton
-      //   is placed in a Row without Expanded. ──────────────────────────
       Row(children: [
         Expanded(
           child: OutlinedButton.icon(
             icon:  const Icon(Icons.arrow_back_rounded, size: 16),
             label: const Text('Back'),
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 52), // remove double.infinity width
+              minimumSize: const Size(0, 52),
             ),
             onPressed: () => _goToStep(0),
           ),
@@ -910,7 +846,6 @@ class _KycVerificationScreenState
     required Color textPrim,
     required Color textSec,
     required Color textMuted,
-    required bool  isLoading,
   }) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Upload Documents',
@@ -921,11 +856,10 @@ class _KycVerificationScreenState
           style: TextStyle(color: textSec, fontSize: 13)),
       const SizedBox(height: 20),
 
-      // ── Upload boxes — stacked vertically for full-width layout ─────────
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _UploadBox(
           label:       "Driver's License",
-          hint:        'Front side of your Philippine driver\'s license',
+          hint:        "Front side of your Philippine driver's license",
           required:    true,
           file:        _licenseFile,
           textMuted:   textMuted,
@@ -940,7 +874,7 @@ class _KycVerificationScreenState
         const SizedBox(height: 16),
         _UploadBox(
           label:       'Valid Government ID',
-          hint:        'SSS, PhilHealth, UMID, Passport, Voter\'s ID, etc.',
+          hint:        "SSS, PhilHealth, UMID, Passport, Voter's ID, etc.",
           required:    true,
           file:        _validIdFile,
           textMuted:   textMuted,
@@ -974,34 +908,230 @@ class _KycVerificationScreenState
       ),
       const SizedBox(height: 24),
 
-      // ── FIX (white screen): same fix as step 1 ──────────────────────────
       Row(children: [
         Expanded(
           child: OutlinedButton.icon(
             icon:  const Icon(Icons.arrow_back_rounded, size: 16),
             label: const Text('Back'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 52),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+            onPressed: () => _goToStep(1),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: ElevatedButton.icon(
+            icon:  const Icon(Icons.arrow_forward_rounded, size: 18),
+            label: const Text('Continue',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            onPressed: _licenseFile != null && _validIdFile != null
+                ? () => _goToStep(3)
+                : null,
+          ),
+        ),
+      ]),
+      const SizedBox(height: 20),
+    ]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 3 — Rental Agreement
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildStep3({
+    required bool  isDark,
+    required Color borderColor,
+    required Color textPrim,
+    required Color textSec,
+    required Color textMuted,
+    required bool  isLoading,
+  }) {
+    final bool canSubmit = _agreementRead &&
+        _agreementChecked &&
+        _signatureCtrl.text.trim().isNotEmpty &&
+        !isLoading;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Rental Agreement',
+          style: TextStyle(
+              fontSize: 20, fontWeight: FontWeight.w800, color: textPrim)),
+      const SizedBox(height: 4),
+      Text('Please read the agreement carefully before submitting.',
+          style: TextStyle(color: textSec, fontSize: 13)),
+      const SizedBox(height: 16),
+
+      // Scrollable agreement box
+      Container(
+        height: 280,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.bgBase : const Color(0xFFF8F9FA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _agreementRead
+                ? AppColors.success.withOpacity(0.5)
+                : borderColor,
+            width: _agreementRead ? 1.5 : 1,
+          ),
+        ),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            if (!_agreementRead &&
+                n.metrics.pixels >= n.metrics.maxScrollExtent - 80) {
+              setState(() => _agreementRead = true);
+            }
+            return false;
+          },
+          child: SingleChildScrollView(
+            controller: _agreementScroll,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('SAKYAN VEHICLE RENTAL AGREEMENT',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: textPrim,
+                        letterSpacing: 0.3)),
+                const SizedBox(height: 4),
+                Text(
+                  'By completing this verification, you (the "Renter") agree '
+                  'to be bound by the following terms with the vehicle owner '
+                  'and Sakyan (the "Platform").',
+                  style: TextStyle(fontSize: 11, color: textSec, height: 1.5),
+                ),
+                const SizedBox(height: 14),
+                ..._clauses(textPrim, textSec),
+              ],
             ),
-            onPressed: isLoading ? null : () => _goToStep(1),
+          ),
+        ),
+      ),
+
+      // Read confirmation / scroll hint
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _agreementRead
+            ? Padding(
+                key: const ValueKey('read'),
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(children: [
+                  const Icon(Icons.check_circle_rounded,
+                      color: AppColors.success, size: 15),
+                  const SizedBox(width: 6),
+                  Text('You have read the full rental agreement.',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w600)),
+                ]),
+              )
+            : Padding(
+                key: const ValueKey('hint'),
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(children: [
+                  Icon(Icons.arrow_downward_rounded, color: textMuted, size: 14),
+                  const SizedBox(width: 6),
+                  Text('Scroll to the bottom to enable acceptance.',
+                      style: TextStyle(fontSize: 12, color: textMuted)),
+                ]),
+              ),
+      ),
+      const SizedBox(height: 16),
+
+      // Agree checkbox
+      GestureDetector(
+        onTap: _agreementRead
+            ? () => setState(() => _agreementChecked = !_agreementChecked)
+            : null,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 22, height: 22,
+            decoration: BoxDecoration(
+              color: _agreementChecked ? AppColors.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _agreementRead
+                    ? (_agreementChecked ? AppColors.primary : textMuted)
+                    : borderColor,
+                width: 1.5,
+              ),
+            ),
+            child: _agreementChecked
+                ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'I have read and agree to the Sakyan Rental Agreement and '
+              'understand my obligations as a Renter.',
+              style: TextStyle(
+                  fontSize: 13,
+                  color: _agreementRead ? textPrim : textMuted,
+                  height: 1.4),
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 20),
+
+      // Typed signature
+      _Field(
+        label: 'Type Your Full Name as Signature',
+        child: TextField(
+          controller: _signatureCtrl,
+          enabled:    _agreementChecked,
+          onChanged:  (_) => setState(() {}),
+          style: TextStyle(
+              color:     _agreementChecked ? textPrim : textMuted,
+              fontSize:  14,
+              fontStyle: FontStyle.italic),
+          decoration: InputDecoration(
+            hintText:  'e.g. Juan Dela Cruz',
+            hintStyle: TextStyle(color: textMuted, fontSize: 13),
+            filled:    true,
+            fillColor: isDark ? AppColors.bgElevated : AppColors.bgElevatedLight,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+            disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor.withOpacity(0.5))),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 14),
+          ),
+        ),
+      ),
+      const SizedBox(height: 24),
+
+      // Buttons
+      Row(children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            icon:  const Icon(Icons.arrow_back_rounded, size: 16),
+            label: const Text('Back'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+            onPressed: isLoading ? null : () => _goToStep(2),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           flex: 2,
           child: ElevatedButton(
-            onPressed: _licenseFile != null &&
-                    _validIdFile != null &&
-                    !isLoading
-                ? _submit
-                : null,
+            onPressed: canSubmit ? _submit : null,
             child: isLoading
                 ? const SizedBox(
-                    width:  20,
-                    height: 20,
+                    width: 20, height: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
-                : const Text('Submit Verification →',
+                : const Text('Submit Verification',
                     style: TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w700)),
           ),
@@ -1009,6 +1139,69 @@ class _KycVerificationScreenState
       ]),
       const SizedBox(height: 20),
     ]);
+  }
+
+  // ── Agreement clauses — plain text, no emojis ─────────────────────────────
+  List<Widget> _clauses(Color textPrim, Color textSec) {
+    final items = [
+      ('1. Vehicle Use',
+       'The Renter agrees to use the vehicle solely for lawful personal '
+       'transportation within the Philippines. Commercial use, racing, '
+       'off-road driving, or operation under the influence of alcohol or '
+       'controlled substances is strictly prohibited.'),
+      ('2. Rental Period',
+       'The Renter agrees to return the vehicle on or before the agreed '
+       'return date and time. Late returns may incur additional charges '
+       'as specified in the booking.'),
+      ('3. Drivers License Requirement',
+       'The Renter must hold a valid Philippine drivers license appropriate '
+       'for the vehicle category throughout the entire rental period.'),
+      ('4. Fuel Policy',
+       'The Renter shall return the vehicle with the same fuel level as at '
+       'the time of pickup. Failure to do so will result in a fueling surcharge.'),
+      ('5. Damage and Liability',
+       'The Renter is responsible for any damage occurring during the rental '
+       'period, including collision, scratches, and interior damage, except '
+       'for pre-existing damage documented at the time of handover.'),
+      ('6. Insurance',
+       'Third-party liability insurance as required by Philippine law is '
+       'included. Comprehensive coverage for the rented vehicle is the '
+       'responsibility of the vehicle owner unless otherwise agreed.'),
+      ('7. Traffic Violations and Fines',
+       'All traffic citations, parking fines, and toll fees incurred during '
+       'the rental period are the sole responsibility of the Renter.'),
+      ('8. Vehicle Condition',
+       'The Renter agrees to inspect the vehicle upon pickup and report any '
+       'pre-existing damage before driving. Unreported damage may result in '
+       'the Renter being held liable.'),
+      ('9. Personal Belongings',
+       'The Platform and vehicle owner are not responsible for personal '
+       'belongings left in the vehicle. Renters must remove all valuables '
+       'upon returning the vehicle.'),
+      ('10. Cancellation Policy',
+       'Cancellations must be made through the Sakyan platform. Refund '
+       'eligibility depends on the cancellation policy of the individual '
+       'partner as displayed at the time of booking.'),
+      ('11. Platform Authority',
+       'Sakyan reserves the right to suspend or terminate a Renters account '
+       'for violations of this agreement or platform policies without prior notice.'),
+      ('12. Governing Law',
+       'This agreement is governed by the laws of the Republic of the '
+       'Philippines. Disputes shall be settled through mediation or, '
+       'failing that, the courts of competent jurisdiction.'),
+    ];
+
+    final widgets = <Widget>[];
+    for (final (t, b) in items) {
+      widgets.add(Text(t,
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w700, color: textPrim)));
+      widgets.add(const SizedBox(height: 3));
+      widgets.add(Text(b,
+          style: TextStyle(fontSize: 11, color: textSec, height: 1.55)));
+      widgets.add(const SizedBox(height: 12));
+    }
+    return widgets;
   }
 }
 

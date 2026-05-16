@@ -109,6 +109,9 @@ class ConversationModel {
   final int unreadCount;
   final String carName;
 
+  /// True when this thread is a Sakyan Support conversation (no booking).
+  bool get isSupport => bookingId.isEmpty;
+
   const ConversationModel({
     required this.bookingId,
     required this.bookingCode,

@@ -1,6 +1,7 @@
 import '../../../core/constants/api_constants.dart';
 import '../../../core/services/api_service.dart';
 import '../models/car_model.dart';
+import '../models/partner_model.dart';
 class CarsRepository {
   const CarsRepository();
   /// Fetch all public cars with optional filters.
@@ -10,6 +11,7 @@ class CarsRepository {
     String? fuelType,
     double? maxPrice,
     int? minSeats,
+    String? partnerId,
   }) async {
     final params = <String, dynamic>{};
     if (search != null && search.isNotEmpty) params['search'] = search;
@@ -17,6 +19,7 @@ class CarsRepository {
     if (fuelType != null)                   params['fuel_type'] = fuelType;
     if (maxPrice != null)                   params['max_price'] = maxPrice;
     if (minSeats != null)                   params['min_seats'] = minSeats;
+    if (partnerId != null)                  params['partner_id'] = partnerId;
     final res = await ApiService.get(ApiConstants.cars, params: params);
     final raw = res.data;
     // Backend may return paginated {results:[]} or plain list
@@ -44,5 +47,26 @@ class CarsRepository {
       return raw.map((e) => Map<String, String>.from(e as Map)).toList();
     }
     return [];
+  }
+
+  /// Fetch all approved partners (for filter sheet).
+  Future<List<ApprovedPartnerModel>> getApprovedPartners() async {
+    try {
+      final res = await ApiService.get(ApiConstants.approvedPartners);
+      final raw = res.data;
+      List list;
+      if (raw is List) {
+        list = raw;
+      } else if (raw is Map && raw['results'] is List) {
+        list = raw['results'] as List;
+      } else {
+        list = [];
+      }
+      return list
+          .map((e) => ApprovedPartnerModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 }

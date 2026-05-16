@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../shared/widgets/messages_app_bar_action.dart';
 import '../../cars/models/car_model.dart';
 import '../../cars/providers/cars_provider.dart';
+import '../widgets/featured_banner_widget.dart';
 
 // ── View mode ─────────────────────────────────────────────────────────────────
 enum _ViewMode { grid, list }
@@ -80,6 +82,7 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
         backgroundColor: scaffoldBg,
         title: const Text('Browse Cars'),
         actions: [
+          const MessagesAppBarAction(),
           // Grid / List toggle
           IconButton(
             icon: Icon(
@@ -99,6 +102,8 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
       ),
       body: Column(
         children: [
+          // ── Featured Partner Banner ────────────────────────────────────────
+          const FeaturedBannerWidget(),
           // ── Search + Filter bar ──────────────────────────────────────────
           Container(
             color: scaffoldBg,
@@ -300,6 +305,16 @@ class _CarsListScreenState extends ConsumerState<CarsListScreen> {
                         ),
                       ],
                     ],
+                  ),
+                ),
+
+                // ── Partner pills row ────────────────────────────────────────
+                const SizedBox(height: 10),
+                _PartnerPillsRow(
+                  selectedPartnerId: filters.partnerId,
+                  isDark: isDark,
+                  onSelect: (id) => _updateFilter(
+                    (f) => f.copyWith(partnerId: id == f.partnerId ? null : id),
                   ),
                 ),
 
@@ -512,10 +527,227 @@ class _QuickPill extends StatelessWidget {
   }
 }
 
+// ── Partner Pills Row ─────────────────────────────────────────────────────────
+class _PartnerPillsRow extends ConsumerWidget {
+  final String? selectedPartnerId;
+  final bool isDark;
+  final ValueChanged<String?> onSelect;
+
+  const _PartnerPillsRow({
+    required this.selectedPartnerId,
+    required this.isDark,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final partnersAsync = ref.watch(approvedPartnersProvider);
+
+    final bg     = isDark ? AppColors.bgSurface    : AppColors.bgSurfaceLight;
+    final border = isDark ? AppColors.border        : AppColors.borderLight;
+    final text   = isDark ? AppColors.textMuted     : AppColors.textMutedLight;
+    final textPrim = isDark ? AppColors.textPrimary : AppColors.textPrimaryLight;
+
+    return partnersAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (partners) {
+        if (partners.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section label
+            Row(
+              children: [
+                const Icon(Icons.storefront_rounded,
+                    size: 12, color: AppColors.primary),
+                const SizedBox(width: 5),
+                Text(
+                  'Our Partners',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: textPrim,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // "All" pill
+                  _PartnerPill(
+                    label: 'All',
+                    isAll: true,
+                    selected: selectedPartnerId == null,
+                    logoUrl: null,
+                    isDark: isDark,
+                    bg: bg,
+                    border: border,
+                    text: text,
+                    onTap: () => onSelect(null),
+                  ),
+                  ...partners.map((p) {
+                    final sel = selectedPartnerId == p.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _PartnerPill(
+                        label: p.displayName,
+                        isAll: false,
+                        selected: sel,
+                        logoUrl: p.logoUrl,
+                        isDark: isDark,
+                        bg: bg,
+                        border: border,
+                        text: text,
+                        onTap: () => onSelect(p.id),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PartnerPill extends StatelessWidget {
+  final String label;
+  final bool isAll, selected, isDark;
+  final String? logoUrl;
+  final Color bg, border, text;
+  final VoidCallback onTap;
+
+  const _PartnerPill({
+    required this.label,
+    required this.isAll,
+    required this.selected,
+    required this.isDark,
+    required this.bg,
+    required this.border,
+    required this.text,
+    required this.onTap,
+    this.logoUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Build initials from label
+    final words = label.trim().split(' ');
+    final initials = words.length > 1
+        ? '${words[0][0]}${words[1][0]}'.toUpperCase()
+        : label.substring(0, label.length > 2 ? 2 : label.length).toUpperCase();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.fromLTRB(8, 6, 12, 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withOpacity(0.12)
+              : bg,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: selected ? AppColors.primary : border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Avatar circle
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary
+                    : (isDark
+                        ? AppColors.bgElevated
+                        : AppColors.bgElevatedLight),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primary.withOpacity(0.5)
+                      : border,
+                  width: 1,
+                ),
+              ),
+              child: isAll
+                  ? Icon(
+                      Icons.directions_car_rounded,
+                      size: 14,
+                      color: selected ? Colors.white : AppColors.primary,
+                    )
+                  : ClipOval(
+                      child: logoUrl != null
+                          ? Image.network(
+                              logoUrl!,
+                              width: 28, height: 28,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                  initials,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: selected
+                                        ? Colors.white
+                                        : (isDark
+                                            ? AppColors.textMuted
+                                            : AppColors.textMutedLight),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                initials,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: selected
+                                      ? Colors.white
+                                      : (isDark
+                                          ? AppColors.textMuted
+                                          : AppColors.textMutedLight),
+                                ),
+                              ),
+                            ),
+                    ),
+            ),
+            const SizedBox(width: 7),
+            // Label
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 80),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? AppColors.primary : text,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FILTER SHEET
 // ─────────────────────────────────────────────────────────────────────────────
-class _FilterSheet extends StatefulWidget {
+class _FilterSheet extends ConsumerStatefulWidget {
   final CarFilters initial;
   final bool isDark;
   final ValueChanged<CarFilters> onApply;
@@ -529,10 +761,10 @@ class _FilterSheet extends StatefulWidget {
   });
 
   @override
-  State<_FilterSheet> createState() => _FilterSheetState();
+  ConsumerState<_FilterSheet> createState() => _FilterSheetState();
 }
 
-class _FilterSheetState extends State<_FilterSheet> {
+class _FilterSheetState extends ConsumerState<_FilterSheet> {
   late CarFilters _draft;
 
   // Price range — use 0 when no min, 10000 as upper cap
@@ -859,6 +1091,54 @@ class _FilterSheetState extends State<_FilterSheet> {
                               () => _draft = _draft.copyWith(minSeats: s)),
                         );
                       }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Rental Company ─────────────────────────────────────
+                    _SheetSection(
+                        label: 'Rental Company', textMuted: textMuted),
+                    const SizedBox(height: 10),
+                    ref.watch(approvedPartnersProvider).when(
+                      loading: () => const Center(
+                        child: SizedBox(
+                          height: 24, width: 24,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.primary),
+                        ),
+                      ),
+                      error: (_, __) => Text(
+                        'Could not load partners',
+                        style: TextStyle(color: textMuted, fontSize: 12),
+                      ),
+                      data: (partners) {
+                        if (partners.isEmpty) {
+                          return Text(
+                            'No partners available',
+                            style: TextStyle(color: textMuted, fontSize: 12),
+                          );
+                        }
+                        return Wrap(
+                          spacing: 8, runSpacing: 8,
+                          children: [
+                            // "Any" chip
+                            _SheetChip(
+                              label: 'Any',
+                              selected: _draft.partnerId == null,
+                              isDark: isDark,
+                              onTap: () => setState(() => _draft =
+                                  _draft.copyWith(partnerId: null)),
+                            ),
+                            // One chip per partner
+                            ...partners.map((p) => _SheetChip(
+                              label: p.displayName,
+                              selected: _draft.partnerId == p.id,
+                              isDark: isDark,
+                              onTap: () => setState(() => _draft =
+                                  _draft.copyWith(partnerId: p.id)),
+                            )),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 32),
                   ],

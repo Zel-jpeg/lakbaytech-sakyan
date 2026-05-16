@@ -10,8 +10,10 @@ class ApiConstants {
   static const String profile  = '/auth/profile';
 
   // Cars
-  static const String cars        = '/cars/';
-  static const String publicStats = '/public/stats/';
+  static const String cars           = '/cars/';
+  static const String publicStats    = '/public/stats/';
+  static const String publicFeatured = '/public/featured/';
+  static const String approvedPartners = '/partners/approved/';
 
   static String carDetail(String id)      => '/cars/$id/';
   static String carBookedDates(String id) => '/cars/$id/booked-dates/';

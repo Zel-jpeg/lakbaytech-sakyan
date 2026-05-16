@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -114,20 +114,40 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = conversation;
-    final hasUnread = c.unreadCount > 0;
-    final initials = c.otherUserName.isNotEmpty
-        ? c.otherUserName
-            .trim()
-            .split(' ')
-            .map((w) => w[0])
-            .take(2)
-            .join()
-            .toUpperCase()
-        : '?';
+    final hasUnread   = c.unreadCount > 0;
+    final isSupport   = c.isSupport;
+
+    // Display name: Sakyan Support for support thread, partner name otherwise
+    final displayName = isSupport
+        ? 'Sakyan Support'
+        : (c.otherUserName.isNotEmpty ? c.otherUserName : 'Partner');
+
+    final initials = isSupport
+        ? 'S'
+        : (c.otherUserName.isNotEmpty
+            ? c.otherUserName
+                .trim()
+                .split(' ')
+                .map((w) => w[0])
+                .take(2)
+                .join()
+                .toUpperCase()
+            : 'P');
 
     return GestureDetector(
-      onTap: () => context.push('/chat/${c.bookingId}',
-          extra: {'receiverId': c.otherUserId, 'name': c.otherUserName, 'carName': c.carName}),
+      onTap: () {
+        if (isSupport) {
+          // Navigate to support chat (special route with no booking ID)
+          context.push('/support-chat');
+        } else {
+          context.push('/chat/${c.bookingId}',
+              extra: {
+                'receiverId': c.otherUserId,
+                'name': c.otherUserName,
+                'carName': c.carName,
+              });
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -146,18 +166,46 @@ class _ConversationTile extends StatelessWidget {
             // Avatar
             Stack(
               children: [
-                c.otherUserAvatar.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          c.otherUserAvatar,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _AvatarFallback(initials: initials),
+                if (isSupport)
+                  // Sakyan Support avatar — shield icon
+                  Container(
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryDark],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
-                      )
-                    : _AvatarFallback(initials: initials),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.shield_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  )
+                else if (c.otherUserAvatar.isNotEmpty)
+                  ClipOval(
+                    child: Image.network(
+                      c.otherUserAvatar,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _AvatarFallback(initials: initials),
+                    ),
+                  )
+                else
+                  _AvatarFallback(initials: initials),
                 if (hasUnread)
                   Positioned(
                     right: 0,
@@ -193,18 +241,42 @@ class _ConversationTile extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          c.otherUserName.isNotEmpty
-                              ? c.otherUserName
-                              : 'Partner',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: hasUnread
-                                ? FontWeight.w700
-                                : FontWeight.w600,
-                            color: textPrim,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayName,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: hasUnread
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  color: textPrim,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isSupport) ...{
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Support',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            },
+                          ],
                         ),
                       ),
                       Text(
@@ -222,11 +294,17 @@ class _ConversationTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  if (c.carName.isNotEmpty)
+                  if (!isSupport && c.carName.isNotEmpty)
                     Text(c.carName,
                         style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.primary,
+                            fontWeight: FontWeight.w500)),
+                  if (isSupport)
+                    Text('Ask questions or report issues',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primary.withOpacity(0.7),
                             fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text(

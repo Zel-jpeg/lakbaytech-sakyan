@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/router/app_router.dart';
+import '../../../shared/widgets/messages_app_bar_action.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cars/models/car_model.dart';
 import '../../cars/providers/cars_provider.dart';
@@ -121,6 +122,7 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
             actions: [
+              const MessagesAppBarAction(),
               IconButton(
                 icon: Icon(Icons.notifications_outlined, color: textPrim),
                 onPressed: () => context.push(AppRoutes.notifications),

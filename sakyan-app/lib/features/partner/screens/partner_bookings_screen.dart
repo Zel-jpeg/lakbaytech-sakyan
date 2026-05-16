@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -23,6 +23,7 @@ class _PartnerBookingsScreenState
     'Pending',
     'Active',
     'Completed',
+    'Cancelled',
   ];
 
   List<BookingModel> _filter(List<BookingModel> all) {
@@ -32,9 +33,9 @@ class _PartnerBookingsScreenState
       case 2:
         return all.where((b) => b.isApproved || b.isActive).toList();
       case 3:
-        return all
-            .where((b) => b.isCompleted || b.isCancelled || b.isRejected)
-            .toList();
+        return all.where((b) => b.isCompleted).toList();
+      case 4:
+        return all.where((b) => b.isCancelled || b.isRejected).toList();
       default:
         return all;
     }
