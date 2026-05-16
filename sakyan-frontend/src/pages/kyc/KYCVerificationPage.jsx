@@ -322,42 +322,34 @@ function FileUploadBox({ label, hint, url, onUploaded, onClear, required }) {
 const AGREEMENT_SECTIONS = [
   {
     num: 1, title: 'Identification of Parties',
-    icon: '🪪',
     body: 'The Renter confirms that all identity documents submitted during KYC verification are authentic, valid, and belong to them. Any fraudulent submission is grounds for immediate account termination and legal action under applicable Philippine laws.',
   },
   {
     num: 2, title: 'Permitted Vehicle Use',
-    icon: '🚗',
     body: 'The rented vehicle shall be used solely for lawful purposes within the Republic of the Philippines. The Renter agrees not to use the vehicle for any illegal activities, including but not limited to: drug trafficking, criminal transport, unauthorized racing, or any activity that violates Philippine law.',
   },
   {
     num: 3, title: 'Driver Responsibility',
-    icon: '🪪',
     body: 'Only the Renter (whose name appears in the KYC verification) is authorized to operate the rented vehicle, unless a written authorization from the Partner is obtained prior to the rental. The Renter assumes full legal liability for any unauthorized use of the vehicle by a third party.',
   },
   {
     num: 4, title: 'Damage Liability',
-    icon: '🛡️',
     body: 'The Renter is fully liable for any physical damage, mechanical damage, vandalism, theft, or loss of the vehicle that occurs during the rental period. This includes damage caused by weather events if proper precautions were not taken. The Renter agrees to compensate the Partner for the full cost of repair or replacement of the vehicle at fair market value. Documentation of the vehicle\'s condition before and after rental (photos/videos) as provided by the Partner shall serve as primary evidence.',
   },
   {
     num: 5, title: 'Traffic Violations & Penalties',
-    icon: '🚦',
     body: 'The Renter is solely responsible for all traffic violations, fines, penalties, and fees incurred during the rental period, including but not limited to: speeding tickets, illegal parking fines, MMDA/LTO violations, and road toll charges. The Renter agrees to indemnify and hold the Partner harmless from any liability arising from such violations.',
   },
   {
     num: 6, title: 'Fuel Policy',
-    icon: '⛽',
     body: 'The vehicle must be returned with the same fuel level as at the time of pickup, as documented by the Partner. Failure to return the vehicle with the same fuel level will result in a fuel reimbursement charge at the prevailing market rate plus an applicable service fee determined by the Partner.',
   },
   {
     num: 7, title: 'Late Return Policy',
-    icon: '⏰',
     body: 'The vehicle must be returned at the agreed date and time as specified in the booking confirmation. Late returns will be subject to additional charges at the Partner\'s daily rate, prorated per hour or per day depending on the Partner\'s policy. The Renter must notify the Partner at least 2 hours before the scheduled return time if an extension is needed.',
   },
   {
     num: 8, title: 'Prohibited Uses',
-    icon: '🚫',
     body: null,
     list: [
       'Subletting or re-renting the vehicle to any third party',
@@ -369,22 +361,18 @@ const AGREEMENT_SECTIONS = [
   },
   {
     num: 9, title: 'Insurance Acknowledgment',
-    icon: '📋',
     body: 'The Renter acknowledges that no comprehensive insurance coverage is included in the rental fee unless explicitly stated by the Partner in writing. The Renter is encouraged to secure personal accident insurance or comprehensive rental insurance at their own expense. The minimum CTPL (Compulsory Third Party Liability) insurance required by Philippine law shall be maintained by the Partner at their expense; however, any claim exceeding CTPL coverage due to the Renter\'s negligence shall be the Renter\'s sole responsibility.',
   },
   {
     num: 10, title: 'Governing Law & Dispute Resolution',
-    icon: '⚖️',
     body: 'This Agreement shall be governed by the laws of the Republic of the Philippines. In the event of a dispute between the Renter and the Partner, both parties agree to first attempt resolution through good-faith negotiation. If unresolved within 15 days, disputes shall be referred to the Barangay Lupon ng Tagapamayapa for mediation before escalating to court proceedings, in accordance with the Katarungang Pambarangay Law (RA 7160).',
   },
   {
     num: 11, title: 'Platform Role',
-    icon: '💻',
     body: 'Sakyan acts solely as a technology platform connecting Renters and Partners. Sakyan is not a party to the rental transaction and is not liable for disputes arising from the rental. Sakyan reserves the right to suspend or terminate accounts that violate platform policies.',
   },
   {
     num: 12, title: 'Agreement to Terms',
-    icon: '✅',
     body: 'By typing your full legal name below and checking the acknowledgment box, you confirm that:',
     list: [
       'You have read, understood, and agree to all terms of this Agreement',
