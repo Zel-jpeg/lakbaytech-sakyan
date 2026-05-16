@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import PublicLayout from '@/components/layout/PublicLayout'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import ScrollToTop from '@/components/common/ScrollToTop'
 
 // Auth
 import LoginPage from '@/pages/auth/LoginPage'
@@ -92,6 +93,7 @@ export default function App() {
   return (
     <>
       <AppInit />
+      <ScrollToTop />
       <Routes>
 
       {/* ── Public + Booking: share PublicLayout (Navbar + Footer) ── */}

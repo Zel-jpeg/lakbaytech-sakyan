@@ -57,13 +57,14 @@ const step2Schema = z.object({
 })
 
 const ID_TYPE_OPTIONS = [
-  { value: 'passport',   label: 'Passport' },
-  { value: 'sss',        label: 'SSS ID' },
-  { value: 'philhealth', label: 'PhilHealth ID' },
-  { value: 'postal',     label: 'Postal ID' },
-  { value: 'voters',     label: "Voter's ID" },
-  { value: 'prc',        label: 'PRC ID' },
-  { value: 'umid',       label: 'UMID' },
+  { value: 'national_id', label: 'Philippine National ID (PhilSys)' },
+  { value: 'passport',    label: 'Passport' },
+  { value: 'sss',         label: 'SSS ID' },
+  { value: 'philhealth',  label: 'PhilHealth ID' },
+  { value: 'postal',      label: 'Postal ID' },
+  { value: 'voters',      label: "Voter's ID" },
+  { value: 'prc',         label: 'PRC ID' },
+  { value: 'umid',        label: 'UMID' },
 ]
 
 // ── Shared input classname ────────────────────────────────────────────────────
@@ -317,84 +318,84 @@ function FileUploadBox({ label, hint, url, onUploaded, onClear, required }) {
   )
 }
 
-// ── Rental Agreement Text ─────────────────────────────────────────────────────
-const RENTAL_AGREEMENT = `CAR RENTAL AGREEMENT — SAKYAN PLATFORM
-Effective upon KYC submission
+// ── Rental Agreement Sections (structured data for modern rendering) ──────────
+const AGREEMENT_SECTIONS = [
+  {
+    num: 1, title: 'Identification of Parties',
+    icon: '🪪',
+    body: 'The Renter confirms that all identity documents submitted during KYC verification are authentic, valid, and belong to them. Any fraudulent submission is grounds for immediate account termination and legal action under applicable Philippine laws.',
+  },
+  {
+    num: 2, title: 'Permitted Vehicle Use',
+    icon: '🚗',
+    body: 'The rented vehicle shall be used solely for lawful purposes within the Republic of the Philippines. The Renter agrees not to use the vehicle for any illegal activities, including but not limited to: drug trafficking, criminal transport, unauthorized racing, or any activity that violates Philippine law.',
+  },
+  {
+    num: 3, title: 'Driver Responsibility',
+    icon: '🪪',
+    body: 'Only the Renter (whose name appears in the KYC verification) is authorized to operate the rented vehicle, unless a written authorization from the Partner is obtained prior to the rental. The Renter assumes full legal liability for any unauthorized use of the vehicle by a third party.',
+  },
+  {
+    num: 4, title: 'Damage Liability',
+    icon: '🛡️',
+    body: 'The Renter is fully liable for any physical damage, mechanical damage, vandalism, theft, or loss of the vehicle that occurs during the rental period. This includes damage caused by weather events if proper precautions were not taken. The Renter agrees to compensate the Partner for the full cost of repair or replacement of the vehicle at fair market value. Documentation of the vehicle\'s condition before and after rental (photos/videos) as provided by the Partner shall serve as primary evidence.',
+  },
+  {
+    num: 5, title: 'Traffic Violations & Penalties',
+    icon: '🚦',
+    body: 'The Renter is solely responsible for all traffic violations, fines, penalties, and fees incurred during the rental period, including but not limited to: speeding tickets, illegal parking fines, MMDA/LTO violations, and road toll charges. The Renter agrees to indemnify and hold the Partner harmless from any liability arising from such violations.',
+  },
+  {
+    num: 6, title: 'Fuel Policy',
+    icon: '⛽',
+    body: 'The vehicle must be returned with the same fuel level as at the time of pickup, as documented by the Partner. Failure to return the vehicle with the same fuel level will result in a fuel reimbursement charge at the prevailing market rate plus an applicable service fee determined by the Partner.',
+  },
+  {
+    num: 7, title: 'Late Return Policy',
+    icon: '⏰',
+    body: 'The vehicle must be returned at the agreed date and time as specified in the booking confirmation. Late returns will be subject to additional charges at the Partner\'s daily rate, prorated per hour or per day depending on the Partner\'s policy. The Renter must notify the Partner at least 2 hours before the scheduled return time if an extension is needed.',
+  },
+  {
+    num: 8, title: 'Prohibited Uses',
+    icon: '🚫',
+    body: null,
+    list: [
+      'Subletting or re-renting the vehicle to any third party',
+      'Using the vehicle for off-road or rough terrain driving unless explicitly permitted by the Partner',
+      'Transporting hazardous, illegal, or prohibited goods',
+      'Using the vehicle for paid driving services (e.g., Grab, Lalamove) without prior Partner consent',
+      'Tampering with, modifying, or removing any part of the vehicle',
+    ],
+  },
+  {
+    num: 9, title: 'Insurance Acknowledgment',
+    icon: '📋',
+    body: 'The Renter acknowledges that no comprehensive insurance coverage is included in the rental fee unless explicitly stated by the Partner in writing. The Renter is encouraged to secure personal accident insurance or comprehensive rental insurance at their own expense. The minimum CTPL (Compulsory Third Party Liability) insurance required by Philippine law shall be maintained by the Partner at their expense; however, any claim exceeding CTPL coverage due to the Renter\'s negligence shall be the Renter\'s sole responsibility.',
+  },
+  {
+    num: 10, title: 'Governing Law & Dispute Resolution',
+    icon: '⚖️',
+    body: 'This Agreement shall be governed by the laws of the Republic of the Philippines. In the event of a dispute between the Renter and the Partner, both parties agree to first attempt resolution through good-faith negotiation. If unresolved within 15 days, disputes shall be referred to the Barangay Lupon ng Tagapamayapa for mediation before escalating to court proceedings, in accordance with the Katarungang Pambarangay Law (RA 7160).',
+  },
+  {
+    num: 11, title: 'Platform Role',
+    icon: '💻',
+    body: 'Sakyan acts solely as a technology platform connecting Renters and Partners. Sakyan is not a party to the rental transaction and is not liable for disputes arising from the rental. Sakyan reserves the right to suspend or terminate accounts that violate platform policies.',
+  },
+  {
+    num: 12, title: 'Agreement to Terms',
+    icon: '✅',
+    body: 'By typing your full legal name below and checking the acknowledgment box, you confirm that:',
+    list: [
+      'You have read, understood, and agree to all terms of this Agreement',
+      'The information submitted in your KYC is accurate and authentic',
+      'You understand that this constitutes a legally binding digital signature',
+    ],
+  },
+]
 
-This Car Rental Agreement ("Agreement") is entered into between the Renter (the individual completing this KYC verification, hereinafter "Renter") and the Car Rental Partner listed on the Sakyan platform ("Partner"), facilitated by Sakyan ("Platform").
-
-By completing this KYC verification, the Renter agrees to be legally bound by the following terms and conditions for any car rental booked through the Sakyan platform.
-
-─────────────────────────────────────────────────────
-1. IDENTIFICATION OF PARTIES
-─────────────────────────────────────────────────────
-The Renter confirms that all identity documents submitted during KYC verification are authentic, valid, and belong to them. Any fraudulent submission is grounds for immediate account termination and legal action under applicable Philippine laws.
-
-─────────────────────────────────────────────────────
-2. PERMITTED VEHICLE USE
-─────────────────────────────────────────────────────
-The rented vehicle shall be used solely for lawful purposes within the Republic of the Philippines. The Renter agrees not to use the vehicle for any illegal activities, including but not limited to: drug trafficking, criminal transport, unauthorized racing, or any activity that violates Philippine law.
-
-─────────────────────────────────────────────────────
-3. DRIVER RESPONSIBILITY
-─────────────────────────────────────────────────────
-Only the Renter (whose name appears in the KYC verification) is authorized to operate the rented vehicle, unless a written authorization from the Partner is obtained prior to the rental. The Renter assumes full legal liability for any unauthorized use of the vehicle by a third party.
-
-─────────────────────────────────────────────────────
-4. DAMAGE LIABILITY
-─────────────────────────────────────────────────────
-The Renter is fully liable for any physical damage, mechanical damage, vandalism, theft, or loss of the vehicle that occurs during the rental period. This includes damage caused by weather events if proper precautions were not taken. The Renter agrees to compensate the Partner for the full cost of repair or replacement of the vehicle at fair market value. Documentation of the vehicle's condition before and after rental (photos/videos) as provided by the Partner shall serve as primary evidence.
-
-─────────────────────────────────────────────────────
-5. TRAFFIC VIOLATIONS AND PENALTIES
-─────────────────────────────────────────────────────
-The Renter is solely responsible for all traffic violations, fines, penalties, and fees incurred during the rental period, including but not limited to: speeding tickets, illegal parking fines, MMDA/LTO violations, and road toll charges. The Renter agrees to indemnify and hold the Partner harmless from any liability arising from such violations.
-
-─────────────────────────────────────────────────────
-6. FUEL POLICY
-─────────────────────────────────────────────────────
-The vehicle must be returned with the same fuel level as at the time of pickup, as documented by the Partner. Failure to return the vehicle with the same fuel level will result in a fuel reimbursement charge at the prevailing market rate plus an applicable service fee determined by the Partner.
-
-─────────────────────────────────────────────────────
-7. LATE RETURN POLICY
-─────────────────────────────────────────────────────
-The vehicle must be returned at the agreed date and time as specified in the booking confirmation. Late returns will be subject to additional charges at the Partner's daily rate, prorated per hour or per day depending on the Partner's policy. The Renter must notify the Partner at least 2 hours before the scheduled return time if an extension is needed.
-
-─────────────────────────────────────────────────────
-8. PROHIBITED USES
-─────────────────────────────────────────────────────
-The Renter is strictly prohibited from:
-(a) Subletting or re-renting the vehicle to any third party;
-(b) Using the vehicle for off-road or rough terrain driving unless explicitly permitted by the Partner;
-(c) Transporting hazardous, illegal, or prohibited goods;
-(d) Using the vehicle for paid driving services (e.g., Grab, Lalamove) without prior Partner consent;
-(e) Tampering with, modifying, or removing any part of the vehicle.
-
-─────────────────────────────────────────────────────
-9. INSURANCE ACKNOWLEDGMENT
-─────────────────────────────────────────────────────
-The Renter acknowledges that no comprehensive insurance coverage is included in the rental fee unless explicitly stated by the Partner in writing. The Renter is encouraged to secure personal accident insurance or comprehensive rental insurance at their own expense. The minimum CTPL (Compulsory Third Party Liability) insurance required by Philippine law shall be maintained by the Partner at their expense; however, any claim exceeding CTPL coverage due to the Renter's negligence shall be the Renter's sole responsibility.
-
-─────────────────────────────────────────────────────
-10. GOVERNING LAW AND DISPUTE RESOLUTION
-─────────────────────────────────────────────────────
-This Agreement shall be governed by the laws of the Republic of the Philippines. In the event of a dispute between the Renter and the Partner, both parties agree to first attempt resolution through good-faith negotiation. If unresolved within 15 days, disputes shall be referred to the Barangay Lupon ng Tagapamayapa for mediation before escalating to court proceedings, in accordance with the Katarungang Pambarangay Law (RA 7160).
-
-─────────────────────────────────────────────────────
-11. PLATFORM ROLE
-─────────────────────────────────────────────────────
-Sakyan acts solely as a technology platform connecting Renters and Partners. Sakyan is not a party to the rental transaction and is not liable for disputes arising from the rental. Sakyan reserves the right to suspend or terminate accounts that violate platform policies.
-
-─────────────────────────────────────────────────────
-12. AGREEMENT TO TERMS
-─────────────────────────────────────────────────────
-By typing your full legal name below and checking the acknowledgment box, you confirm that:
-• You have read, understood, and agree to all terms of this Agreement;
-• The information submitted in your KYC is accurate and authentic;
-• You understand that this constitutes a legally binding digital signature.`
-
-// ── Rental Agreement Step Component ──────────────────────────────────────────
-function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
+// ── Rental Agreement Step Component (Modern UI) ─────────────────────────────
+function RentalAgreementStep({ onBack, onSubmit, isSubmitting, onCancel }) {
   const { user } = useAuthStore()
   const [agreed, setAgreed] = useState(false)
   const [signature, setSignature] = useState('')
@@ -415,30 +416,94 @@ function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
   return (
     <div className="space-y-5">
       <div className="mb-4">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Rental Agreement</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-sm shadow-md">📜</span>
+          Rental Agreement
+        </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Read and sign the agreement before submitting your verification.
         </p>
       </div>
 
-      {/* Scrollable agreement */}
+      {/* Scrollable modern agreement */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="h-64 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-xl
-                   bg-gray-50 dark:bg-gray-800/50 p-4 text-xs text-gray-700 dark:text-gray-300
-                   leading-relaxed whitespace-pre-line font-mono scroll-smooth"
+        className="h-80 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700
+                   bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900/60
+                   scroll-smooth"
       >
-        {RENTAL_AGREEMENT}
+        {/* Agreement Header */}
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-brand-500 to-brand-600
+                        px-5 py-4 text-white">
+          <h3 className="text-base font-bold tracking-tight">Car Rental Agreement</h3>
+          <p className="text-xs text-brand-100 mt-0.5">Sakyan Platform · Effective upon KYC submission</p>
+        </div>
+
+        <div className="px-5 py-4">
+          {/* Preamble */}
+          <div className="mb-5 p-4 rounded-xl bg-brand-50/60 dark:bg-brand-900/15
+                          border border-brand-100 dark:border-brand-800">
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              This Car Rental Agreement ("Agreement") is entered into between the <strong>Renter</strong> (the individual completing this KYC verification) and the <strong>Car Rental Partner</strong> listed on the Sakyan platform, facilitated by <strong>Sakyan</strong> ("Platform").
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
+              By completing this KYC verification, the Renter agrees to be legally bound by the following terms and conditions.
+            </p>
+          </div>
+
+          {/* Sections */}
+          <div className="space-y-3">
+            {AGREEMENT_SECTIONS.map((section) => (
+              <div key={section.num}
+                className="group rounded-xl border border-gray-100 dark:border-gray-700/60
+                           bg-white dark:bg-gray-800/40 p-4 transition
+                           hover:border-brand-200 dark:hover:border-brand-700/50
+                           hover:shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="shrink-0 w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-700/60
+                                   flex items-center justify-center text-sm">
+                    {section.icon}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <span className="text-brand-500 mr-1.5">{section.num}.</span>
+                      {section.title}
+                    </h4>
+                    {section.body && (
+                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mt-1.5">
+                        {section.body}
+                      </p>
+                    )}
+                    {section.list && (
+                      <ul className="mt-2 space-y-1">
+                        {section.list.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                            <span className="text-brand-400 mt-0.5 shrink-0">•</span>
+                            <span className="leading-relaxed">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {!hasScrolled && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5
+                      bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800
+                      rounded-lg px-3 py-2">
           <Info size={12} /> Please scroll through the entire agreement to continue.
         </p>
       )}
       {hasScrolled && (
-        <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1.5">
+        <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1.5
+                      bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800
+                      rounded-lg px-3 py-2">
           <CheckCircle2 size={12} /> You have read the full agreement.
         </p>
       )}
@@ -506,6 +571,12 @@ function RentalAgreementStep({ onBack, onSubmit, isSubmitting }) {
 
       {/* Actions */}
       <div className="flex gap-3 pt-1">
+        <button type="button" onClick={onCancel}
+          className="flex items-center gap-1.5 px-5 py-3 border border-red-200 dark:border-red-800
+                     rounded-xl text-sm font-medium text-red-500 dark:text-red-400
+                     hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+          <X size={15} /> Cancel
+        </button>
         <button type="button" onClick={onBack}
           className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700
                      rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400
@@ -704,6 +775,12 @@ export default function KYCVerificationPage() {
                 </select>
               </Field>
               <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => navigate(-1)}
+                  className="flex items-center gap-1.5 px-5 py-3 border border-red-200 dark:border-red-800
+                             rounded-xl text-sm font-medium text-red-500 dark:text-red-400
+                             hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                  <X size={15} /> Cancel
+                </button>
                 <button type="button" onClick={() => setStep(0)} className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-brand-300 dark:hover:border-brand-600 transition">
                   <ArrowLeft size={15} /> Back
                 </button>
@@ -750,6 +827,12 @@ export default function KYCVerificationPage() {
               </div>
 
               <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => navigate(-1)}
+                  className="flex items-center gap-1.5 px-5 py-3 border border-red-200 dark:border-red-800
+                             rounded-xl text-sm font-medium text-red-500 dark:text-red-400
+                             hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                  <X size={15} /> Cancel
+                </button>
                 <button type="button" onClick={() => setStep(1)}
                   className="flex items-center gap-1.5 px-5 py-3 border border-gray-200 dark:border-gray-700
                              rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400
@@ -780,6 +863,7 @@ export default function KYCVerificationPage() {
           {step === 3 && (
             <RentalAgreementStep
               onBack={() => setStep(2)}
+              onCancel={() => navigate(-1)}
               onSubmit={handleFinalSubmit}
               isSubmitting={submitKYC.isPending}
             />
