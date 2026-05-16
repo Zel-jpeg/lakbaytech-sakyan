@@ -38,7 +38,17 @@ export default function CarsPage() {
   const { data, isLoading } = useCars({ ...debouncedFilters, ordering: sort })
   const cars = data?.results || data || []
 
-  // Sync to URL
+  // Sync URL → filters when navigating to /cars?partner_id=xxx
+  // (e.g. clicking FeaturedBanner while already on this page)
+  useEffect(() => {
+    const urlPartnerId = searchParams.get('partner_id') || ''
+    if (urlPartnerId !== filters.partner_id) {
+      setFilters(f => ({ ...f, partner_id: urlPartnerId }))
+      if (urlPartnerId) setShowFilters(true)   // auto-open filters so user sees the active company
+    }
+  }, [searchParams.get('partner_id')])
+
+  // Sync filters → URL (one-way, only location/search/partner_id in URL)
   useEffect(() => {
     const params = {}
     if (filters.location)   params.location   = filters.location

@@ -84,6 +84,68 @@ class AdminPartnerActionView(APIView):
         return Response(PartnerSerializer(partner).data)
 
 
+class AdminBulkCommissionView(APIView):
+    """PATCH /api/admin/partners/bulk-commission/
+    Body: { company_rate: float, individual_rate: float }
+    Bulk-updates commission_rate for ALL approved partners by type.
+    """
+    permission_classes = [IsAdmin]
+
+    def patch(self, request):
+        company_rate    = request.data.get('company_rate')
+        individual_rate = request.data.get('individual_rate')
+
+        errors = {}
+        if company_rate is None and individual_rate is None:
+            return Response(
+                {'error': 'Provide at least one of company_rate or individual_rate.'},
+                status=400
+            )
+
+        def _validate(val, key):
+            try:
+                v = float(val)
+                if not (0 <= v <= 100):
+                    raise ValueError
+                return v
+            except (ValueError, TypeError):
+                errors[key] = f'{key} must be a number between 0 and 100.'
+                return None
+
+        c_rate = _validate(company_rate,    'company_rate')    if company_rate    is not None else None
+        i_rate = _validate(individual_rate, 'individual_rate') if individual_rate is not None else None
+
+        if errors:
+            return Response(errors, status=400)
+
+        updated_company    = 0
+        updated_individual = 0
+
+        if c_rate is not None:
+            updated_company = Partner.objects.filter(
+                status='approved', partner_type='company'
+            ).update(commission_rate=c_rate)
+
+        if i_rate is not None:
+            updated_individual = Partner.objects.filter(
+                status='approved', partner_type='individual'
+            ).update(commission_rate=i_rate)
+
+        return Response({
+            'success': True,
+            'updated_company':    updated_company,
+            'updated_individual': updated_individual,
+            'company_rate':    c_rate,
+            'individual_rate': i_rate,
+            'message': (
+                f"Updated {updated_company} company partner(s) to {c_rate}% "
+                f"and {updated_individual} individual partner(s) to {i_rate}%."
+            ) if c_rate and i_rate else (
+                f"Updated {updated_company or updated_individual} partner(s)."
+            )
+        })
+
+
 class AdminStatsView(APIView):
     permission_classes = [IsAdmin]
 

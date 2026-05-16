@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, Percent, DollarSign, CheckCircle2, Info } from 'lucide-react'
+import { Settings, Save, Percent, DollarSign, CheckCircle2, Info, Users, RefreshCw, Building2, User } from 'lucide-react'
 import api from '@/config/axios'
 import toast from 'react-hot-toast'
 
@@ -19,9 +19,124 @@ const SETTING_META = {
     icon: Percent,
     color: 'bg-indigo-50 dark:bg-indigo-900/30',
     iconCls: 'text-indigo-600 dark:text-indigo-400',
-    description: 'Default commission % deducted from partner earnings per completed booking. Can be overridden per partner.',
+    description: 'Default commission % reference. Use the Bulk Commission Reset below to actually apply rates to all partners.',
     suffix: '%',
   },
+}
+
+// ─── Bulk Commission Reset Card ────────────────────────────────────────────────
+function BulkCommissionCard() {
+  const [companyRate,    setCompanyRate]    = useState('5')
+  const [individualRate, setIndividualRate] = useState('3')
+  const [result,         setResult]         = useState(null)
+
+  const mutation = useMutation({
+    mutationFn: () => api.patch('/admin/partners/bulk-commission/', {
+      company_rate:    parseFloat(companyRate),
+      individual_rate: parseFloat(individualRate),
+    }),
+    onSuccess: (res) => {
+      setResult(res.data)
+      toast.success(`Updated ${(res.data.updated_company || 0) + (res.data.updated_individual || 0)} partner(s)!`)
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.error || 'Failed to update commissions.'
+      toast.error(msg)
+    },
+  })
+
+  const handleApply = () => {
+    const c = parseFloat(companyRate)
+    const i = parseFloat(individualRate)
+    if (isNaN(c) || c < 0 || c > 100) { toast.error('Company rate must be 0–100.'); return }
+    if (isNaN(i) || i < 0 || i > 100) { toast.error('Individual rate must be 0–100.'); return }
+    setResult(null)
+    mutation.mutate()
+  }
+
+  return (
+    <div className="bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+          <Users size={18} className="text-emerald-600 dark:text-emerald-400" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900 dark:text-white">Bulk Commission Reset</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            Apply new commission rates to <strong>all approved partners</strong> by type. This overwrites individual overrides.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        {/* Company rate */}
+        <div>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            <Building2 size={12} className="text-purple-500" /> Company Partners
+          </label>
+          <div className="relative">
+            <input
+              type="number" min="0" max="100" step="0.5"
+              value={companyRate}
+              onChange={e => setCompanyRate(e.target.value)}
+              className={inputCls + ' pr-8'}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">%</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Recommended: 5%</p>
+        </div>
+
+        {/* Individual rate */}
+        <div>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            <User size={12} className="text-blue-500" /> Individual Partners
+          </label>
+          <div className="relative">
+            <input
+              type="number" min="0" max="100" step="0.5"
+              value={individualRate}
+              onChange={e => setIndividualRate(e.target.value)}
+              className={inputCls + ' pr-8'}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">%</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Recommended: 3%</p>
+        </div>
+      </div>
+
+      {/* Result banner */}
+      {result && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3 mb-4 text-sm text-emerald-700 dark:text-emerald-400 flex items-start gap-2">
+          <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Commission rates updated!</p>
+            <p className="text-xs mt-0.5">
+              {result.updated_company ?? 0} company partner(s) → {result.company_rate}% &nbsp;·&nbsp;
+              {result.updated_individual ?? 0} individual partner(s) → {result.individual_rate}%
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Warning */}
+      <div className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400 mb-4">
+        <Info size={12} className="shrink-0 mt-0.5" />
+        <p>This applies to all existing approved partners and overrides any per-partner custom rates. New bookings will immediately use the new rates.</p>
+      </div>
+
+      <button
+        onClick={handleApply}
+        disabled={mutation.isPending}
+        className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700
+                   disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400
+                   text-white text-sm font-semibold rounded-xl transition"
+      >
+        {mutation.isPending
+          ? <><RefreshCw size={15} className="animate-spin" /> Applying…</>
+          : <><RefreshCw size={15} /> Apply to All Partners</>}
+      </button>
+    </div>
+  )
 }
 
 // Numeric setting card
@@ -126,21 +241,32 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-4 max-w-lg">
-          {[1, 2].map(i => (
-            <div key={i} className="h-36 bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 animate-pulse" />
-          ))}
+      <div className="space-y-4 max-w-lg">
+        {/* Bulk Commission Reset — always show */}
+        <BulkCommissionCard />
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 py-1">
+          <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
+          <span className="text-xs text-gray-400 dark:text-gray-600 font-medium">Other Platform Settings</span>
+          <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
         </div>
-      ) : settings.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 dark:text-gray-500">No settings found.</div>
-      ) : (
-        <div className="space-y-4 max-w-lg">
-          {settings.map(setting => (
+
+        {isLoading ? (
+          <>
+            {[1, 2].map(i => (
+              <div key={i} className="h-36 bg-white dark:bg-[#1a1d2e] rounded-2xl border border-gray-100 dark:border-gray-800 animate-pulse" />
+            ))}
+          </>
+        ) : settings.length === 0 ? (
+          <div className="text-center py-16 text-gray-400 dark:text-gray-500">No settings found.</div>
+        ) : (
+          settings.map(setting => (
             <SettingCard key={setting.key} setting={setting} onSave={handleSave} />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   )
 }
+

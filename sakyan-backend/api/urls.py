@@ -15,7 +15,7 @@ from .views.partner_views import (
     ApprovedPartnersView, PartnerBoostRequestView,
 )
 from .views.admin_views import (
-    AdminPartnerListView, AdminPartnerActionView,
+    AdminPartnerListView, AdminPartnerActionView, AdminBulkCommissionView,
     AdminStatsView, PublicStatsView, AdminAllBookingsView, AdminUserListView,
     AdminSettingsView, AdminSettingUpdateView,
     AdminKYCListView, AdminKYCActionView,
@@ -71,6 +71,7 @@ urlpatterns = [
     # Admin — Partners
     path('admin/partners/', AdminPartnerListView.as_view()),
     path('admin/partners/<uuid:pk>/<str:action>/', AdminPartnerActionView.as_view()),
+    path('admin/partners/bulk-commission/', AdminBulkCommissionView.as_view()),
 
     # Admin — Stats & Bookings
     path('admin/stats/', AdminStatsView.as_view()),

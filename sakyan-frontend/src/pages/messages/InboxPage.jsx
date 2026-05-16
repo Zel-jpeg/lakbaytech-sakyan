@@ -138,9 +138,22 @@ export default function InboxPage() {
   const { uploadFile, uploading } = useFileUpload('chat-images')
   const convList = conversations || []
 
+  const targetPartnerId = searchParams.get('partner_id')   // from boost reply button
+
   useEffect(() => {
     if (!convList.length) return
     if (targetSupport && !activeConv) {
+      if (targetPartnerId) {
+        // Admin opening specific partner support thread (from boost requests page)
+        const s = convList.find(c =>
+          isSupportConv(c) && (
+            String(c.support_partner_id) === String(targetPartnerId) ||
+            String(c.customer_id) === String(targetPartnerId)
+          )
+        )
+        if (s) { setActiveConv(s); setMobileView('chat') }
+        return
+      }
       const s = convList.find(c => isSupportConv(c))
       if (s) { setActiveConv(s); setMobileView('chat') }
       return
@@ -149,7 +162,7 @@ export default function InboxPage() {
       const m = convList.find(c => String(c.booking_id) === String(targetBookingId))
       if (m) { setActiveConv(m); setMobileView('chat') }
     }
-  }, [targetBookingId, targetSupport, convList, activeConv])
+  }, [targetBookingId, targetSupport, targetPartnerId, convList, activeConv])
 
   const isSupport = isSupportConv(activeConv)
   const adminSupportPartnerId = isSupport && user?.role === 'admin' && activeConv
