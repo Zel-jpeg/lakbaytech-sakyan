@@ -390,8 +390,10 @@ export default function CarDetailPage() {
       return
     }
     // Navigate to messages with inquiry thread auto-selected.
-    // partner_id here is the Partner table PK (UUID), not the user UUID.
-    navigate(`/messages?inquiry=1&partner_id=${car.partner_id}`)
+    // We pass partner_name so the inbox can open the chat panel even before
+    // the first message exists (no DB thread yet).
+    const name = encodeURIComponent(car.partner_name || 'Partner')
+    navigate(`/messages?inquiry=1&partner_id=${car.partner_id}&partner_name=${name}`)
   }
 
   return (

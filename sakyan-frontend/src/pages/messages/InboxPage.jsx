@@ -15,12 +15,10 @@ import toast from 'react-hot-toast'
 
 // ── Conversation type helpers ─────────────────────────────────────────────────
 
-const SUPPORT_ID = 'support'
-
 function isSupportConv(conv) {
   return conv?.type === 'support' ||
     conv?.is_support === true ||
-    conv?.booking_id === SUPPORT_ID ||
+    conv?.booking_id === 'support' ||
     String(conv?.booking_id || '').startsWith('support:')
 }
 
@@ -30,16 +28,13 @@ function isInquiryConv(conv) {
     String(conv?.booking_id || '').startsWith('inquiry:')
 }
 
-function resolveOtherUser(conv, userId, userRole) {
+function resolveOtherUser(conv, userId) {
   if (!conv || !userId) return { name: 'Unknown', id: null }
-  if (isSupportConv(conv)) {
-    if (userRole === 'admin') return { name: conv.customer_name || 'Partner', id: conv.customer_id || conv.support_partner_id }
-    return { name: 'Sakyan Support', id: null }
-  }
+  if (isSupportConv(conv)) return { name: 'Sakyan Support', id: null }
   if (isInquiryConv(conv)) {
     return {
-      name: conv.other_user?.full_name || conv.partner_name || conv.customer_name || 'Partner',
-      id:   conv.other_user?.id || conv.partner_user_id || null,
+      name: conv.other_user?.full_name || conv.partner_name || 'Partner',
+      id:   conv.other_user?.id || null,
     }
   }
   const isCustomer = String(userId) === String(conv.customer_id)
@@ -68,7 +63,7 @@ const FILTERS = [
 
 function FilterChips({ active, onChange, counts }) {
   return (
-    <div className="flex gap-1.5 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 overflow-x-auto scrollbar-none">
+    <div className="flex gap-1.5 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 overflow-x-auto">
       {FILTERS.map(f => (
         <button
           key={f.key}
@@ -82,8 +77,9 @@ function FilterChips({ active, onChange, counts }) {
           {f.label}
           {counts[f.key] > 0 && (
             <span className={`text-[10px] font-bold px-1 rounded-full
-              ${active === f.key ? 'bg-white/20 text-white' : 'bg-brand-600 text-white'}
-            `}>{counts[f.key]}</span>
+              ${active === f.key ? 'bg-white/20 text-white' : 'bg-brand-600 text-white'}`}>
+              {counts[f.key]}
+            </span>
           )}
         </button>
       ))}
@@ -93,60 +89,40 @@ function FilterChips({ active, onChange, counts }) {
 
 // ── Conversation list item ────────────────────────────────────────────────────
 
-function ConversationItem({ conv, isActive, onClick, userId, userRole }) {
-  const other    = resolveOtherUser(conv, userId, userRole)
+function ConversationItem({ conv, isActive, onClick, userId }) {
+  const other     = resolveOtherUser(conv, userId)
   const hasUnread = conv.unread_count > 0
   const isSupport = isSupportConv(conv)
   const isInquiry = isInquiryConv(conv)
-
-  const Avatar = () => {
-    if (isSupport) return (
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0">
-        <ShieldCheck size={18} className="text-white" />
-      </div>
-    )
-    if (isInquiry) return (
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
-        <MessageCircle size={17} className="text-white" />
-      </div>
-    )
-    return (
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center shrink-0 text-white font-bold text-sm">
-        {(other.name || '?')[0].toUpperCase()}
-      </div>
-    )
-  }
-
-  const Badge = () => {
-    if (isSupport) return <span className="ml-1.5 text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-medium">Support</span>
-    if (isInquiry) return <span className="ml-1.5 text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400 px-1.5 py-0.5 rounded-full font-medium">Inquiry</span>
-    return null
-  }
-
-  const subline = isSupport
-    ? 'Ask questions or report issues'
-    : isInquiry
-      ? `Inquiry · ${conv.partner_name || conv.car_name || 'Partner'}`
-      : `Re: ${conv.car_name || conv.booking_code || 'Booking'}`
 
   return (
     <button onClick={onClick}
       className={`w-full text-left px-4 py-3.5 flex items-start gap-3 border-b border-gray-100 dark:border-gray-800 transition
         hover:bg-gray-50 dark:hover:bg-gray-800/60
         ${isActive ? 'bg-brand-50 dark:bg-brand-900/20 border-l-2 border-l-brand-500' : ''}`}>
-      <Avatar />
+
+      {/* Avatar */}
+      {isSupport
+        ? <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0"><ShieldCheck size={18} className="text-white" /></div>
+        : isInquiry
+          ? <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0"><MessageCircle size={17} className="text-white" /></div>
+          : <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center shrink-0 text-white font-bold text-sm">{(other.name || '?')[0].toUpperCase()}</div>
+      }
+
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <p className={`text-sm truncate ${hasUnread ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'}`}>
-            {other.name}<Badge />
+            {other.name}
+            {isSupport && <span className="ml-1.5 text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-medium">Support</span>}
+            {isInquiry && <span className="ml-1.5 text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400 px-1.5 py-0.5 rounded-full font-medium">Inquiry</span>}
           </p>
-          {hasUnread && (
-            <span className="bg-brand-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-              {conv.unread_count}
-            </span>
-          )}
+          {hasUnread && <span className="bg-brand-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">{conv.unread_count}</span>}
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{subline}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+          {isSupport ? 'Ask questions or report issues'
+            : isInquiry ? `Inquiry · ${conv.partner_name || 'Partner'}`
+            : `Re: ${conv.car_name || conv.booking_code || 'Booking'}`}
+        </p>
         <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{lastMsgText(conv)}</p>
       </div>
     </button>
@@ -198,8 +174,6 @@ function MessageBubble({ msg, isOwn, isOptimistic, hasFailed, onRetry }) {
   )
 }
 
-// ── Image preview strip ───────────────────────────────────────────────────────
-
 function ImagePreview({ file, onRemove }) {
   const [src, setSrc] = useState(null)
   useEffect(() => {
@@ -227,10 +201,11 @@ export default function InboxPage() {
   const navigate       = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const targetBookingId = searchParams.get('booking')
-  const targetSupport   = searchParams.get('support') === '1'
-  const targetInquiry   = searchParams.get('inquiry') === '1'
-  const targetPartnerId = searchParams.get('partner_id')  // Partner PK (UUID)
+  const targetBookingId  = searchParams.get('booking')
+  const targetSupport    = searchParams.get('support') === '1'
+  const targetInquiry    = searchParams.get('inquiry') === '1'
+  const targetPartnerId  = searchParams.get('partner_id')    // Partner PK (UUID)
+  const targetPartnerName = searchParams.get('partner_name') // display name from car page
 
   const { data: conversations, isLoading: convsLoading } = useConversations()
   const [activeConv,     setActiveConv]     = useState(null)
@@ -247,7 +222,7 @@ export default function InboxPage() {
   const { uploadFile, uploading } = useFileUpload('chat-images')
   const convList = conversations || []
 
-  // ── Filter logic ────────────────────────────────────────────────────────────
+  // ── Filtered list ────────────────────────────────────────────────────────────
   const filteredConvs = convList.filter(c => {
     if (activeFilter === 'all')     return true
     if (activeFilter === 'support') return isSupportConv(c)
@@ -263,33 +238,56 @@ export default function InboxPage() {
     support: convList.filter(c => isSupportConv(c) && c.unread_count > 0).length,
   }
 
-  // ── Auto-select conversation based on URL params ─────────────────────────────
+  // ── Auto-select / create synthetic conversation ──────────────────────────────
+  // Must wait for convList to finish loading before we know whether a thread exists.
   useEffect(() => {
-    if (!convList.length) return
+    if (convsLoading) return                // wait for real data
+    if (activeConv && !activeConv._synthetic) return // already have a real conv
 
-    // ?inquiry=1&partner_id=<partner_pk>  → open inquiry thread
-    if (targetInquiry && targetPartnerId && !activeConv) {
-      const found = convList.find(c =>
+    // ?inquiry=1&partner_id=<partner_pk> — pre-booking inquiry
+    if (targetInquiry && targetPartnerId) {
+      const existing = convList.find(c =>
         isInquiryConv(c) && String(c.partner_id) === String(targetPartnerId)
       )
-      if (found) {
+      if (existing) {
         setActiveFilter('inquiry')
-        setActiveConv(found)
+        setActiveConv(existing)
         setMobileView('chat')
       } else {
-        // No thread yet — switch to inquiry filter so user can see it once created
+        // No thread yet — build a synthetic conversation so the chat panel
+        // opens immediately with the input box ready to type the first message.
         setActiveFilter('inquiry')
+        const partnerName = targetPartnerName
+          ? decodeURIComponent(targetPartnerName)
+          : 'Partner'
+        setActiveConv({
+          type:            'inquiry',
+          booking_id:      `inquiry:${targetPartnerId}`,
+          booking_code:    'Inquiry',
+          car_name:        partnerName,
+          partner_name:    partnerName,
+          partner_id:      targetPartnerId,
+          partner_user_id: null,  // unknown until first message is sent
+          customer_id:     user?.id ? String(user.id) : '',
+          is_inquiry:      true,
+          other_user:      { id: null, full_name: partnerName, avatar_url: '' },
+          unread_count:    0,
+          last_message:    null,
+          _synthetic:      true,  // flag: this exists only in UI, not yet in DB
+        })
+        setMobileView('chat')
       }
       return
     }
 
-    // ?support=1&partner_id=<user_id> → admin opening specific partner support thread
-    if (targetSupport && !activeConv) {
-      if (targetPartnerId) {
+    // ?support=1 — Sakyan Support thread
+    if (targetSupport) {
+      const targetSupportPartnerId = searchParams.get('partner_id')
+      if (targetSupportPartnerId) {
         const s = convList.find(c =>
           isSupportConv(c) && (
-            String(c.support_partner_id) === String(targetPartnerId) ||
-            String(c.customer_id) === String(targetPartnerId)
+            String(c.support_partner_id) === String(targetSupportPartnerId) ||
+            String(c.customer_id) === String(targetSupportPartnerId)
           )
         )
         if (s) { setActiveConv(s); setMobileView('chat') }
@@ -301,20 +299,30 @@ export default function InboxPage() {
     }
 
     // ?booking=<booking_id>
-    if (targetBookingId && !activeConv) {
+    if (targetBookingId) {
       const m = convList.find(c => String(c.booking_id) === String(targetBookingId))
       if (m) { setActiveConv(m); setMobileView('chat') }
     }
-  }, [targetBookingId, targetSupport, targetInquiry, targetPartnerId, convList, activeConv])
+  }, [convsLoading, convList, targetInquiry, targetSupport, targetBookingId,
+      targetPartnerId, targetPartnerName, user?.id])
 
-  // ── Message data selectors ───────────────────────────────────────────────────
+  // Once a synthetic conv's first message is sent, the real conv will appear in
+  // convList — upgrade the synthetic conv to the real one automatically.
+  useEffect(() => {
+    if (!activeConv?._synthetic || !targetPartnerId) return
+    const real = convList.find(c =>
+      isInquiryConv(c) && String(c.partner_id) === String(targetPartnerId)
+    )
+    if (real) setActiveConv(real)
+  }, [convList, activeConv?._synthetic, targetPartnerId])
+
+  // ── Message data ─────────────────────────────────────────────────────────────
   const isSupport = isSupportConv(activeConv)
   const isInquiry = isInquiryConv(activeConv)
 
   const adminSupportPartnerId = isSupport && user?.role === 'admin' && activeConv
     ? (activeConv.support_partner_id || activeConv.customer_id || null) : null
 
-  // Inquiry: use the Partner PK stored in conv.partner_id
   const activeInquiryPartnerId = isInquiry ? (activeConv?.partner_id || null) : null
 
   const { data: bookingMessages, isLoading: bookingMsgsLoading } =
@@ -331,11 +339,9 @@ export default function InboxPage() {
   const sendInquiryMsg   = useSendInquiry()
   const sendInquiryReply = useSendInquiryReply()
 
-  const serverMsgs = isSupport
-    ? (supportMessages || [])
-    : isInquiry
-      ? (inquiryMessages || [])
-      : (bookingMessages?.results || bookingMessages || [])
+  const serverMsgs  = isSupport  ? (supportMessages  || [])
+    : isInquiry ? (inquiryMessages || [])
+    : (bookingMessages?.results || bookingMessages || [])
 
   const msgsLoading = isSupport ? supportMsgsLoading
     : isInquiry ? inquiryMsgsLoading
@@ -366,7 +372,7 @@ export default function InboxPage() {
     setImageFile(null)
   }
 
-  // ── Send handler ─────────────────────────────────────────────────────────────
+  // ── Send ─────────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async (e, retryData = null) => {
     e?.preventDefault()
     if (!activeConv) return
@@ -406,11 +412,10 @@ export default function InboxPage() {
     }
 
     if (isInquiry) {
-      // First message uses useSendInquiry; replies (both sides) use useSendInquiryReply
       const partnerId  = activeInquiryPartnerId
-      const receiverId = resolveOtherUser(activeConv, user?.id, user?.role).id
-
-      // If we have a receiver (i.e. the thread exists), do a reply; else start fresh
+      // For a synthetic (first-ever) conversation other_user.id is null → use sendInquiryMsg.
+      // For existing threads, other_user.id is the partner's user UUID → use sendInquiryReply.
+      const receiverId = resolveOtherUser(activeConv, user?.id).id
       if (receiverId) {
         sendInquiryReply.mutate({ partnerId, receiverId, content, imageUrl }, { onError })
       } else {
@@ -422,7 +427,7 @@ export default function InboxPage() {
         { onError }
       )
     } else {
-      const { id: receiverId } = resolveOtherUser(activeConv, user?.id, user?.role)
+      const { id: receiverId } = resolveOtherUser(activeConv, user?.id)
       sendBookingMsg.mutate({ bookingId: activeConv.booking_id, receiverId, content, imageUrl }, { onError })
     }
   }, [activeConv, input, imageFile, isSupport, isInquiry, adminSupportPartnerId,
@@ -435,17 +440,18 @@ export default function InboxPage() {
   }
 
   const canSend     = (input.trim() || imageFile) && !uploading
-  const activeOther = activeConv ? resolveOtherUser(activeConv, user?.id, user?.role) : null
+  const activeOther = activeConv ? resolveOtherUser(activeConv, user?.id) : null
 
-  // ── Chat header subtitle ─────────────────────────────────────────────────────
   const chatSubtitle = isSupport
     ? (user?.role === 'admin' ? 'Partner support thread' : 'Ask Sakyan anything — we typically reply within 1 business day')
     : isInquiry
       ? `Pre-booking inquiry · ${activeConv?.partner_name || 'Partner'}`
       : `Re: ${activeConv?.car_name || activeConv?.booking_code}`
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117]">
+
       {/* Top bar */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -465,13 +471,12 @@ export default function InboxPage() {
       </div>
 
       <div className="max-w-5xl mx-auto flex h-[calc(100vh-64px)]">
+
         {/* ── Sidebar ── */}
         <div className={`w-full sm:w-72 md:w-80 shrink-0 border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col overflow-hidden ${mobileView === 'chat' ? 'hidden sm:flex' : 'flex'}`}>
 
-          {/* Filter chips */}
           <FilterChips active={activeFilter} onChange={setActiveFilter} counts={filterCounts} />
 
-          {/* Conversation list */}
           {convsLoading && (
             <div className="flex-1">
               {[...Array(5)].map((_, i) => (
@@ -490,7 +495,10 @@ export default function InboxPage() {
             <div className="flex-1 flex flex-col items-center justify-center py-16 px-6 text-center">
               <MessageSquare size={36} className="text-gray-200 dark:text-gray-700 mb-3" />
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {activeFilter === 'all' ? 'No conversations yet' : `No ${activeFilter} conversations`}
+                {activeFilter === 'all' ? 'No conversations yet'
+                  : activeFilter === 'inquiry' ? 'No inquiries yet'
+                  : activeFilter === 'booking' ? 'No booking chats yet'
+                  : 'No support messages yet'}
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 leading-relaxed">
                 {activeFilter === 'inquiry'
@@ -508,7 +516,6 @@ export default function InboxPage() {
                 key={conv.booking_id}
                 conv={conv}
                 userId={user?.id}
-                userRole={user?.role}
                 isActive={activeConv?.booking_id === conv.booking_id}
                 onClick={() => handleSelectConv(conv)}
               />
@@ -522,12 +529,9 @@ export default function InboxPage() {
             <>
               {/* Header */}
               <div className={`px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3
-                ${isSupport
-                  ? 'bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10'
-                  : isInquiry
-                    ? 'bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-900/10 dark:to-violet-900/10'
-                    : 'bg-white dark:bg-gray-900'
-                }`}>
+                ${isSupport ? 'bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10'
+                  : isInquiry ? 'bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-900/10 dark:to-violet-900/10'
+                  : 'bg-white dark:bg-gray-900'}`}>
                 <button className="sm:hidden p-1.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition" onClick={() => setMobileView('list')}>
                   <ArrowLeft size={18} />
                 </button>
@@ -550,24 +554,28 @@ export default function InboxPage() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50/50 dark:bg-gray-800/20">
-                {msgsLoading && (
+                {msgsLoading && !activeConv._synthetic && (
                   <div className="flex justify-center py-8">
                     <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
-                {!msgsLoading && msgList.length === 0 && (
+                {(!msgsLoading || activeConv._synthetic) && msgList.length === 0 && (
                   <div className="text-center py-12">
-                    {isSupport ? (
+                    {isInquiry ? (
+                      <>
+                        <MessageCircle size={32} className="mx-auto text-indigo-300 dark:text-indigo-700 mb-3" />
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Start your conversation with {activeOther?.name}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
+                          Ask about availability, rates, or anything else before you book. The partner will reply in their inbox.
+                        </p>
+                      </>
+                    ) : isSupport ? (
                       <>
                         <ShieldCheck size={32} className="mx-auto text-emerald-300 dark:text-emerald-700 mb-3" />
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Start a conversation with Sakyan Support</p>
                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 max-w-xs mx-auto leading-relaxed">Have a question or issue? Send us a message and we'll get back to you.</p>
-                      </>
-                    ) : isInquiry ? (
-                      <>
-                        <MessageCircle size={32} className="mx-auto text-indigo-300 dark:text-indigo-700 mb-3" />
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Send your first message to {activeOther?.name}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 max-w-xs mx-auto leading-relaxed">Ask about availability, pricing, or anything about the car before you book.</p>
                       </>
                     ) : (
                       <>
@@ -590,7 +598,6 @@ export default function InboxPage() {
                 <div ref={bottomRef} />
               </div>
 
-              {/* Image preview strip */}
               {imageFile && <ImagePreview file={imageFile} onRemove={() => setImageFile(null)} />}
 
               {/* Input bar */}
@@ -608,7 +615,7 @@ export default function InboxPage() {
                   onChange={e => setInput(e.target.value)}
                   placeholder={
                     imageFile ? 'Add a caption… (optional)'
-                    : isInquiry ? `Message ${activeOther?.name || 'Partner'}…`
+                    : isInquiry ? `Ask ${activeOther?.name || 'the partner'} something…`
                     : isSupport ? 'Type your support message…'
                     : 'Type a message…'
                   }
@@ -622,11 +629,12 @@ export default function InboxPage() {
               </form>
             </>
           ) : (
+            /* Nothing selected yet */
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <MessageSquare size={44} className="text-gray-200 dark:text-gray-700 mb-4" />
               <p className="text-gray-600 dark:text-gray-400 font-medium">Select a conversation</p>
               <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
-                {targetInquiry ? 'Loading your inquiry…' : targetBookingId ? 'Loading your conversation…' : 'Choose a conversation from the left to start chatting.'}
+                Choose a conversation from the left to start chatting.
               </p>
             </div>
           )}
