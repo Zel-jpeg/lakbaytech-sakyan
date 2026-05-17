@@ -477,12 +477,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           child: TableCalendar(
             firstDay: DateTime.now(),
             lastDay: DateTime.now().add(const Duration(days: 365)),
-            focusedDay: _startDate ?? DateTime.now(),
+      focusedDay: _startDate ?? DateTime.now(),
             rangeStartDay: _startDate,
             rangeEndDay: _endDate,
             rangeSelectionMode: RangeSelectionMode.toggledOn,
             onRangeSelected: (start, end, focused) {
-              setState(() { _startDate = start; _endDate = end; });
+              setState(() {
+                _startDate = start;
+                // When the user taps a single day the calendar returns end=null.
+                // Default to start so it counts as a valid 1-day booking.
+                _endDate = end ?? start;
+              });
             },
             enabledDayPredicate: (day) =>
                 !_bookedDays.contains(DateTime(day.year, day.month, day.day)),
