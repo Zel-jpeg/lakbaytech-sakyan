@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   MapPin, Users, Fuel, Settings2, Palette, Calendar,
   ChevronLeft, ChevronRight, ArrowLeft, CheckCircle2,
-  XCircle, Tag, Building2, Shield, Car,
+  XCircle, Tag, Building2, Shield, Car, MessageCircle,
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
@@ -371,6 +371,29 @@ export default function CarDetailPage() {
     navigate(`/booking/checkout/${car.id}`)
   }
 
+  // ── Message Partner handler ───────────────────────────────────────────────
+  // Shows only to customers and partner users browsing OTHER partner's cars.
+  // Clicking navigates to Inbox with the inquiry thread pre-selected;
+  // the browser back button returns here naturally (history stack).
+  const ownPartnerId = user?.role === 'partner' ? user?.partner?.id : null
+  const carPartnerId = car.partner_id ? String(car.partner_id) : null
+  const isOwnCar     = ownPartnerId && carPartnerId && String(ownPartnerId) === carPartnerId
+
+  const canMessagePartner =
+    user &&
+    user.role !== 'admin' &&
+    !isOwnCar
+
+  const handleMessagePartner = () => {
+    if (!user) {
+      navigate('/login', { state: { from: `/cars/${car.id}` } })
+      return
+    }
+    // Navigate to messages with inquiry thread auto-selected.
+    // partner_id here is the Partner table PK (UUID), not the user UUID.
+    navigate(`/messages?inquiry=1&partner_id=${car.partner_id}`)
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
@@ -668,6 +691,22 @@ export default function CarDetailPage() {
                 </div>
               ))}
             </div>
+
+            {/* Message Partner — visible to customers & other-partner users only */}
+            {canMessagePartner && (
+              <button
+                id="btn-message-partner"
+                onClick={handleMessagePartner}
+                className="w-full flex items-center justify-center gap-2 py-2.5
+                           border border-brand-300 dark:border-brand-700
+                           text-brand-600 dark:text-brand-400 text-sm font-medium
+                           rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20
+                           transition-all active:scale-[0.98]"
+              >
+                <MessageCircle size={16} />
+                Message Partner
+              </button>
+            )}
           </div>
         </div>
 

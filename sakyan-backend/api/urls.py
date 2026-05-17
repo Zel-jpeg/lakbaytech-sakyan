@@ -23,7 +23,10 @@ from .views.admin_views import (
     AdminBoostListView, AdminBoostActionView,
     PublicFeaturedView,
 )
-from .views.message_views import MessageListView, SendMessageView, ConversationListView, SupportThreadView
+from .views.message_views import (
+    MessageListView, SendMessageView, ConversationListView,
+    SupportThreadView, InquiryThreadView, InquiryReplyView,
+)
 from .views.notification_views import NotificationListView, MarkNotificationReadView
 
 urlpatterns = [
@@ -101,6 +104,8 @@ urlpatterns = [
     # Messages
     path('messages/', SendMessageView.as_view()),
     path('messages/support/', SupportThreadView.as_view()),
+    path('messages/inquiry/', InquiryThreadView.as_view()),
+    path('messages/inquiry/reply/', InquiryReplyView.as_view()),
     path('messages/conversations/', ConversationListView.as_view()),
     path('messages/<uuid:booking_id>/', MessageListView.as_view()),
 

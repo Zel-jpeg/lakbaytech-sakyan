@@ -127,3 +127,76 @@ export function useSendSupportMessage() {
     },
   })
 }
+
+// ─── Inquiry thread (pre-booking: user ↔ partner) ────────────────────────────
+
+export function useInquiryMessages(partnerId) {
+  const qc = useQueryClient()
+  const queryKey = ['inquiry-messages', partnerId]
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const res = await api.get(`/messages/inquiry/?partner_id=${partnerId}`)
+      return res.data
+    },
+    enabled: !!partnerId,
+  })
+
+  // Supabase realtime — listen for new inquiry messages
+  useEffect(() => {
+    if (!partnerId) return
+    const channel = supabase
+      .channel(`inquiry-messages:${partnerId}:${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          // inquiry messages have inquiry_partner_id set and no booking_id
+          if (!payload.new?.booking_id && payload.new?.inquiry_partner_id) {
+            qc.invalidateQueries({ queryKey })
+            qc.invalidateQueries({ queryKey: ['conversations'] })
+          }
+        }
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [partnerId])
+
+  return query
+}
+
+/** Send a new inquiry (first message or customer continuation). */
+export function useSendInquiry() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ partnerId, content, imageUrl }) =>
+      api.post('/messages/inquiry/', {
+        partner_id: partnerId,
+        content:    content || '',
+        image_url:  imageUrl || null,
+      }).then(r => r.data),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['inquiry-messages', variables.partnerId] })
+      qc.invalidateQueries({ queryKey: ['conversations'] })
+    },
+  })
+}
+
+/** Reply inside an existing inquiry thread (both sides can use this). */
+export function useSendInquiryReply() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ partnerId, receiverId, content, imageUrl }) =>
+      api.post('/messages/inquiry/reply/', {
+        partner_id:  partnerId,
+        receiver_id: receiverId,
+        content:     content || '',
+        image_url:   imageUrl || null,
+      }).then(r => r.data),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['inquiry-messages', variables.partnerId] })
+      qc.invalidateQueries({ queryKey: ['conversations'] })
+    },
+  })
+}

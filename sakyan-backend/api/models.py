@@ -212,9 +212,13 @@ class Booking(models.Model):
 
 
 class Message(models.Model):
-    id          = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    booking     = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='messages',
-                                    null=True, blank=True)   # null = support message
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    booking          = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='messages',
+                                         null=True, blank=True)   # null = support/inquiry message
+    # When set, this is a pre-booking inquiry to a specific partner (booking=None, inquiry_partner=<Partner>)
+    inquiry_partner  = models.ForeignKey('Partner', on_delete=models.CASCADE,
+                                         related_name='inquiry_messages',
+                                         null=True, blank=True)
     sender      = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
     receiver    = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
     content     = models.TextField(blank=True)   # optional when image_url is provided
