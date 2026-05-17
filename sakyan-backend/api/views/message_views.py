@@ -3,7 +3,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
-from ..models import Message, Booking, User
+from ..models import Message, Booking, User, Car
 from ..serializers import MessageSerializer
 
 
@@ -254,3 +254,78 @@ class ConversationListView(APIView):
             conversations = [support_entry] + conversations
 
         return Response(conversations)
+
+
+# ─── Pre-Booking Inquiry (customer → partner, no booking yet) ────────────────
+
+class InquiryMessageView(APIView):
+    """
+    POST /messages/inquiry/
+    Allows a customer to send a question to a partner before making a booking.
+    Body: { car_id, content, image_url? }
+    The message is stored with booking=None so it appears in the support-style
+    thread between the customer and the partner.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if user.role != 'customer':
+            return Response({'error': 'Only customers can send inquiries.'}, status=403)
+
+        car_id    = request.data.get('car_id', '').strip()
+        content   = request.data.get('content', '').strip()
+        image_url = request.data.get('image_url', '').strip() or None
+
+        if not car_id:
+            return Response({'error': 'car_id is required.'}, status=400)
+        if not content and not image_url:
+            return Response({'error': 'Either content or image_url is required.'}, status=400)
+
+        # Look up the car and its partner's user account
+        try:
+            car = Car.objects.select_related('partner__user').get(pk=car_id)
+        except (Car.DoesNotExist, Exception):
+            return Response({'error': 'Car not found.'}, status=404)
+
+        partner_user = car.partner.user
+        if not partner_user:
+            return Response({'error': 'Partner not available.'}, status=404)
+
+        # Create the inquiry message — no booking, so it shows as a support-type thread
+        msg = Message.objects.create(
+            booking=None,
+            sender=user,
+            receiver=partner_user,
+            content=content,
+            image_url=image_url,
+        )
+        return Response(MessageSerializer(msg).data, status=201)
+
+    def get(self, request):
+        """
+        GET /messages/inquiry/?partner_user_id=<uuid>
+        Retrieve inquiry messages between the current customer and a specific partner.
+        """
+        user = request.user
+        partner_user_id = request.query_params.get('partner_user_id', '').strip()
+
+        if not partner_user_id:
+            return Response({'error': 'partner_user_id is required.'}, status=400)
+
+        try:
+            partner_user = User.objects.get(pk=partner_user_id)
+        except (User.DoesNotExist, Exception):
+            return Response({'error': 'Partner not found.'}, status=404)
+
+        qs = Message.objects.filter(
+            booking__isnull=True
+        ).filter(
+            Q(sender=user, receiver=partner_user) |
+            Q(sender=partner_user, receiver=user)
+        ).order_by('created_at')
+
+        # Mark unread as read
+        qs.filter(receiver=user, is_read=False).update(is_read=True)
+
+        return Response(MessageSerializer(qs, many=True).data)

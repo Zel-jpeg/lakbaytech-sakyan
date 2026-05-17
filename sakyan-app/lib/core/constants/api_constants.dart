@@ -45,9 +45,10 @@ class ApiConstants {
   static const String partnerProfile = '/partner/profile/';
 
   // Messages
-  static const String conversations = '/messages/conversations/';
-  static const String sendMessage   = '/messages/';
-  static const String supportThread = '/messages/support/';
+  static const String conversations  = '/messages/conversations/';
+  static const String sendMessage    = '/messages/';
+  static const String supportThread  = '/messages/support/';
+  static const String inquiryMessage = '/messages/inquiry/';
   static String bookingMessages(String bookingId) => '/messages/$bookingId/';
 
   // Notifications

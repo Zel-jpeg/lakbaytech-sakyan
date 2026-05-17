@@ -21,6 +21,8 @@ class CarModel {
   final bool isAvailable;
   final List<CarImageModel> images;
   final String partnerId;
+  final String partnerUserId;   // user UUID of partner — needed for /messages/ receiver
+  final String partnerName;     // business name (from partner_name flat field)
 
   // ── Flat image URL returned by list endpoints when images[] is not included ──
   // Django list serializers often return a single `primary_image_url` field
@@ -48,6 +50,8 @@ class CarModel {
     this.isAvailable  = true,
     this.images       = const [],
     this.partnerId    = '',
+    this.partnerUserId = '',
+    this.partnerName  = '',
     String? flatPrimaryImageUrl,
   }) : _flatPrimaryImageUrl = flatPrimaryImageUrl;
 
@@ -107,11 +111,30 @@ class CarModel {
   factory CarModel.fromJson(Map<String, dynamic> json) {
     // partner can be a full object or just an id string
     String partnerId = '';
+    String partnerUserId = '';
+    String partnerName = '';
     final p = json['partner'];
     if (p is Map) {
       partnerId = p['id'] as String? ?? '';
+      // partner_name flat field (from CarDetailSerializer / CarListSerializer)
+      partnerName = json['partner_name']?.toString() ?? '';
+      // Try to get the partner's user UUID from nested partner object
+      final pu = p['user'];
+      if (pu is Map) {
+        partnerUserId = pu['id']?.toString() ?? '';
+        if (partnerName.isEmpty) partnerName = pu['full_name']?.toString() ?? '';
+      } else if (pu is String && pu.isNotEmpty) {
+        partnerUserId = pu;
+      }
+      // Last resort: use partner profile UUID
+      if (partnerUserId.isEmpty) partnerUserId = partnerId;
     } else if (p is String) {
       partnerId = p;
+      partnerUserId = p;
+    }
+    // Also check flat partner_name field at top level (CarListSerializer)
+    if (partnerName.isEmpty) {
+      partnerName = json['partner_name']?.toString() ?? '';
     }
 
     final rawFeatures = json['features'];
@@ -178,6 +201,8 @@ class CarModel {
       isAvailable:          json['is_available'] as bool?    ?? true,
       images:               images,
       partnerId:            partnerId,
+      partnerUserId:        partnerUserId,
+      partnerName:          partnerName,
       flatPrimaryImageUrl:  flatImageUrl,
     );
   }

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/services/api_service.dart';
 import '../models/booking_model.dart';
@@ -55,6 +56,17 @@ class BookingRepository {
 
   /// Cancel a booking.
   Future<void> cancelBooking(String id) async {
-    await ApiService.post(ApiConstants.bookingAction(id, 'cancel'));
+    try {
+      await ApiService.patch(ApiConstants.bookingAction(id, 'cancel'), data: {});
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      String? msg;
+      if (body is Map) {
+        msg = (body['error'] ?? body['detail'] ?? body['message'])?.toString();
+      } else if (body is String && body.isNotEmpty) {
+        msg = body;
+      }
+      throw Exception(msg ?? 'Failed to cancel booking. Please try again.');
+    }
   }
 }

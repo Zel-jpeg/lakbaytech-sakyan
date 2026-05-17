@@ -440,7 +440,38 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
                             style: TextStyle(fontSize: 12, color: textMuted)),
                       ],
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 12),
+
+                    // ── Message Partner button ──────────────────────────────
+                    if (user != null && car.partnerUserId.isNotEmpty) ...[
+                      Container(
+                        height: 52,
+                        width: 52,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.primary, width: 1.5),
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.chat_bubble_rounded,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
+                          tooltip: 'Message Partner',
+                          onPressed: () => context.push('/inquiry-chat', extra: {
+                            'carId':         car.id,
+                            'partnerUserId': car.partnerUserId,
+                            'partnerName':   car.partnerName.isNotEmpty
+                                ? car.partnerName
+                                : 'Partner',
+                            'carName':       car.name,
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+
                     Expanded(
                       child: ElevatedButton(
                         onPressed: car.isAvailable && user != null

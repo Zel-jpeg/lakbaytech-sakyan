@@ -125,25 +125,24 @@ class ConversationModel {
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
-    // ── other_user — nested object or UUID string ─────────────────────────
-    String otherUserId = '', otherUserName = '', otherUserAvatar = '';
-    final o = json['other_user'];
-    if (o is Map) {
-      otherUserId     = _s(o['id']);
-      otherUserName   = _s(o['full_name']);
-      otherUserAvatar = _s(o['avatar_url']);
-    } else if (o is String) {
-      otherUserId = o;
-    }
+    // ── The backend ConversationListView returns FLAT fields, not a nested
+    // `other_user` object. The structure is:
+    //   {
+    //     "booking_id":      "uuid",
+    //     "booking_code":    "SKY-...",
+    //     "car_name":        "Toyota Vios",
+    //     "customer_name":   "Juan Dela Cruz",
+    //     "partner_name":    "ABC Rentals",      ← business name
+    //     "customer_id":     "uuid",
+    //     "partner_user_id": "uuid",
+    //     "unread_count":    2,
+    //     "is_support":      false,              ← optional flag
+    //     "last_message":    { "content": "...", "created_at": "...", "sender_id": "..." }
+    //   }
+    // We store the partner side as "other user" since the app is customer-facing.
+    // ─────────────────────────────────────────────────────────────────────────
 
-    // ── car name — nested Map or flat field ───────────────────────────────
-    String carName = '';
-    final car = json['car'];
-    if (car is Map) carName = _s(car['name']);
-    if (carName.isEmpty) carName = _s(json['car_name']);
-
-    // ── booking / booking_id ──────────────────────────────────────────────
-    // Never use `as String?` here — booking may be an expanded Map.
+    // ── booking_id ────────────────────────────────────────────────────────────
     String bookingId = '';
     final rawBid = json['booking_id'];
     final rawB   = json['booking'];
@@ -155,39 +154,58 @@ class ConversationModel {
       bookingId = _s(rawB['id']);
     }
 
-    // ── booking_code — may be at top level or inside booking object ────────
-    String bookingCode = '';
-    final rawBc = json['booking_code'];
-    if (rawBc is String && rawBc.isNotEmpty) {
-      bookingCode = rawBc;
-    } else if (rawB is Map) {
+    // ── booking_code ──────────────────────────────────────────────────────────
+    String bookingCode = _s(json['booking_code']);
+    if (bookingCode.isEmpty && rawB is Map) {
       bookingCode = _s(rawB['booking_code']);
     }
 
-    // ── last_message — might be null or non-string ─────────────────────────
+    // ── is_support flag ───────────────────────────────────────────────────────
+    // Backend sets is_support: true OR booking_id: 'support' / 'support:<uuid>'
+    final isSupport = (json['is_support'] == true) ||
+        bookingId.startsWith('support');
+
+    // ── other user (partner side for customers) ───────────────────────────────
+    // Backend returns partner_name (business name) and partner_user_id
+    String otherUserId   = _s(json['partner_user_id']);
+    String otherUserName = _s(json['partner_name']);   // business_name
+    String otherUserAvatar = '';
+
+    // Fallback: try nested other_user object (future-proofing)
+    final o = json['other_user'];
+    if (o is Map) {
+      if (otherUserId.isEmpty)   otherUserId   = _s(o['id']);
+      if (otherUserName.isEmpty) otherUserName = _s(o['full_name']);
+      if (otherUserAvatar.isEmpty) otherUserAvatar = _s(o['avatar_url']);
+    }
+
+    // ── car name ──────────────────────────────────────────────────────────────
+    String carName = _s(json['car_name']);
+    final car = json['car'];
+    if (carName.isEmpty && car is Map) carName = _s(car['name']);
+
+    // ── last_message ──────────────────────────────────────────────────────────
     final rawLm = json['last_message'];
     String lastMessage = '';
     if (rawLm is String) {
       lastMessage = rawLm;
     } else if (rawLm is Map) {
-      // backend returns { content, created_at, sender_id }
       lastMessage = _s(rawLm['content']);
     }
 
-    // ── last_message_at ────────────────────────────────────────────────────
+    // ── last_message_at ───────────────────────────────────────────────────────
     DateTime lastMessageAt = DateTime.now();
     final rawAt = json['last_message_at'];
     if (rawAt is String && rawAt.isNotEmpty) {
       lastMessageAt = DateTime.tryParse(rawAt) ?? DateTime.now();
     } else if (rawLm is Map) {
-      // fallback: parse from nested last_message object
       final rawCreated = rawLm['created_at'];
       if (rawCreated is String && rawCreated.isNotEmpty) {
         lastMessageAt = DateTime.tryParse(rawCreated) ?? DateTime.now();
       }
     }
 
-    // ── unread_count — might come as String from some serialisers ─────────
+    // ── unread_count ──────────────────────────────────────────────────────────
     int unreadCount = 0;
     final rawUc = json['unread_count'];
     if (rawUc is int) {
