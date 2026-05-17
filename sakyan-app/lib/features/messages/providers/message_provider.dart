@@ -94,12 +94,14 @@ class InquiryChatNotifier
     required String carId,
     required String content,
     String? imageUrl,
+    String? customerId,   // used by partner when replying (carId will be empty)
   }) async {
     final current = state.value ?? [];
     final msg = await ref.read(messageRepositoryProvider).sendInquiry(
-          carId:    carId,
-          content:  content,
-          imageUrl: imageUrl,
+          carId:      carId,
+          content:    content,
+          imageUrl:   imageUrl,
+          customerId: customerId,
         );
     state = AsyncValue.data([...current, msg]);
     ref.invalidate(conversationsProvider);

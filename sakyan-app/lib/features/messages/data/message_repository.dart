@@ -188,19 +188,23 @@ class MessageRepository {
     required String carId,
     required String content,
     String? imageUrl,
+    String? customerId,   // set by partner when replying (carId is empty)
   }) async {
     if (content.trim().isEmpty && (imageUrl == null || imageUrl.isEmpty)) {
       throw Exception('Cannot send an empty message.');
     }
     try {
-      final res = await ApiService.post(
-        ApiConstants.inquiryMessage,
-        data: {
-          'car_id':  carId,
-          'content': content.trim(),
-          if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
-        },
-      );
+      final body = <String, dynamic>{
+        'content': content.trim(),
+        if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
+      };
+      // Customer sends car_id; partner sends customer_id
+      if (carId.isNotEmpty) {
+        body['car_id'] = carId;
+      } else if (customerId != null && customerId.isNotEmpty) {
+        body['customer_id'] = customerId;
+      }
+      final res = await ApiService.post(ApiConstants.inquiryMessage, data: body);
       return MessageModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       final msg = _extractDjangoError(e.response?.data);

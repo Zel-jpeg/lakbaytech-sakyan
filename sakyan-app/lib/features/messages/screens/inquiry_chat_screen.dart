@@ -138,11 +138,15 @@ class _InquiryChatScreenState extends ConsumerState<InquiryChatScreen> {
       _clearImage();
     }
 
+    // Customer uses carId; partner leaves carId empty and sends customerId instead
+    final isPartnerSide = widget.carId.isEmpty;
+
     try {
       await ref.read(inquiryChatProvider(widget.partnerUserId).notifier).send(
-            carId:    widget.carId,
-            content:  savedText,
-            imageUrl: imageUrl,
+            carId:      isPartnerSide ? '' : widget.carId,
+            content:    savedText,
+            imageUrl:   imageUrl,
+            customerId: isPartnerSide ? widget.partnerUserId : null,
           );
       _scrollToBottom(animated: true);
     } catch (e) {
@@ -231,8 +235,13 @@ class _InquiryChatScreenState extends ConsumerState<InquiryChatScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Pre-booking inquiry for ${widget.carName}. '
-                  'You can ask the partner any questions before booking.',
+                  widget.carId.isEmpty
+                      // Partner side
+                      ? 'Inquiry from ${widget.partnerName}'
+                          '${widget.carName.isNotEmpty && widget.carName != "Pre-booking Inquiry" ? " about ${widget.carName}" : ""}'
+                      // Customer side
+                      : 'Pre-booking inquiry for ${widget.carName}. '
+                          'Ask the partner any questions before booking.',
                   style: const TextStyle(
                       color: AppColors.primary,
                       fontSize: 11,

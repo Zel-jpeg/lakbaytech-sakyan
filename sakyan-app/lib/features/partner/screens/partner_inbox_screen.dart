@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -166,14 +166,30 @@ class _ConvTile extends StatelessWidget {
         : '?';
 
     return GestureDetector(
-      onTap: () => context.push(
-        '/chat/${c.bookingId}',
-        extra: {
-          'receiverId': c.otherUserId,
-          'name':       c.otherUserName,
-          'carName':    c.carName,
-        },
-      ),
+      onTap: () {
+        if (c.isInquiry) {
+          // For inquiry threads, the other party UUID is embedded in bookingId
+          // as "inquiry:<customer-uuid>". The partner navigates to the inquiry
+          // chat screen passing the CUSTOMER's user ID as partnerUserId
+          // (InquiryChatScreen uses it as the "other party" to fetch the thread).
+          final customerUserId = c.inquiryOtherUserId;
+          context.push('/inquiry-chat', extra: {
+            'carId':         '',          // partner doesn't need carId to fetch
+            'partnerUserId': customerUserId,
+            'partnerName':   c.otherUserName.isNotEmpty ? c.otherUserName : 'Customer',
+            'carName':       c.carName.isNotEmpty ? c.carName : 'Pre-booking Inquiry',
+          });
+        } else {
+          context.push(
+            '/chat/${c.bookingId}',
+            extra: {
+              'receiverId': c.otherUserId,
+              'name':       c.otherUserName,
+              'carName':    c.carName,
+            },
+          );
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(

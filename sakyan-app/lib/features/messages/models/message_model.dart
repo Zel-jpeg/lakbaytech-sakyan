@@ -110,7 +110,16 @@ class ConversationModel {
   final String carName;
 
   /// True when this thread is a Sakyan Support conversation (no booking).
-  bool get isSupport => bookingId.isEmpty;
+  bool get isSupport  => bookingId == 'support' || bookingId.startsWith('support:');
+
+  /// True when this thread is a pre-booking inquiry (customer ↔ partner, no booking).
+  bool get isInquiry  => bookingId.startsWith('inquiry:');
+
+  /// For inquiry threads, the UUID of the other party embedded in bookingId.
+  String get inquiryOtherUserId {
+    if (!isInquiry) return otherUserId;
+    return bookingId.replaceFirst('inquiry:', '');
+  }
 
   const ConversationModel({
     required this.bookingId,

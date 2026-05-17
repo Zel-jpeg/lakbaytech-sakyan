@@ -36,7 +36,7 @@ class SendMessageView(generics.CreateAPIView):
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _admin_ids():
-    """List of admin user UUIDs used to distinguish support from inquiry messages."""
+    """List of admin user UUIDs — used to distinguish support vs inquiry messages."""
     return list(User.objects.filter(role='admin').values_list('id', flat=True))
 
 
@@ -44,7 +44,7 @@ def _admin_ids():
 
 class SupportThreadView(APIView):
     """
-    GET  /messages/support/                    → user sees own admin↔user support thread
+    GET  /messages/support/                    → user sees their admin support thread
     GET  /messages/support/?partner_id=<uuid>  → admin fetches a specific user's thread
     POST /messages/support/                    → send to admin
          body (customer/partner): { content }
@@ -279,10 +279,13 @@ class ConversationListView(APIView):
                         display_name = other_user.partner.business_name
                     except Exception:
                         display_name = other_user.full_name
+
+                    car_name_hint = 'Pre-booking Inquiry'
+
                     inquiry_convs.append({
                         'booking_id':      f'inquiry:{other_id}',
                         'booking_code':    'Inquiry',
-                        'car_name':        'Pre-booking Inquiry',
+                        'car_name':        car_name_hint,
                         'customer_name':   user.full_name,
                         'partner_name':    display_name,
                         'customer_id':     str(user.id),
@@ -295,12 +298,22 @@ class ConversationListView(APIView):
                             'sender_id':  str(last.sender_id),
                         } if last else None,
                     })
+
                 else:
                     # Partner role — other is a customer
+                    # Try to guess the car from this partner's fleet (best effort)
+                    car_name_hint = 'Pre-booking Inquiry'
+                    try:
+                        partner_cars = Car.objects.filter(partner__user=user)
+                        if partner_cars.count() == 1:
+                            car_name_hint = partner_cars.first().name
+                    except Exception:
+                        pass
+
                     inquiry_convs.append({
                         'booking_id':      f'inquiry:{other_id}',
                         'booking_code':    'Inquiry',
-                        'car_name':        'Pre-booking Inquiry',
+                        'car_name':        car_name_hint,
                         'customer_name':   other_user.full_name,
                         'partner_name':    user.full_name,
                         'customer_id':     other_id,
@@ -326,53 +339,77 @@ class ConversationListView(APIView):
         return Response(conversations)
 
 
-# ─── Pre-Booking Inquiry (customer → partner, booking=None, no admin) ─────────
+# ─── Pre-Booking Inquiry (customer ↔ partner, booking=None, no admin) ─────────
 
 class InquiryMessageView(APIView):
     """
-    POST /messages/inquiry/              → send a pre-booking question to a partner
-    GET  /messages/inquiry/?partner_user_id=<uuid>  → fetch the thread
+    POST /messages/inquiry/
+        Customer sends: { car_id, content, image_url? }
+        Partner replies: { customer_id, content, image_url? }
+
+    GET  /messages/inquiry/?partner_user_id=<uuid>
+        Fetch the thread between the current user and another party.
+        Works for both customer (pass partner's user UUID) and partner (pass customer's UUID).
 
     Inquiry messages: booking=None, neither side is admin.
     Support messages: booking=None, one side is admin.
-    These two sets are mutually exclusive and are identified via admin-id exclusion.
+    These are mutually exclusive and distinguished by admin-id exclusion.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user      = request.user
-        car_id    = request.data.get('car_id', '').strip()
         content   = request.data.get('content', '').strip()
         image_url = request.data.get('image_url', '').strip() or None
 
-        if not car_id:
-            return Response({'error': 'car_id is required.'}, status=400)
         if not content and not image_url:
             return Response({'error': 'Either content or image_url is required.'}, status=400)
 
-        try:
-            car = Car.objects.select_related('partner__user').get(pk=car_id)
-        except (Car.DoesNotExist, Exception):
-            return Response({'error': 'Car not found.'}, status=404)
+        if user.role == 'customer':
+            # Customer sends inquiry via car_id → partner is derived from car
+            car_id = request.data.get('car_id', '').strip()
+            if not car_id:
+                return Response({'error': 'car_id is required.'}, status=400)
+            try:
+                car = Car.objects.select_related('partner__user').get(pk=car_id)
+            except (Car.DoesNotExist, Exception):
+                return Response({'error': 'Car not found.'}, status=404)
+            partner_user = car.partner.user
+            if not partner_user:
+                return Response({'error': 'Partner not available.'}, status=404)
+            if partner_user.role == 'admin':
+                return Response({'error': 'Cannot send inquiry to an admin account.'}, status=400)
+            receiver = partner_user
 
-        partner_user = car.partner.user
-        if not partner_user:
-            return Response({'error': 'Partner not available.'}, status=404)
+        elif user.role == 'partner':
+            # Partner replies to a customer inquiry via customer_id
+            customer_id = request.data.get('customer_id', '').strip()
+            if not customer_id:
+                return Response({'error': 'customer_id is required for partner replies.'}, status=400)
+            try:
+                receiver = User.objects.get(pk=customer_id)
+            except (User.DoesNotExist, Exception):
+                return Response({'error': 'Customer not found.'}, status=404)
+            if receiver.role != 'customer':
+                return Response({'error': 'Receiver must be a customer.'}, status=400)
 
-        # Never route to an admin — it would be misclassified as a support message
-        if partner_user.role == 'admin':
-            return Response({'error': 'Cannot send inquiry to an admin account.'}, status=400)
+        else:
+            return Response(
+                {'error': 'Only customers and partners can use inquiry messaging.'},
+                status=403,
+            )
 
         msg = Message.objects.create(
             booking=None,
             sender=user,
-            receiver=partner_user,
+            receiver=receiver,
             content=content,
             image_url=image_url,
         )
         return Response(MessageSerializer(msg).data, status=201)
 
     def get(self, request):
+        """Fetch inquiry thread between logged-in user and the given other party."""
         user            = request.user
         partner_user_id = request.query_params.get('partner_user_id', '').strip()
 
@@ -380,20 +417,19 @@ class InquiryMessageView(APIView):
             return Response({'error': 'partner_user_id is required.'}, status=400)
 
         try:
-            partner_user = User.objects.get(pk=partner_user_id)
+            other_user = User.objects.get(pk=partner_user_id)
         except (User.DoesNotExist, Exception):
-            return Response({'error': 'Partner not found.'}, status=404)
+            return Response({'error': 'User not found.'}, status=404)
 
         admin_ids = _admin_ids()
 
-        # Strictly exclude messages where an admin is involved
         qs = Message.objects.filter(
             booking__isnull=True
         ).exclude(
             Q(sender_id__in=admin_ids) | Q(receiver_id__in=admin_ids)
         ).filter(
-            Q(sender=user, receiver=partner_user) |
-            Q(sender=partner_user, receiver=user)
+            Q(sender=user, receiver=other_user) |
+            Q(sender=other_user, receiver=user)
         ).order_by('created_at')
 
         qs.filter(receiver=user, is_read=False).update(is_read=True)
