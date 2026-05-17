@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import '../../../core/constants/api_constants.dart';
 import '../../../core/services/api_service.dart';
 import '../models/message_model.dart';
 
@@ -11,9 +10,7 @@ class MessageRepository {
     // Run both requests in parallel
     final futures = await Future.wait<dynamic>([
       ApiService.get('/messages/conversations/'),
-      ApiService.get('/messages/support/').catchError(
-        (e) => Response(requestOptions: RequestOptions(path: ''), data: []),
-      ),
+      ApiService.get('/messages/support/').catchError((_) => null),
     ]);
 
     final res = futures[0];
@@ -181,52 +178,6 @@ class MessageRepository {
       if (msg != null) throw Exception(msg);
       rethrow;
     }
-  }
-
-  // ── Pre-booking inquiry (customer → partner, no booking yet) ──────────────
-  Future<MessageModel> sendInquiry({
-    required String carId,
-    required String content,
-    String? imageUrl,
-    String? customerId,   // set by partner when replying (carId is empty)
-  }) async {
-    if (content.trim().isEmpty && (imageUrl == null || imageUrl.isEmpty)) {
-      throw Exception('Cannot send an empty message.');
-    }
-    try {
-      final body = <String, dynamic>{
-        'content': content.trim(),
-        if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
-      };
-      // Customer sends car_id; partner sends customer_id
-      if (carId.isNotEmpty) {
-        body['car_id'] = carId;
-      } else if (customerId != null && customerId.isNotEmpty) {
-        body['customer_id'] = customerId;
-      }
-      final res = await ApiService.post(ApiConstants.inquiryMessage, data: body);
-      return MessageModel.fromJson(res.data as Map<String, dynamic>);
-    } on DioException catch (e) {
-      final msg = _extractDjangoError(e.response?.data);
-      if (msg != null) throw Exception(msg);
-      rethrow;
-    }
-  }
-
-  // ── Fetch inquiry thread (customer ↔ partner, no booking) ──────────────────
-  Future<List<MessageModel>> getInquiryMessages(String partnerUserId) async {
-    final res = await ApiService.get(
-      '${ApiConstants.inquiryMessage}?partner_user_id=$partnerUserId',
-    );
-    final raw = res.data;
-    List list = raw is List
-        ? raw
-        : (raw is Map && raw['results'] is List
-            ? raw['results'] as List
-            : []);
-    return list
-        .map((e) => MessageModel.fromJson(e as Map<String, dynamic>))
-        .toList();
   }
 
   // ── Helper: turn a Django error body into a human-readable string ──────────

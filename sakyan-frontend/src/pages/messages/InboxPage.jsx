@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   useConversations, useMessages, useSendMessage,
   useSupportMessages, useSendSupportMessage,
-  useInquiryMessages, useSendInquiryMessage,
 } from '@/hooks/useMessages'
 import { useAuthStore } from '@/store/authStore'
 import { useFileUpload } from '@/hooks/useFileUpload'
@@ -13,12 +12,6 @@ import toast from 'react-hot-toast'
 const SUPPORT_ID = 'support'
 function isSupportConv(conv) {
   return conv?.is_support === true || conv?.booking_id === SUPPORT_ID || String(conv?.booking_id || '').startsWith('support:')
-}
-function isInquiryConv(conv) {
-  return String(conv?.booking_id || '').startsWith('inquiry:')
-}
-function getInquiryOtherUserId(conv) {
-  return String(conv?.booking_id || '').replace('inquiry:', '')
 }
 function resolveOtherUser(conv, userId, userRole) {
   if (!conv || !userId) return { name: 'Unknown', id: null }
@@ -172,29 +165,23 @@ export default function InboxPage() {
   }, [targetBookingId, targetSupport, targetPartnerId, convList, activeConv])
 
   const isSupport = isSupportConv(activeConv)
-  const isInquiry = isInquiryConv(activeConv)
   const adminSupportPartnerId = isSupport && user?.role === 'admin' && activeConv
     ? (activeConv.support_partner_id || activeConv.customer_id || null) : null
 
-  // Derive the other-party UUID for inquiry threads
-  const inquiryOtherUserId = isInquiry ? getInquiryOtherUserId(activeConv) : null
+  const { data: bookingMessages, isLoading: bookingMsgsLoading } = useMessages(!isSupport && activeConv ? activeConv.booking_id : null)
+  const { data: supportMessages, isLoading: supportMsgsLoading } = useSupportMessages(isSupport ? adminSupportPartnerId : undefined)
+  const sendBookingMsg = useSendMessage()
+  const sendSupportMsg = useSendSupportMessage()
 
-  const { data: bookingMessages,  isLoading: bookingMsgsLoading  } = useMessages(!isSupport && !isInquiry && activeConv ? activeConv.booking_id : null)
-  const { data: supportMessages,  isLoading: supportMsgsLoading  } = useSupportMessages(isSupport ? adminSupportPartnerId : undefined)
-  const { data: inquiryMessages,  isLoading: inquiryMsgsLoading  } = useInquiryMessages(isInquiry ? inquiryOtherUserId : null)
-  const sendBookingMsg  = useSendMessage()
-  const sendSupportMsg  = useSendSupportMessage()
-  const sendInquiryMsg  = useSendInquiryMessage()
-
-  const serverMsgs  = isSupport ? (supportMessages || []) : isInquiry ? (inquiryMessages || []) : (bookingMessages?.results || bookingMessages || [])
-  const msgsLoading = isSupport ? supportMsgsLoading : isInquiry ? inquiryMsgsLoading : bookingMsgsLoading
+  const serverMsgs  = isSupport ? (supportMessages || []) : (bookingMessages?.results || bookingMessages || [])
+  const msgsLoading = isSupport ? supportMsgsLoading : bookingMsgsLoading
 
   // Remove confirmed optimistic messages
   useEffect(() => {
     if (!optimisticMsgs.length || !serverMsgs.length) return
     setOptimisticMsgs(prev => prev.filter(om =>
       !serverMsgs.some(sm =>
-        sm.content === om.content && sm.image_url === om.image_url && String(sm.sender?.id ?? sm.sender) === String(user?.id)
+        sm.content === om.content && sm.image_url === om.image_url && String(sm.sender) === String(user?.id)
       )
     ))
   }, [serverMsgs])
@@ -238,15 +225,11 @@ export default function InboxPage() {
 
     if (isSupport) {
       sendSupportMsg.mutate({ content, imageUrl, ...(adminSupportPartnerId ? { receiverId: adminSupportPartnerId } : {}) }, { onError })
-    } else if (isInquiry) {
-      // Partner replies with customer_id; customer sends with car_id (not applicable here)
-      const customerId  = activeConv?.customer_id
-      sendInquiryMsg.mutate({ customerId, content, imageUrl }, { onError })
     } else {
       const { id: receiverId } = resolveOtherUser(activeConv, user?.id, user?.role)
       sendBookingMsg.mutate({ bookingId: activeConv.booking_id, receiverId, content, imageUrl }, { onError })
     }
-  }, [activeConv, input, imageFile, isSupport, isInquiry, inquiryOtherUserId, adminSupportPartnerId, user, sendSupportMsg, sendInquiryMsg, sendBookingMsg, uploadFile])
+  }, [activeConv, input, imageFile, isSupport, adminSupportPartnerId, user, sendSupportMsg, sendBookingMsg, uploadFile])
 
   const handleRetry = (msg) => {
     setOptimisticMsgs(prev => prev.filter(m => m.id !== msg.id))
@@ -342,7 +325,7 @@ export default function InboxPage() {
                 )}
                 {msgList.map(msg => (
                   <MessageBubble key={msg.id} msg={msg}
-                    isOwn={String(msg.sender?.id ?? msg.sender) === String(user?.id)}
+                    isOwn={String(msg.sender) === String(user?.id)}
                     isOptimistic={!!msg._optimistic && !msg._failed}
                     hasFailed={!!msg._failed}
                     onRetry={() => handleRetry(msg)}

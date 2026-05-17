@@ -840,7 +840,7 @@ class _MessageBubble extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    DateFormat('h:mm a').format(message.createdAt.toLocal()),
+                    DateFormat('h:mm a').format(message.createdAt),
                     style: TextStyle(
                         fontSize: 10,
                         color:
@@ -879,14 +879,12 @@ class _TimeDivider extends StatelessWidget {
     final d     = DateTime(time.year, time.month, time.day);
 
     String label;
-    final localTime = time.toLocal();
-    final localD = DateTime(localTime.year, localTime.month, localTime.day);
-    if (localD == today) {
-      label = 'Today  ${DateFormat('h:mm a').format(localTime)}';
-    } else if (today.difference(localD).inDays == 1) {
-      label = 'Yesterday  ${DateFormat('h:mm a').format(localTime)}';
+    if (d == today) {
+      label = 'Today  ${DateFormat('h:mm a').format(time)}';
+    } else if (today.difference(d).inDays == 1) {
+      label = 'Yesterday  ${DateFormat('h:mm a').format(time)}';
     } else {
-      label = DateFormat('MMM d,  h:mm a').format(localTime);
+      label = DateFormat('MMM d,  h:mm a').format(time);
     }
 
     return Padding(

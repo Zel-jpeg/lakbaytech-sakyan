@@ -25,7 +25,6 @@ import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/messages/screens/inbox_screen.dart';
 import '../../features/messages/screens/chat_screen.dart';
 import '../../features/messages/screens/support_chat_screen.dart';
-import '../../features/messages/screens/inquiry_chat_screen.dart';
 
 import '../../features/profile/screens/profile_screen.dart';
 
@@ -341,19 +340,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             receiverId:   extra['receiverId']   as String?,
             receiverName: extra['name']         as String?,
             carName:      extra['carName']       as String?,
-          );
-        },
-      ),
-
-      GoRoute(
-        path: '/inquiry-chat',
-        builder: (_, s) {
-          final extra = s.extra as Map<String, dynamic>? ?? {};
-          return InquiryChatScreen(
-            carId:         extra['carId']         as String? ?? '',
-            partnerUserId: extra['partnerUserId'] as String? ?? '',
-            partnerName:   extra['partnerName']   as String? ?? 'Partner',
-            carName:       extra['carName']        as String? ?? '',
           );
         },
       ),

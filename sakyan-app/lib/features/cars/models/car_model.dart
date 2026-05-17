@@ -21,8 +21,6 @@ class CarModel {
   final bool isAvailable;
   final List<CarImageModel> images;
   final String partnerId;
-  final String partnerUserId;   // user UUID of partner — needed for /messages/ receiver
-  final String partnerName;     // business name (from partner_name flat field)
 
   // ── Flat image URL returned by list endpoints when images[] is not included ──
   // Django list serializers often return a single `primary_image_url` field
@@ -50,8 +48,6 @@ class CarModel {
     this.isAvailable  = true,
     this.images       = const [],
     this.partnerId    = '',
-    this.partnerUserId = '',
-    this.partnerName  = '',
     String? flatPrimaryImageUrl,
   }) : _flatPrimaryImageUrl = flatPrimaryImageUrl;
 
@@ -109,48 +105,14 @@ class CarModel {
 
   // ── Serialisation ──────────────────────────────────────────────────────────
   factory CarModel.fromJson(Map<String, dynamic> json) {
-    // ── Partner ───────────────────────────────────────────────────────────────
-    // CarDetailSerializer returns:
-    //   partner      : <partner-profile-UUID>  (the FK, stringified)
-    //   partner_id   : <partner-profile-UUID>  (explicit field, same value)
-    //   partner_user_id : <user-UUID>          ← what we need for /messages/
-    //   partner_name : <business_name>
-    // CarListSerializer returns only partner_name; partner is a UUID string.
-
-    String partnerId    = '';
-    String partnerUserId = '';
-    String partnerName  = '';
-
+    // partner can be a full object or just an id string
+    String partnerId = '';
     final p = json['partner'];
     if (p is Map) {
-      partnerId = p['id']?.toString() ?? '';
-      // Nested user block (future-proofing if serializer expands partner)
-      final pu = p['user'];
-      if (pu is Map) {
-        partnerUserId = pu['id']?.toString() ?? '';
-        if (partnerName.isEmpty) partnerName = pu['full_name']?.toString() ?? '';
-      } else if (pu is String && pu.isNotEmpty) {
-        partnerUserId = pu;
-      }
-    } else if (p is String && p.isNotEmpty) {
+      partnerId = p['id'] as String? ?? '';
+    } else if (p is String) {
       partnerId = p;
     }
-
-    // ── Flat fields from CarDetailSerializer (always prefer these) ────────────
-    // partner_id flat field (explicit UUID field on serializer)
-    final flatPartnerId = json['partner_id']?.toString() ?? '';
-    if (flatPartnerId.isNotEmpty) partnerId = flatPartnerId;
-
-    // partner_user_id — the USER uuid of the partner's account
-    final flatPartnerUserId = json['partner_user_id']?.toString() ?? '';
-    if (flatPartnerUserId.isNotEmpty) partnerUserId = flatPartnerUserId;
-
-    // partner_name — business name
-    final flatPartnerName = json['partner_name']?.toString() ?? '';
-    if (flatPartnerName.isNotEmpty) partnerName = flatPartnerName;
-
-    // Last resort: use partner profile UUID (messages may fail but at least we pass something)
-    if (partnerUserId.isEmpty) partnerUserId = partnerId;
 
     final rawFeatures = json['features'];
     List<String> features = const [];
@@ -216,8 +178,6 @@ class CarModel {
       isAvailable:          json['is_available'] as bool?    ?? true,
       images:               images,
       partnerId:            partnerId,
-      partnerUserId:        partnerUserId,
-      partnerName:          partnerName,
       flatPrimaryImageUrl:  flatImageUrl,
     );
   }
