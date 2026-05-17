@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Send, MessageSquare, Search, ArrowLeft, Car, Clock, ShieldCheck, Users, X, Paperclip, ImageIcon, AlertCircle, RefreshCw } from 'lucide-react'
+import { Send, MessageSquare, Search, ArrowLeft, Car, Clock, ShieldCheck, Users, X, Paperclip, ImageIcon, AlertCircle, RefreshCw, MessageCircle } from 'lucide-react'
 import {
   useConversations, useMessages, useSendMessage,
   useSupportMessages, useSendSupportMessage,
+  useInquiryMessages, useSendInquiryReply,
 } from '@/hooks/useMessages'
 import { useAuthStore } from '@/store/authStore'
 import { useFileUpload } from '@/hooks/useFileUpload'
@@ -16,9 +17,21 @@ function isSupportConv(conv) {
   if (!conv) return false
   return conv.is_support === true || conv.booking_id === SUPPORT_PREFIX || String(conv.booking_id || '').startsWith('support:')
 }
+function isInquiryConv(conv) {
+  if (!conv) return false
+  return conv.is_inquiry === true || conv.type === 'inquiry' || String(conv.booking_id || '').startsWith('inquiry:')
+}
 function resolveOtherUser(conv, userId) {
   if (!conv || !userId) return { name: 'Unknown', id: null }
   if (isSupportConv(conv)) return { name: 'Sakyan Support', id: null }
+  // For inquiry convs, the backend already resolved other_user correctly
+  // (customer's name for partner view, partner's name for customer view)
+  if (isInquiryConv(conv)) {
+    return {
+      name: conv.other_user?.full_name || conv.customer_name || 'Customer',
+      id:   conv.other_user?.id || conv.customer_id || null,
+    }
+  }
   const isCustomer = String(userId) === String(conv.customer_id)
   return {
     name: isCustomer ? (conv.partner_name || 'Partner') : (conv.customer_name || 'Customer'),
@@ -190,6 +203,29 @@ export default function PartnerInboxPage() {
     : convList
 
   const isSupport = isSupportConv(activeConv)
+  const isInquiry = isInquiryConv(activeConv)
+  // Partner PK for inquiry threads (stored as conv.partner_id by ConversationListView)
+  const activeInquiryPartnerId = isInquiry ? (activeConv?.partner_id || null) : null
+
+  const { data: bookingMessages, isLoading: bookingMsgsLoading } = useMessages(
+    !isSupport && !isInquiry && activeConv ? activeConv.booking_id : null
+  )
+  const { data: supportMessages, isLoading: supportMsgsLoading } = useSupportMessages(
+    isSupport ? undefined : undefined
+  )
+  const { data: inquiryMessages, isLoading: inquiryMsgsLoading } = useInquiryMessages(
+    isInquiry ? activeInquiryPartnerId : null
+  )
+  const sendBookingMsg   = useSendMessage()
+  const sendSupportMsg   = useSendSupportMessage()
+  const sendInquiryReply = useSendInquiryReply()
+
+  const serverMsgs  = isSupport  ? (supportMessages  || [])
+    : isInquiry ? (inquiryMessages || [])
+    : (bookingMessages?.results || bookingMessages || [])
+  const msgsLoading = isSupport ? supportMsgsLoading
+    : isInquiry ? inquiryMsgsLoading
+    : bookingMsgsLoading
 
   useEffect(() => {
     if (!convList.length) return
@@ -204,22 +240,20 @@ export default function PartnerInboxPage() {
     }
   }, [targetBookingId, targetSupport, convList, activeConv])
 
-  const { data: bookingMessages, isLoading: bookingMsgsLoading } = useMessages(!isSupport && activeConv ? activeConv.booking_id : null)
-  const { data: supportMessages, isLoading: supportMsgsLoading } = useSupportMessages(isSupport ? undefined : undefined) // undefined means partner's own support thread
-  const sendBookingMsg = useSendMessage()
-  const sendSupportMsg = useSendSupportMessage()
-
-  const serverMsgs  = isSupport ? (supportMessages || []) : (bookingMessages?.results || bookingMessages || [])
-  const msgsLoading = isSupport ? supportMsgsLoading : bookingMsgsLoading
-
+  // Remove confirmed optimistic messages once they appear in server data
   useEffect(() => {
     if (!optimisticMsgs.length || !serverMsgs.length) return
     setOptimisticMsgs(prev => prev.filter(om =>
-      !serverMsgs.some(sm => sm.content === om.content && sm.image_url === om.image_url && String(sm.sender) === String(user?.id))
+      !serverMsgs.some(sm =>
+        sm.content === om.content &&
+        sm.image_url === om.image_url &&
+        String(sm.sender) === String(user?.id)
+      )
     ))
   }, [serverMsgs])
 
   useEffect(() => { setOptimisticMsgs([]) }, [activeConv?.booking_id])
+
 
   const msgList = [...serverMsgs, ...optimisticMsgs]
 
@@ -259,13 +293,23 @@ export default function PartnerInboxPage() {
       toast.error('Message failed to send.')
     }
 
-    if (isSupport) {
+    if (isInquiry) {
+      // Partner is replying — receiver is the inquirer (other_user.id)
+      const partnerId  = activeInquiryPartnerId
+      const receiverId = resolveOtherUser(activeConv, user?.id).id
+      if (!receiverId) {
+        toast.error('Cannot identify inquirer to reply to.')
+        setOptimisticMsgs(prev => prev.map(m => m.id === optId ? { ...m, _failed: true } : m))
+        return
+      }
+      sendInquiryReply.mutate({ partnerId, receiverId, content, imageUrl }, { onError })
+    } else if (isSupport) {
       sendSupportMsg.mutate({ content, imageUrl }, { onError })
     } else {
       const { id: receiverId } = resolveOtherUser(activeConv, user?.id)
       sendBookingMsg.mutate({ bookingId: activeConv.booking_id, receiverId, content, imageUrl }, { onError })
     }
-  }, [activeConv, input, imageFile, isSupport, user, sendSupportMsg, sendBookingMsg, uploadFile])
+  }, [activeConv, input, imageFile, isSupport, isInquiry, activeInquiryPartnerId, user, sendSupportMsg, sendBookingMsg, sendInquiryReply, uploadFile])
 
   const handleRetry = (msg) => {
     setOptimisticMsgs(prev => prev.filter(m => m.id !== msg.id))
@@ -281,6 +325,12 @@ export default function PartnerInboxPage() {
             <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-3"><ShieldCheck size={26} className="text-emerald-400"/></div>
             <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Send us a message</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 max-w-xs leading-relaxed">Questions about your account, remittances, or anything else? We're here to help.</p>
+          </>
+        ) : isInquiry ? (
+          <>
+            <div className="w-14 h-14 rounded-full bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center mb-3"><MessageCircle size={26} className="text-indigo-400"/></div>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pre-booking inquiry</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 max-w-xs leading-relaxed">A customer wants to ask you something before booking. Reply to help them decide!</p>
           </>
         ) : (
           <>
@@ -354,19 +404,29 @@ export default function PartnerInboxPage() {
         {activeConv ? (
           <>
             {/* Chat header */}
-            <div className={`px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 shrink-0 ${isSupport ? 'bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10' : 'bg-white dark:bg-gray-900'}`}>
+            <div className={`px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 shrink-0
+              ${isSupport ? 'bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10'
+                : isInquiry ? 'bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-900/10 dark:to-violet-900/10'
+                : 'bg-white dark:bg-gray-900'}`}>
               <button className="sm:hidden p-1.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition" onClick={() => setMobileView('list')}><ArrowLeft size={18}/></button>
               {isSupport
                 ? <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0"><ShieldCheck size={16}/></div>
-                : <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shrink-0">{initials(activeOther?.name)}</div>
+                : isInquiry
+                  ? <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shrink-0"><MessageCircle size={15}/></div>
+                  : <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shrink-0">{initials(activeOther?.name)}</div>
               }
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 dark:text-white text-sm">{activeOther?.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-gray-900 dark:text-white text-sm">{activeOther?.name}</p>
+                  {isInquiry && <span className="text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400 px-1.5 py-0.5 rounded-full font-medium">Inquiry</span>}
+                </div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 truncate flex items-center gap-1">
-                  {isSupport ? 'We typically reply within 1 business day' : <><Car size={10} className="shrink-0"/> {activeConv.car_name || activeConv.booking_code}</>}
+                  {isSupport ? 'We typically reply within 1 business day'
+                    : isInquiry ? `Pre-booking inquiry from ${activeOther?.name}`
+                    : <><Car size={10} className="shrink-0"/> {activeConv.car_name || activeConv.booking_code}</>}
                 </p>
               </div>
-              {!isSupport && (activeConv.booking_code || activeConv.booking_id) && (
+              {!isSupport && !isInquiry && (activeConv.booking_code || activeConv.booking_id) && (
                 <span className="shrink-0 px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[10px] font-mono rounded-lg">#{activeConv.booking_code || activeConv.booking_id}</span>
               )}
             </div>
@@ -390,7 +450,7 @@ export default function PartnerInboxPage() {
                 <Paperclip size={18}/>
               </button>
               <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
-                placeholder={imageFile ? 'Add a caption… (optional)' : isSupport ? 'Ask Sakyan Support anything…' : 'Type a message…'}
+                placeholder={imageFile ? 'Add a caption… (optional)' : isSupport ? 'Ask Sakyan Support anything…' : isInquiry ? `Reply to ${activeOther?.name}…` : 'Type a message…'}
                 className="flex-1 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-2.5 text-sm bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:bg-white dark:focus:bg-gray-700/60 transition"
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e) } }}
               />
