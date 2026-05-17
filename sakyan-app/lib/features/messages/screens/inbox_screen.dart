@@ -116,29 +116,32 @@ class _ConversationTile extends StatelessWidget {
     final c = conversation;
     final hasUnread   = c.unreadCount > 0;
     final isSupport   = c.isSupport;
+    final isInquiry   = c.isInquiry;
 
-    // Display name: Sakyan Support for support thread, partner name otherwise
+    // Display name
     final displayName = isSupport
         ? 'Sakyan Support'
-        : (c.otherUserName.isNotEmpty ? c.otherUserName : 'Partner');
+        : (c.otherUserName.isNotEmpty ? c.otherUserName : (isInquiry ? 'Partner' : 'Partner'));
 
     final initials = isSupport
         ? 'S'
         : (c.otherUserName.isNotEmpty
-            ? c.otherUserName
-                .trim()
-                .split(' ')
-                .map((w) => w[0])
-                .take(2)
-                .join()
-                .toUpperCase()
+            ? c.otherUserName.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase()
             : 'P');
 
     return GestureDetector(
       onTap: () {
         if (isSupport) {
-          // Navigate to support chat (special route with no booking ID)
           context.push('/support-chat');
+        } else if (c.isInquiry) {
+          // Route to the inquiry chat screen
+          final partnerId   = c.partnerId ?? '';
+          final partnerName = c.otherUserName.isNotEmpty ? c.otherUserName : 'Partner';
+          context.push('/inquiry-chat', extra: {
+            'partnerId':   partnerId,
+            'partnerName': partnerName,
+            'receiverId':  c.otherUserId,
+          });
         } else {
           context.push('/chat/${c.bookingId}',
               extra: {
@@ -152,12 +155,16 @@ class _ConversationTile extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: hasUnread
-              ? AppColors.primary.withOpacity(0.05)
+              ? (isInquiry
+                  ? const Color(0xFF6366F1).withOpacity(0.05)
+                  : AppColors.primary.withOpacity(0.05))
               : cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: hasUnread
-                ? AppColors.primary.withOpacity(0.25)
+                ? (isInquiry
+                    ? const Color(0xFF6366F1).withOpacity(0.25)
+                    : AppColors.primary.withOpacity(0.25))
                 : borderColor,
           ),
         ),
@@ -186,10 +193,35 @@ class _ConversationTile extends StatelessWidget {
                       ],
                     ),
                     child: const Center(
-                      child: Icon(
-                        Icons.shield_rounded,
-                        color: Colors.white,
-                        size: 24,
+                      child: Icon(Icons.shield_rounded, color: Colors.white, size: 24),
+                    ),
+                  )
+                else if (isInquiry)
+                  // Inquiry avatar — indigo chat bubble icon
+                  Container(
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF7C3AED)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700),
                       ),
                     ),
                   )
@@ -276,6 +308,25 @@ class _ConversationTile extends StatelessWidget {
                                 ),
                               ),
                             },
+                            if (isInquiry) ...{
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Inquiry',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Color(0xFF6366F1),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            },
                           ],
                         ),
                       ),
@@ -284,7 +335,7 @@ class _ConversationTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           color: hasUnread
-                              ? AppColors.primary
+                              ? (isInquiry ? const Color(0xFF6366F1) : AppColors.primary)
                               : textMuted,
                           fontWeight: hasUnread
                               ? FontWeight.w600
@@ -294,7 +345,7 @@ class _ConversationTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  if (!isSupport && c.carName.isNotEmpty)
+                  if (!isSupport && !isInquiry && c.carName.isNotEmpty)
                     Text(c.carName,
                         style: const TextStyle(
                             fontSize: 11,
@@ -305,6 +356,12 @@ class _ConversationTile extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 11,
                             color: AppColors.primary.withOpacity(0.7),
+                            fontWeight: FontWeight.w500)),
+                  if (isInquiry)
+                    const Text('Pre-booking inquiry',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6366F1),
                             fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text(

@@ -111,7 +111,16 @@ class ConversationModel {
 
   /// True when this thread is a Sakyan Support conversation (no booking).
   /// The backend returns booking_id = 'support'; locally-built entries use ''.
-  bool get isSupport => bookingId.isEmpty || bookingId == 'support';
+  bool get isSupport => bookingId.isEmpty || bookingId == 'support' || bookingId.startsWith('support:');
+
+  /// True when this is a pre-booking inquiry thread.
+  bool get isInquiry => bookingId.startsWith('inquiry:') || type == 'inquiry';
+
+  /// Partner PK for inquiry threads (used to call GET /messages/inquiry/?partner_id=)
+  final String? partnerId;
+
+  /// Conversation type string from backend ('inquiry', 'support', 'booking').
+  final String type;
 
   const ConversationModel({
     required this.bookingId,
@@ -123,6 +132,8 @@ class ConversationModel {
     required this.lastMessageAt,
     this.unreadCount = 0,
     this.carName     = '',
+    this.partnerId,
+    this.type        = '',
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
@@ -217,6 +228,8 @@ class ConversationModel {
       lastMessageAt:   lastMessageAt,
       unreadCount:     unreadCount,
       carName:         carName,
+      partnerId:       json['partner_id']?.toString(),
+      type:            json['type']?.toString() ?? '',
     );
   }
 }

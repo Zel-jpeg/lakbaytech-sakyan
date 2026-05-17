@@ -21,6 +21,7 @@ class CarModel {
   final bool isAvailable;
   final List<CarImageModel> images;
   final String partnerId;
+  final String partnerName;
 
   // ── Flat image URL returned by list endpoints when images[] is not included ──
   // Django list serializers often return a single `primary_image_url` field
@@ -48,6 +49,7 @@ class CarModel {
     this.isAvailable  = true,
     this.images       = const [],
     this.partnerId    = '',
+    this.partnerName  = '',
     String? flatPrimaryImageUrl,
   }) : _flatPrimaryImageUrl = flatPrimaryImageUrl;
 
@@ -106,13 +108,17 @@ class CarModel {
   // ── Serialisation ──────────────────────────────────────────────────────────
   factory CarModel.fromJson(Map<String, dynamic> json) {
     // partner can be a full object or just an id string
-    String partnerId = '';
+    String partnerId = '', partnerName = '';
     final p = json['partner'];
     if (p is Map) {
-      partnerId = p['id'] as String? ?? '';
+      partnerId   = p['id']?.toString()            ?? '';
+      partnerName = p['business_name']?.toString() ?? p['name']?.toString() ?? '';
     } else if (p is String) {
       partnerId = p;
     }
+    // flat fallback fields
+    if (partnerId.isEmpty)   partnerId   = json['partner_id']?.toString()   ?? '';
+    if (partnerName.isEmpty) partnerName = json['partner_name']?.toString() ?? '';
 
     final rawFeatures = json['features'];
     List<String> features = const [];
@@ -178,6 +184,7 @@ class CarModel {
       isAvailable:          json['is_available'] as bool?    ?? true,
       images:               images,
       partnerId:            partnerId,
+      partnerName:          partnerName,
       flatPrimaryImageUrl:  flatImageUrl,
     );
   }

@@ -139,6 +139,80 @@ class MessageRepository {
     }
   }
 
+  // ── Inquiry thread (pre-booking) ───────────────────────────────────────────
+
+  /// GET /messages/inquiry/?partner_id=<uuid>
+  /// Returns all inquiry messages for the given partner thread.
+  Future<List<MessageModel>> getInquiryMessages(String partnerId) async {
+    final res = await ApiService.get(
+      '/messages/inquiry/',
+      params: {'partner_id': partnerId},
+    );
+    final raw = res.data;
+    List list = raw is List
+        ? raw
+        : (raw is Map && raw['results'] is List
+            ? raw['results'] as List
+            : []);
+    return list
+        .map((e) => MessageModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /messages/inquiry/ — sends the very first message in a thread.
+  Future<MessageModel> sendInquiry({
+    required String partnerId,
+    required String content,
+    String? imageUrl,
+  }) async {
+    if (content.trim().isEmpty && (imageUrl == null || imageUrl.isEmpty)) {
+      throw Exception('Cannot send an empty message.');
+    }
+    try {
+      final res = await ApiService.post(
+        '/messages/inquiry/',
+        data: {
+          'partner_id': partnerId,
+          'content': content.trim().isEmpty ? ' ' : content.trim(),
+          if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
+        },
+      );
+      return MessageModel.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      final msg = _extractDjangoError(e.response?.data);
+      if (msg != null) throw Exception(msg);
+      rethrow;
+    }
+  }
+
+  /// POST /messages/inquiry/reply/ — replies to an existing inquiry thread.
+  Future<MessageModel> sendInquiryReply({
+    required String partnerId,
+    required String receiverId,
+    required String content,
+    String? imageUrl,
+  }) async {
+    if (content.trim().isEmpty && (imageUrl == null || imageUrl.isEmpty)) {
+      throw Exception('Cannot send an empty message.');
+    }
+    try {
+      final res = await ApiService.post(
+        '/messages/inquiry/reply/',
+        data: {
+          'partner_id':  partnerId,
+          'receiver_id': receiverId,
+          'content': content.trim().isEmpty ? ' ' : content.trim(),
+          if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
+        },
+      );
+      return MessageModel.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      final msg = _extractDjangoError(e.response?.data);
+      if (msg != null) throw Exception(msg);
+      rethrow;
+    }
+  }
+
   // ── Helper: turn a Django error body into a human-readable string ──────────
   static String? _extractDjangoError(dynamic body) {
     if (body == null) return null;

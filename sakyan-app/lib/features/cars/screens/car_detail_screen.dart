@@ -408,7 +408,7 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
           ],
         ),
 
-        // ── Sticky Book Now bar ──────────────────────────────────────────
+        // ── Sticky Book Now + Message Partner bar ────────────────────────────
         Positioned(
           left: 0, right: 0, bottom: 0,
           child: Column(
@@ -425,6 +425,7 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
                 ),
                 child: Row(
                   children: [
+                    // Price label
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -440,7 +441,31 @@ class _CarDetailScreenState extends ConsumerState<CarDetailScreen> {
                             style: TextStyle(fontSize: 12, color: textMuted)),
                       ],
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 12),
+                    // Message Partner button (indigo, outline style)
+                    if (user != null && car.partnerId.isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: () => context.push(
+                          '/inquiry-chat',
+                          extra: {
+                            'partnerId':   car.partnerId,
+                            'partnerName': car.partnerName,
+                          },
+                        ),
+                        icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                        label: const Text('Ask'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF6366F1),
+                          side: const BorderSide(color: Color(0xFF6366F1)),
+                          minimumSize: const Size(0, 52),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                        ),
+                      ),
+                    if (user != null && car.partnerId.isNotEmpty)
+                      const SizedBox(width: 8),
+                    // Book Now button
                     Expanded(
                       child: ElevatedButton(
                         onPressed: car.isAvailable && user != null

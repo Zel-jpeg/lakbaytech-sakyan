@@ -25,6 +25,7 @@ import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/messages/screens/inbox_screen.dart';
 import '../../features/messages/screens/chat_screen.dart';
 import '../../features/messages/screens/support_chat_screen.dart';
+import '../../features/messages/screens/inquiry_chat_screen.dart';
 
 import '../../features/profile/screens/profile_screen.dart';
 
@@ -329,6 +330,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/support-chat',
         builder: (_, __) => const SupportChatScreen(),
+      ),
+
+      GoRoute(
+        path: '/inquiry-chat',
+        builder: (_, s) {
+          final extra = s.extra as Map<String, dynamic>? ?? {};
+          return InquiryChatScreen(
+            partnerId:   extra['partnerId']   as String? ?? '',
+            partnerName: extra['partnerName'] as String? ?? 'Partner',
+            receiverId:  extra['receiverId']  as String?,
+          );
+        },
       ),
 
       GoRoute(
