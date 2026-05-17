@@ -253,8 +253,20 @@ class _InquiryChatScreenState extends ConsumerState<InquiryChatScreen> {
                   children: [
                     Icon(Icons.wifi_off_rounded, size: 48, color: textMuted),
                     const SizedBox(height: 12),
-                    Text('Failed to load messages',
-                        style: TextStyle(color: textMuted)),
+                    Text('Could not load conversation',
+                        style: TextStyle(
+                            color: textMuted,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        e.toString().replaceFirst('Exception: ', ''),
+                        style: TextStyle(color: textMuted, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: () => ref.invalidate(

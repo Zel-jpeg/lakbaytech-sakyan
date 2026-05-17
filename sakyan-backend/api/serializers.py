@@ -124,11 +124,13 @@ class CarListSerializer(serializers.ModelSerializer):
 
 
 class CarDetailSerializer(serializers.ModelSerializer):
-    images        = CarImageSerializer(many=True, read_only=True)
-    partner_name  = serializers.CharField(source='partner.business_name', read_only=True)
-    partner_phone = serializers.CharField(source='partner.contact_phone', read_only=True)
-    partner_id    = serializers.UUIDField(source='partner.id', read_only=True)
-    primary_image = serializers.SerializerMethodField()
+    images          = CarImageSerializer(many=True, read_only=True)
+    partner_name    = serializers.CharField(source='partner.business_name', read_only=True)
+    partner_phone   = serializers.CharField(source='partner.contact_phone', read_only=True)
+    partner_id      = serializers.UUIDField(source='partner.id', read_only=True)
+    # The USER uuid of the partner — needed for /messages/inquiry/ receiver lookup
+    partner_user_id = serializers.UUIDField(source='partner.user.id', read_only=True)
+    primary_image   = serializers.SerializerMethodField()
 
     class Meta:
         model = Car

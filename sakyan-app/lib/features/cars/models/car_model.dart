@@ -109,16 +109,22 @@ class CarModel {
 
   // ── Serialisation ──────────────────────────────────────────────────────────
   factory CarModel.fromJson(Map<String, dynamic> json) {
-    // partner can be a full object or just an id string
-    String partnerId = '';
+    // ── Partner ───────────────────────────────────────────────────────────────
+    // CarDetailSerializer returns:
+    //   partner      : <partner-profile-UUID>  (the FK, stringified)
+    //   partner_id   : <partner-profile-UUID>  (explicit field, same value)
+    //   partner_user_id : <user-UUID>          ← what we need for /messages/
+    //   partner_name : <business_name>
+    // CarListSerializer returns only partner_name; partner is a UUID string.
+
+    String partnerId    = '';
     String partnerUserId = '';
-    String partnerName = '';
+    String partnerName  = '';
+
     final p = json['partner'];
     if (p is Map) {
-      partnerId = p['id'] as String? ?? '';
-      // partner_name flat field (from CarDetailSerializer / CarListSerializer)
-      partnerName = json['partner_name']?.toString() ?? '';
-      // Try to get the partner's user UUID from nested partner object
+      partnerId = p['id']?.toString() ?? '';
+      // Nested user block (future-proofing if serializer expands partner)
       final pu = p['user'];
       if (pu is Map) {
         partnerUserId = pu['id']?.toString() ?? '';
@@ -126,16 +132,25 @@ class CarModel {
       } else if (pu is String && pu.isNotEmpty) {
         partnerUserId = pu;
       }
-      // Last resort: use partner profile UUID
-      if (partnerUserId.isEmpty) partnerUserId = partnerId;
-    } else if (p is String) {
+    } else if (p is String && p.isNotEmpty) {
       partnerId = p;
-      partnerUserId = p;
     }
-    // Also check flat partner_name field at top level (CarListSerializer)
-    if (partnerName.isEmpty) {
-      partnerName = json['partner_name']?.toString() ?? '';
-    }
+
+    // ── Flat fields from CarDetailSerializer (always prefer these) ────────────
+    // partner_id flat field (explicit UUID field on serializer)
+    final flatPartnerId = json['partner_id']?.toString() ?? '';
+    if (flatPartnerId.isNotEmpty) partnerId = flatPartnerId;
+
+    // partner_user_id — the USER uuid of the partner's account
+    final flatPartnerUserId = json['partner_user_id']?.toString() ?? '';
+    if (flatPartnerUserId.isNotEmpty) partnerUserId = flatPartnerUserId;
+
+    // partner_name — business name
+    final flatPartnerName = json['partner_name']?.toString() ?? '';
+    if (flatPartnerName.isNotEmpty) partnerName = flatPartnerName;
+
+    // Last resort: use partner profile UUID (messages may fail but at least we pass something)
+    if (partnerUserId.isEmpty) partnerUserId = partnerId;
 
     final rawFeatures = json['features'];
     List<String> features = const [];
