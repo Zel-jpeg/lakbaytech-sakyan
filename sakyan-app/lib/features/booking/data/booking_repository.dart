@@ -55,6 +55,6 @@ class BookingRepository {
 
   /// Cancel a booking.
   Future<void> cancelBooking(String id) async {
-    await ApiService.post(ApiConstants.bookingAction(id, 'cancel'));
+    await ApiService.patch(ApiConstants.bookingAction(id, 'cancel'));
   }
 }

@@ -821,17 +821,21 @@ class _BookingDetailModalState extends ConsumerState<_BookingDetailModal> {
   }
 
   Future<void> _handleCancel(BuildContext ctx) async {
+    // Use dialogCtx (the dialog's OWN context) in button callbacks — never the
+    // outer ctx, which may become stale while the dialog is open (e.g. polling
+    // rebuilds the parent screen and deactivates the bottom-sheet element).
     final confirmed = await showDialog<bool>(
       context: ctx,
-      builder: (_) => AlertDialog(
+      barrierDismissible: false, // prevent accidental outside-tap dismissal
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Cancel Booking'),
         content: const Text('Are you sure you want to cancel this booking?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
+              onPressed: () => Navigator.pop(dialogCtx, false),
               child: const Text('Keep it')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Yes, Cancel'),
           ),
@@ -839,7 +843,7 @@ class _BookingDetailModalState extends ConsumerState<_BookingDetailModal> {
       ),
     );
 
-    if (confirmed != true || !ctx.mounted) return;
+    if (confirmed != true) return;
 
     setState(() => _cancelling = true);
     try {
@@ -847,31 +851,32 @@ class _BookingDetailModalState extends ConsumerState<_BookingDetailModal> {
           .read(bookingRepositoryProvider)
           .cancelBooking(widget.booking.id);
       widget.onCancel();
-      if (ctx.mounted) {
-        Navigator.of(ctx).pop(); // close modal
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(
-            content: const Row(children: [
-              Icon(Icons.check_rounded, color: Colors.white, size: 16),
-              SizedBox(width: 8),
-              Text('Booking cancelled'),
-            ]),
-            backgroundColor: AppColors.statusCancelled,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          ),
-        );
-      }
-    } catch (_) {
-      if (ctx.mounted) {
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to cancel booking'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      // Pop the modal first, then show the snackbar via the global messenger
+      // so we don't rely on ctx being mounted after the pop.
+      if (ctx.mounted) Navigator.of(ctx).pop();
+      BookingToastService.messengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: const Row(children: [
+            Icon(Icons.check_rounded, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text('Booking cancelled successfully'),
+          ]),
+          backgroundColor: AppColors.statusCancelled,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        ),
+      );
+    } catch (e) {
+      BookingToastService.messengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('Failed to cancel booking: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _cancelling = false);
     }
