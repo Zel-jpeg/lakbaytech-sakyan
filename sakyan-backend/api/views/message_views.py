@@ -90,7 +90,8 @@ class SupportThreadView(APIView):
     def post(self, request):
         user = request.user
         content   = request.data.get('content', '').strip()
-        image_url = request.data.get('image_url', '').strip() or None
+        _raw_img  = request.data.get('image_url')
+        image_url = _raw_img.strip() if isinstance(_raw_img, str) else None
 
         if not content and not image_url:
             return Response({'error': 'Either content or image_url is required.'}, status=400)
@@ -225,6 +226,12 @@ class ConversationListView(APIView):
                     'partner_user_id':    str(user.id),
                     'is_support':         True,
                     'support_partner_id': str(other.id),
+                    # other_user lets the frontend resolve the display name correctly
+                    'other_user': {
+                        'id':         str(other.id),
+                        'full_name':  other.full_name,
+                        'avatar_url': other.avatar_url or '',
+                    },
                     'unread_count':       unread,
                     'last_message': {
                         'content':    last.content,
@@ -246,8 +253,12 @@ class ConversationListView(APIView):
             ).filter(
                 Q(sender=user) | Q(receiver=user)
             ).order_by('-created_at')
-            last_support  = support_msgs.first()
+            last_support   = support_msgs.first()
             unread_support = support_msgs.filter(receiver=user, is_read=False).count()
+
+            # Fetch the admin so the frontend knows who the "other user" is
+            admin_user = User.objects.filter(role='admin').order_by('created_at').first()
+            admin_id   = str(admin_user.id) if admin_user else ''
 
             support_entry = {
                 'booking_id':      'support',
@@ -256,8 +267,15 @@ class ConversationListView(APIView):
                 'customer_name':   'Sakyan Support',
                 'partner_name':    'Sakyan Support',
                 'customer_id':     str(user.id),
-                'partner_user_id': str(user.id),
+                # Use admin's user ID so Flutter can route replies to the right recipient
+                'partner_user_id': admin_id,
                 'is_support':      True,
+                # other_user = the admin ("Sakyan Support") from the user's perspective
+                'other_user': {
+                    'id':         admin_id,
+                    'full_name':  'Sakyan Support',
+                    'avatar_url': '',
+                },
                 'unread_count':    unread_support,
                 'last_message': {
                     'content':    last_support.content,
