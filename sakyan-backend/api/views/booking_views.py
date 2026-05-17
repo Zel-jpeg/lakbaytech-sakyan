@@ -77,7 +77,7 @@ class CustomerBookingListView(generics.ListAPIView):
     def get_queryset(self):
         return Booking.objects.filter(
             customer=self.request.user
-        ).select_related('car', 'partner').prefetch_related('car__images')
+        ).select_related('car', 'partner', 'partner__user').prefetch_related('car__images')
 
 
 class PartnerBookingListView(generics.ListAPIView):
@@ -110,17 +110,19 @@ class BookingDetailView(generics.RetrieveAPIView):
 class UpdateBookingStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
+    # Maps action → (required_role, allowed_from_statuses, to_status)
+    ALLOWED_ACTIONS = {
+        'approve': ('partner',   ['pending_review'],         'approved'),
+        'reject':  ('partner',   ['pending_review'],         'rejected'),
+        'cancel':  ('customer',  ['pending_review', 'approved'], 'cancelled'),
+        'complete':('partner',   ['active'],                 'completed'),
+    }
+
     def patch(self, request, pk, action):
-        allowed_actions = {
-            'approve': ('partner', 'pending_review', 'approved'),
-            'reject':  ('partner', 'pending_review', 'rejected'),
-            'cancel':  ('customer', 'pending_review', 'cancelled'),
-            'complete':('partner', 'active',          'completed'),
-        }
-        if action not in allowed_actions:
+        if action not in self.ALLOWED_ACTIONS:
             return Response({'error': 'Invalid action'}, status=400)
 
-        required_role, from_status, to_status = allowed_actions[action]
+        required_role, from_statuses, to_status = self.ALLOWED_ACTIONS[action]
 
         try:
             if request.user.role == 'partner':
@@ -132,8 +134,9 @@ class UpdateBookingStatusView(APIView):
         except Booking.DoesNotExist:
             return Response({'error': 'Not found'}, status=404)
 
-        if booking.booking_status != from_status and request.user.role != 'admin':
-            return Response({'error': f'Can only {action} bookings in {from_status} status'}, status=400)
+        if booking.booking_status not in from_statuses and request.user.role != 'admin':
+            statuses_str = ' or '.join(from_statuses)
+            return Response({'error': f'Can only {action} bookings in {statuses_str} status'}, status=400)
 
         # Enforce role: only the correct role can perform each action (admins bypass)
         if request.user.role != 'admin' and request.user.role != required_role:

@@ -152,6 +152,15 @@ class ConversationListView(APIView):
                 receiver=user, is_read=False
             ).count()
 
+            # Determine the "other" user from this conversation's perspective
+            if user.role == 'customer':
+                other_user_obj = booking.partner.user
+                # Use business name for partner display
+                other_name = booking.partner.business_name or other_user_obj.full_name
+            else:
+                other_user_obj = booking.customer
+                other_name = other_user_obj.full_name
+
             conversations.append({
                 'booking_id':      str(booking.id),
                 'booking_code':    booking.booking_code,
@@ -160,6 +169,11 @@ class ConversationListView(APIView):
                 'partner_name':    booking.partner.business_name,
                 'customer_id':     str(booking.customer_id),
                 'partner_user_id': str(booking.partner.user_id),
+                'other_user': {
+                    'id':         str(other_user_obj.id),
+                    'full_name':  other_name,
+                    'avatar_url': other_user_obj.avatar_url or '',
+                },
                 'unread_count':    unread_count,
                 'last_message': {
                     'content':    last_message.content,

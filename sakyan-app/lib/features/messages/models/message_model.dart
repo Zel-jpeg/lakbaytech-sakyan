@@ -110,6 +110,7 @@ class ConversationModel {
   final String carName;
 
   /// True when this thread is a Sakyan Support conversation (no booking).
+  /// The repository builds support conversations with an empty bookingId.
   bool get isSupport => bookingId.isEmpty;
 
   const ConversationModel({
@@ -125,7 +126,9 @@ class ConversationModel {
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
-    // ── other_user — nested object or UUID string ─────────────────────────
+    // ── other_user — nested object (preferred) or fall back to flat fields ──
+    // Backend now returns:  other_user: { id, full_name, avatar_url }
+    // Old / support entries may still have only flat fields.
     String otherUserId = '', otherUserName = '', otherUserAvatar = '';
     final o = json['other_user'];
     if (o is Map) {
@@ -135,6 +138,14 @@ class ConversationModel {
     } else if (o is String) {
       otherUserId = o;
     }
+
+    // ── Flat-field fallback (customers see partner, partners see customer) ──
+    // When other_user is absent try partner fields first (customer view),
+    // then customer fields (partner view).
+    if (otherUserId.isEmpty)   otherUserId   = _s(json['partner_user_id']);
+    if (otherUserName.isEmpty) otherUserName = _s(json['partner_name']);
+    if (otherUserId.isEmpty)   otherUserId   = _s(json['customer_id']);
+    if (otherUserName.isEmpty) otherUserName = _s(json['customer_name']);
 
     // ── car name — nested Map or flat field ───────────────────────────────
     String carName = '';

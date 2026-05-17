@@ -269,6 +269,22 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         )
 
 
+class PartnerInBookingSerializer(serializers.ModelSerializer):
+    """Lightweight nested serializer used inside BookingSerializer."""
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Partner
+        fields = ['id', 'business_name', 'contact_phone', 'user']
+
+    def get_user(self, obj):
+        return {
+            'id':         str(obj.user_id),
+            'full_name':  obj.user.full_name,
+            'avatar_url': obj.user.avatar_url or '',
+        }
+
+
 class BookingSerializer(serializers.ModelSerializer):
     car_name         = serializers.CharField(source='car.name', read_only=True)
     car_id           = serializers.UUIDField(source='car.id', read_only=True)
@@ -279,6 +295,7 @@ class BookingSerializer(serializers.ModelSerializer):
     customer_phone   = serializers.CharField(source='customer.phone', read_only=True)
     customer_profile = serializers.SerializerMethodField()
     partner_name     = serializers.CharField(source='partner.business_name', read_only=True)
+    partner          = PartnerInBookingSerializer(read_only=True)
 
     class Meta:
         model = Booking
