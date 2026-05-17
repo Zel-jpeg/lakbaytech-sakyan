@@ -14,7 +14,6 @@ class MessageListView(generics.ListAPIView):
     def get_queryset(self):
         booking_id = self.kwargs['booking_id']
         user = self.request.user
-        # Mark messages as read when conversation is opened
         Message.objects.filter(
             booking_id=booking_id,
             receiver=user,
@@ -34,61 +33,64 @@ class SendMessageView(generics.CreateAPIView):
         )
 
 
-# ─── Support Thread (partner ↔ admin, no booking) ────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _admin_ids():
+    """List of admin user UUIDs used to distinguish support from inquiry messages."""
+    return list(User.objects.filter(role='admin').values_list('id', flat=True))
+
+
+# ─── Support Thread (user ↔ admin only, booking=None) ────────────────────────
 
 class SupportThreadView(APIView):
     """
-    GET  /messages/support/                   → partner/customer sees own thread
-    GET  /messages/support/?partner_id=<uuid> → admin fetches a specific partner thread
-    POST /messages/support/                   → send a support message
-         body (partner): { content }
-         body (admin):   { content, receiver_id }
+    GET  /messages/support/                    → user sees own admin↔user support thread
+    GET  /messages/support/?partner_id=<uuid>  → admin fetches a specific user's thread
+    POST /messages/support/                    → send to admin
+         body (customer/partner): { content }
+         body (admin):            { content, receiver_id }
     """
     permission_classes = [IsAuthenticated]
 
     def _get_admin(self):
-        """Return the first admin user as the system support account."""
         return User.objects.filter(role='admin').order_by('created_at').first()
 
     def get(self, request):
         user = request.user
+        ids = _admin_ids()
         partner_id = request.query_params.get('partner_id')
 
         if user.role == 'admin':
             if partner_id:
-                # Admin views specific partner thread — all messages where one
-                # side is the partner and the other is any admin
                 qs = Message.objects.filter(
                     booking__isnull=True
                 ).filter(
                     Q(sender_id=partner_id) | Q(receiver_id=partner_id)
+                ).filter(
+                    Q(sender_id__in=ids) | Q(receiver_id__in=ids)
                 ).order_by('created_at')
-                # Mark unread messages sent to this admin as read
                 qs.filter(receiver=user, is_read=False).update(is_read=True)
             else:
-                # Admin listing: return all support messages (ConversationListView
-                # handles the grouping; here just return all for completeness)
                 qs = Message.objects.filter(
                     booking__isnull=True
+                ).filter(
+                    Q(sender_id__in=ids) | Q(receiver_id__in=ids)
                 ).order_by('created_at')
         else:
-            # Partner/customer sees their own support thread
+            # Only messages where the OTHER side is an admin
             qs = Message.objects.filter(
                 booking__isnull=True
             ).filter(
+                Q(sender_id__in=ids) | Q(receiver_id__in=ids)
+            ).filter(
                 Q(sender=user) | Q(receiver=user)
             ).order_by('created_at')
-            # Mark only messages received BY this user as read
-            Message.objects.filter(
-                booking__isnull=True,
-                receiver=user,
-                is_read=False,
-            ).update(is_read=True)
+            qs.filter(receiver=user, is_read=False).update(is_read=True)
 
         return Response(MessageSerializer(qs, many=True).data)
 
     def post(self, request):
-        user = request.user
+        user      = request.user
         content   = request.data.get('content', '').strip()
         image_url = request.data.get('image_url', '').strip() or None
 
@@ -96,54 +98,42 @@ class SupportThreadView(APIView):
             return Response({'error': 'Either content or image_url is required.'}, status=400)
 
         if user.role == 'admin':
-            # Admin replies to a specific partner
-            partner_id = request.data.get('receiver_id')
-            if not partner_id:
-                return Response(
-                    {'error': 'receiver_id is required for admin replies.'},
-                    status=400
-                )
+            receiver_id = request.data.get('receiver_id')
+            if not receiver_id:
+                return Response({'error': 'receiver_id is required for admin replies.'}, status=400)
             try:
-                receiver = User.objects.get(pk=partner_id)
+                receiver = User.objects.get(pk=receiver_id)
             except (User.DoesNotExist, Exception):
                 return Response({'error': 'Receiver not found.'}, status=404)
         else:
-            # Partner/customer messages the first admin
             receiver = self._get_admin()
             if not receiver:
-                return Response(
-                    {'error': 'No admin is available right now. Please try again later.'},
-                    status=503
-                )
+                return Response({'error': 'No admin available right now.'}, status=503)
 
         msg = Message.objects.create(
-            booking=None,
-            sender=user,
-            receiver=receiver,
-            content=content,
-            image_url=image_url,
+            booking=None, sender=user, receiver=receiver,
+            content=content, image_url=image_url,
         )
         return Response(MessageSerializer(msg).data, status=201)
 
 
-# ─── Conversation List (booking threads + support thread) ─────────────────────
+# ─── Conversation List (booking + support pinned + inquiry threads) ───────────
 
 class ConversationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
+        user   = request.user
+        ids    = _admin_ids()
+        id_set = set(ids)
 
-        # ── 1. Booking-based conversations ──────────────────────────────────
-        # NOTE: use messages__isnull=False or filter explicitly for non-null booking
-        # to avoid pulling in support messages via the related manager.
+        # ── 1. Booking-based conversations ────────────────────────────────────
         bookings = Booking.objects.filter(
             Q(customer=user) | Q(partner__user=user)
         ).select_related('car', 'customer', 'partner', 'partner__user')
 
         conversations = []
         for booking in bookings:
-            # Only fetch messages that belong to this specific booking (booking_id not null)
             booking_messages = Message.objects.filter(
                 booking=booking
             ).order_by('-created_at')
@@ -168,37 +158,37 @@ class ConversationListView(APIView):
                 } if last_message else None,
             })
 
-        # Sort booking conversations newest first
         conversations.sort(
             key=lambda x: x['last_message']['created_at'] if x['last_message'] else '',
-            reverse=True
+            reverse=True,
         )
 
-        # ── 2. Support thread ────────────────────────────────────────────────
+        # ── 2. Support thread entry (admin ↔ user, booking=None) ──────────────
         if user.role == 'admin':
-            # Build one entry per unique non-admin user who has a support thread
+            # One entry per unique non-admin user who has an admin support thread
             support_msgs_all = (
                 Message.objects
                 .filter(booking__isnull=True)
+                .filter(Q(sender_id__in=ids) | Q(receiver_id__in=ids))
                 .select_related('sender', 'receiver')
                 .order_by('created_at')
             )
-            seen_partner_ids = set()
+            seen = set()
             support_convs = []
             for msg in support_msgs_all:
-                # The "other" party is whichever side is not the admin
-                other = msg.receiver if msg.sender.role == 'admin' else msg.sender
-                if other.id in seen_partner_ids:
+                other = msg.receiver if msg.sender_id in id_set else msg.sender
+                if other.id in seen:
                     continue
-                seen_partner_ids.add(other.id)
+                seen.add(other.id)
 
-                # Get last message and unread count for this thread
                 thread_qs = Message.objects.filter(
                     booking__isnull=True
                 ).filter(
+                    Q(sender_id__in=ids) | Q(receiver_id__in=ids)
+                ).filter(
                     Q(sender=other) | Q(receiver=other)
                 ).order_by('-created_at')
-                last = thread_qs.first()
+                last   = thread_qs.first()
                 unread = thread_qs.filter(receiver=user, is_read=False).count()
 
                 support_convs.append({
@@ -221,18 +211,20 @@ class ConversationListView(APIView):
 
             support_convs.sort(
                 key=lambda x: x['last_message']['created_at'] if x['last_message'] else '',
-                reverse=True
+                reverse=True,
             )
             conversations = support_convs + conversations
 
         else:
-            # Partner/customer: one pinned "Sakyan Support" entry
+            # Customer / Partner: one pinned Sakyan Support entry (admin-only messages)
             support_msgs = Message.objects.filter(
                 booking__isnull=True
             ).filter(
+                Q(sender_id__in=ids) | Q(receiver_id__in=ids)
+            ).filter(
                 Q(sender=user) | Q(receiver=user)
             ).order_by('-created_at')
-            last_support  = support_msgs.first()
+            last_support   = support_msgs.first()
             unread_support = support_msgs.filter(receiver=user, is_read=False).count()
 
             support_entry = {
@@ -253,26 +245,102 @@ class ConversationListView(APIView):
             }
             conversations = [support_entry] + conversations
 
+        # ── 3. Inquiry threads (customer ↔ partner, booking=None, NO admin) ───
+        if user.role != 'admin':
+            inquiry_msgs = Message.objects.filter(
+                booking__isnull=True
+            ).exclude(
+                Q(sender_id__in=ids) | Q(receiver_id__in=ids)
+            ).filter(
+                Q(sender=user) | Q(receiver=user)
+            ).select_related('sender', 'receiver').order_by('created_at')
+
+            # Group by the other person
+            seen_inquiry = {}
+            for msg in inquiry_msgs:
+                other = msg.receiver if msg.sender_id == user.id else msg.sender
+                seen_inquiry[str(other.id)] = other
+
+            inquiry_convs = []
+            for other_id, other_user in seen_inquiry.items():
+                thread = Message.objects.filter(
+                    booking__isnull=True
+                ).exclude(
+                    Q(sender_id__in=ids) | Q(receiver_id__in=ids)
+                ).filter(
+                    Q(sender=user, receiver=other_user) |
+                    Q(sender=other_user, receiver=user)
+                ).order_by('-created_at')
+                last   = thread.first()
+                unread = thread.filter(receiver=user, is_read=False).count()
+
+                if user.role == 'customer':
+                    try:
+                        display_name = other_user.partner.business_name
+                    except Exception:
+                        display_name = other_user.full_name
+                    inquiry_convs.append({
+                        'booking_id':      f'inquiry:{other_id}',
+                        'booking_code':    'Inquiry',
+                        'car_name':        'Pre-booking Inquiry',
+                        'customer_name':   user.full_name,
+                        'partner_name':    display_name,
+                        'customer_id':     str(user.id),
+                        'partner_user_id': other_id,
+                        'is_inquiry':      True,
+                        'unread_count':    unread,
+                        'last_message': {
+                            'content':    last.content,
+                            'created_at': last.created_at,
+                            'sender_id':  str(last.sender_id),
+                        } if last else None,
+                    })
+                else:
+                    # Partner role — other is a customer
+                    inquiry_convs.append({
+                        'booking_id':      f'inquiry:{other_id}',
+                        'booking_code':    'Inquiry',
+                        'car_name':        'Pre-booking Inquiry',
+                        'customer_name':   other_user.full_name,
+                        'partner_name':    user.full_name,
+                        'customer_id':     other_id,
+                        'partner_user_id': str(user.id),
+                        'is_inquiry':      True,
+                        'unread_count':    unread,
+                        'last_message': {
+                            'content':    last.content,
+                            'created_at': last.created_at,
+                            'sender_id':  str(last.sender_id),
+                        } if last else None,
+                    })
+
+            inquiry_convs.sort(
+                key=lambda x: x['last_message']['created_at'] if x['last_message'] else '',
+                reverse=True,
+            )
+            # Insert: [support_pin] + inquiry_convs + booking_convs
+            support_pin   = conversations[:1]
+            booking_convs = conversations[1:]
+            conversations = support_pin + inquiry_convs + booking_convs
+
         return Response(conversations)
 
 
-# ─── Pre-Booking Inquiry (customer → partner, no booking yet) ────────────────
+# ─── Pre-Booking Inquiry (customer → partner, booking=None, no admin) ─────────
 
 class InquiryMessageView(APIView):
     """
-    POST /messages/inquiry/
-    Allows a customer to send a question to a partner before making a booking.
-    Body: { car_id, content, image_url? }
-    The message is stored with booking=None so it appears in the support-style
-    thread between the customer and the partner.
+    POST /messages/inquiry/              → send a pre-booking question to a partner
+    GET  /messages/inquiry/?partner_user_id=<uuid>  → fetch the thread
+
+    Inquiry messages: booking=None, neither side is admin.
+    Support messages: booking=None, one side is admin.
+    These two sets are mutually exclusive and are identified via admin-id exclusion.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user
-        if user.role != 'customer':
-            return Response({'error': 'Only customers can send inquiries.'}, status=403)
-
+        user      = request.user
         car_id    = request.data.get('car_id', '').strip()
         content   = request.data.get('content', '').strip()
         image_url = request.data.get('image_url', '').strip() or None
@@ -282,7 +350,6 @@ class InquiryMessageView(APIView):
         if not content and not image_url:
             return Response({'error': 'Either content or image_url is required.'}, status=400)
 
-        # Look up the car and its partner's user account
         try:
             car = Car.objects.select_related('partner__user').get(pk=car_id)
         except (Car.DoesNotExist, Exception):
@@ -292,7 +359,10 @@ class InquiryMessageView(APIView):
         if not partner_user:
             return Response({'error': 'Partner not available.'}, status=404)
 
-        # Create the inquiry message — no booking, so it shows as a support-type thread
+        # Never route to an admin — it would be misclassified as a support message
+        if partner_user.role == 'admin':
+            return Response({'error': 'Cannot send inquiry to an admin account.'}, status=400)
+
         msg = Message.objects.create(
             booking=None,
             sender=user,
@@ -303,11 +373,7 @@ class InquiryMessageView(APIView):
         return Response(MessageSerializer(msg).data, status=201)
 
     def get(self, request):
-        """
-        GET /messages/inquiry/?partner_user_id=<uuid>
-        Retrieve inquiry messages between the current customer and a specific partner.
-        """
-        user = request.user
+        user            = request.user
         partner_user_id = request.query_params.get('partner_user_id', '').strip()
 
         if not partner_user_id:
@@ -318,14 +384,18 @@ class InquiryMessageView(APIView):
         except (User.DoesNotExist, Exception):
             return Response({'error': 'Partner not found.'}, status=404)
 
+        admin_ids = _admin_ids()
+
+        # Strictly exclude messages where an admin is involved
         qs = Message.objects.filter(
             booking__isnull=True
+        ).exclude(
+            Q(sender_id__in=admin_ids) | Q(receiver_id__in=admin_ids)
         ).filter(
             Q(sender=user, receiver=partner_user) |
             Q(sender=partner_user, receiver=user)
         ).order_by('created_at')
 
-        # Mark unread as read
         qs.filter(receiver=user, is_read=False).update(is_read=True)
 
         return Response(MessageSerializer(qs, many=True).data)
