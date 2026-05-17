@@ -110,8 +110,8 @@ class ConversationModel {
   final String carName;
 
   /// True when this thread is a Sakyan Support conversation (no booking).
-  /// The repository builds support conversations with an empty bookingId.
-  bool get isSupport => bookingId.isEmpty;
+  /// The backend returns booking_id = 'support'; locally-built entries use ''.
+  bool get isSupport => bookingId.isEmpty || bookingId == 'support';
 
   const ConversationModel({
     required this.bookingId,
