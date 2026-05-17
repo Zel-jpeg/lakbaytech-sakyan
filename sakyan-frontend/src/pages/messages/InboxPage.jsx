@@ -455,7 +455,18 @@ export default function InboxPage() {
       {/* Top bar */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+          <button
+            onClick={() => {
+              // If we arrived here from My Bookings (via ?booking= query param),
+              // go back there directly — navigate(-1) can skip it and land on a blank page.
+              if (targetBookingId) {
+                navigate('/booking/my-bookings')
+              } else {
+                navigate(-1)
+              }
+            }}
+            className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+          >
             <ArrowLeft size={18} />
           </button>
           <div>
